@@ -1,0 +1,8 @@
+- name: Drucktool ausrollen
+  hosts: all
+  become: true
+  vars_files:
+    - group_vars/vault.yml
+  roles:
+    - docker
+    - drucktool

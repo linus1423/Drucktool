@@ -1,0 +1,8 @@
+# Kopieren nach group_vars/vault.yml und verschlüsseln:
+#   ansible-vault encrypt group_vars/vault.yml
+# z. B. mit: openssl rand -hex 24
+drucktool_postgres_password: 'bitte-ein-langes-zufaelliges-passwort'
+drucktool_superadmin_password: 'bitte-aendern-mindestens-12-zeichen'
+# Nur nötig, wenn das Image in einer privaten Registry liegt.
+drucktool_registry_username: ''
+drucktool_registry_password: ''

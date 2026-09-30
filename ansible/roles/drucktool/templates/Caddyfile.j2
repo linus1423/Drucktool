@@ -1,0 +1,10 @@
+{
+{% if drucktool_acme_email %}
+	email {{ drucktool_acme_email }}
+{% endif %}
+}
+
+{{ drucktool_domain }} {
+	encode zstd gzip
+	reverse_proxy app:3000
+}
