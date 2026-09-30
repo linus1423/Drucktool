@@ -29,6 +29,9 @@ importers:
       drizzle-orm:
         specifier: ^0.45.3
         version: 0.45.3(postgres@3.4.9)
+      nodemailer:
+        specifier: ^10.0.13
+        version: 10.0.13
       postgres:
         specifier: ^3.4.9
         version: 3.4.9
@@ -48,12 +51,18 @@ importers:
       '@types/node':
         specifier: ^26.6.3
         version: 26.6.3
+      '@types/nodemailer':
+        specifier: ^8.0.2
+        version: 8.0.2
       '@types/react':
         specifier: ^19.3.0
         version: 19.3.0
       '@types/react-dom':
         specifier: ^19.3.0
         version: 19.3.0(@types/react@19.3.0)
+      '@types/smtp-server':
+        specifier: ^3.5.13
+        version: 3.5.13
       '@vitejs/plugin-react':
         specifier: ^6.1.1
         version: 6.1.1(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
@@ -66,6 +75,9 @@ importers:
       nitro:
         specifier: 3.0.260903-beta
         version: 3.0.260903-beta
+      smtp-server:
+        specifier: ^3.19.16
+        version: 3.19.16
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
@@ -1038,6 +1050,9 @@ packages:
   '@types/node@26.6.3':
     resolution: {integrity: sha512-dsqMQQoeTLqu9wynDD00q573mNzso3IdQOAfHRJqLCcmCFPoGo9A1bDpUcv/9tnKpErQWv9uKeGfl37EIS02Yg==}
 
+  '@types/nodemailer@8.0.2':
+    resolution: {integrity: sha512-c7M5ox8p0nEOfbJ2E9Qcmt8/QCu/VzsiAhzBiZbvky2PhKZDHpKB3sQHBM5MEZNkCfBOaS6S9//AGPRTNB7IaA==}
+
   '@types/react-dom@19.3.0':
     resolution: {integrity: sha512-ZI7bU42mZXXKHn/qNLEw2IrbiINU7X5+vfgdixBHkCNpYWXjKgfQ/P+uyGb5CjOLB9UcnTeg3rylQtV2hym44Q==}
     peerDependencies:
@@ -1045,6 +1060,9 @@ packages:
 
   '@types/react@19.3.0':
     resolution: {integrity: sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==}
+
+  '@types/smtp-server@3.5.13':
+    resolution: {integrity: sha512-S3rGl2KbViH+98/CgHipPIWgtAFnjxLsppxIRbgJHNuZL7Y+py+7kZjT7xS+wOmCxYTn4O7IqLqkvekg99MDVQ==}
 
   '@typescript/typescript-aix-ppc64@7.0.2':
     resolution: {integrity: sha512-MTKKkWB7p/0E9xi1d1tHtZ5PiLkGEMIq88pK2CubZjOsLtYTLqhgIgi6zepFa+9GHZ6h05NMCkQxGKiPXMxXtQ==}
@@ -1476,6 +1494,9 @@ packages:
   httpxy@0.5.5:
     resolution: {integrity: sha512-uDjmnPyp1q4Sgzf3w+J/Fc6UqcCEj0x4Wjp7OqK5dGhNeDgpyrAmnS6ey8QWrX3SWDon2DMKf9sBa5X9+CVyMA==}
 
+  ipv6-normalize@1.0.1:
+    resolution: {integrity: sha512-Bm6H79i01DjgGTCWjUuCjJ6QDo1HB96PT/xCYuyJUP9WFbVDrLSbG4EZCvOCun2rNswZb0c3e4Jt/ws795esHA==}
+
   isbot@5.2.2:
     resolution: {integrity: sha512-iQcBXcd+Rv/pkubRyGh2utW2j1oPG5hZY6TUhVPpqK4G+o3IbxpJNx04hgksjc/N7GK5pEorUxDeg31cFgEk/w==}
     engines: {node: '>=18'}
@@ -1678,6 +1699,10 @@ packages:
     resolution: {integrity: sha512-kQK9LGGFiHtrWiNhZtA7Qbw17AQz+dmsEKODRIVTXA9+e5MS/2gZEBhYJt13GrAz5/IOZKddH/0Z3TP/Zgo+yw==}
     engines: {node: '>=18'}
 
+  nodemailer@10.0.13:
+    resolution: {integrity: sha512-SzG86OlvcW/NNhUFC6uROMwRTL4n7MswfQqC/T8mhkmnY1YVa23zUEMYi4ijSeXSl9GLz9ZeTJDUatEDuY5FeQ==}
+    engines: {node: '>=20.0.0'}
+
   obug@2.2.1:
     resolution: {integrity: sha512-XrsrhT5sybtKI6wakr2SPOlGZWWYbUXZ7a0jT8/QOeAPau+1X/bSegNe5YR75oJmEZQbKningirmGOEJCIk61Q==}
     engines: {node: '>=12.20.0'}
@@ -1707,6 +1732,10 @@ packages:
     resolution: {integrity: sha512-Z/CJHIkdujO/OtN7nXUii0Rf3VT5SRuhjBA82Xvu2XhBUgX3nhP67T0LHceBdQLex7OOFGTox+Q5Yg8Jk2Qivg==}
     engines: {node: '>=14'}
     hasBin: true
+
+  punycode.js@2.3.1:
+    resolution: {integrity: sha512-uxFIHU0YlHYhDQtV4R9J6a52SLx28BCjT+4ieh7IGbgwVJWO+km431c4yRlREUAsAmt/uMjQUyQHNEPf0M39CA==}
+    engines: {node: '>=6'}
 
   react-dom@19.3.0:
     resolution: {integrity: sha512-JDk8dgif51OjFoDE70+OT9ICyYr+69HlmihNwp1+Nsfbna3t5sIiCa9ZJktDmQ4/1b/rn26hIAR2uYXDMr5r0Q==}
@@ -1751,6 +1780,10 @@ packages:
   seroval@1.6.8:
     resolution: {integrity: sha512-HlSgSAkTk4EqHcje1ptJjfZi1YDv5KbhVJ/d3P7T/nAXua2VmDu+AKDX5VTdFfZf48nDkWB2TKYt0DrCSa+3wg==}
     engines: {node: '>=10'}
+
+  smtp-server@3.19.16:
+    resolution: {integrity: sha512-EAO7FiexdU+s/IiW92MIRDSOaVTGF2skmXEpSvl+A+NDMDLnv+NnoYpmEh+7kmARU1F1NTTe3am35IBMEEnN1w==}
+    engines: {node: '>=20.0.0'}
 
   source-map-js@1.2.2:
     resolution: {integrity: sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==}
@@ -2767,6 +2800,10 @@ snapshots:
     dependencies:
       undici-types: 8.9.0
 
+  '@types/nodemailer@8.0.2':
+    dependencies:
+      '@types/node': 26.6.3
+
   '@types/react-dom@19.3.0(@types/react@19.3.0)':
     dependencies:
       '@types/react': 19.3.0
@@ -2774,6 +2811,11 @@ snapshots:
   '@types/react@19.3.0':
     dependencies:
       csstype: 3.2.3
+
+  '@types/smtp-server@3.5.13':
+    dependencies:
+      '@types/node': 26.6.3
+      '@types/nodemailer': 8.0.2
 
   '@typescript/typescript-aix-ppc64@7.0.2':
     optional: true
@@ -3066,6 +3108,8 @@ snapshots:
 
   httpxy@0.5.5: {}
 
+  ipv6-normalize@1.0.1: {}
+
   isbot@5.2.2: {}
 
   jiti@2.7.0: {}
@@ -3214,6 +3258,8 @@ snapshots:
 
   node-releases@2.0.57: {}
 
+  nodemailer@10.0.13: {}
+
   obug@2.2.1: {}
 
   ocache@0.3.0: {}
@@ -3233,6 +3279,8 @@ snapshots:
   postgres@3.4.9: {}
 
   prettier@3.9.9: {}
+
+  punycode.js@2.3.1: {}
 
   react-dom@19.3.0(react@19.3.0):
     dependencies:
@@ -3279,6 +3327,12 @@ snapshots:
       seroval: 1.6.8
 
   seroval@1.6.8: {}
+
+  smtp-server@3.19.16:
+    dependencies:
+      ipv6-normalize: 1.0.1
+      nodemailer: 10.0.13
+      punycode.js: 2.3.1
 
   source-map-js@1.2.2: {}
 

@@ -29,6 +29,18 @@ services:
 {% else %}
       - '3000:3000'
 {% endif %}
+
+  # Verschickt E-Mails aus der Outbox.
+  worker:
+    image: {{ drucktool_image }}:{{ drucktool_image_tag }}
+    command: worker
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      disable: true
 {% if drucktool_domain %}
 
   caddy:

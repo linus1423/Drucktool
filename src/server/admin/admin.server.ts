@@ -4,6 +4,7 @@ import { USER_ROLES, USER_STATUSES, type UserRole } from '~/lib/roles'
 import { emailSchema, organisationSchema, passwordSchema } from '~/lib/validation'
 import { getDb, schema, type Tx } from '../db/client.server'
 import { hashPassword } from '../auth/password.server'
+import { notifyRegistrationDecision } from '../mail/notifications.server'
 import type { Principal } from '../requests/requests.server'
 
 const { users, organisations, requests, sessions } = schema
@@ -72,6 +73,7 @@ export async function approveRegistration(actor: Principal, input: z.infer<typeo
         .set({ status: 'active', updatedAt: new Date() })
         .where(and(eq(organisations.id, organisationId), eq(organisations.status, 'pending')))
     }
+    await notifyRegistrationDecision(tx, user, true)
   })
 }
 
@@ -93,6 +95,7 @@ export async function rejectRegistration(actor: Principal, userId: string) {
         .set({ status: 'disabled', updatedAt: new Date() })
         .where(and(eq(organisations.id, user.organisationId), eq(organisations.status, 'pending')))
     }
+    await notifyRegistrationDecision(tx, user, false)
   })
 }
 

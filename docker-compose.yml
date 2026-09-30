@@ -17,6 +17,7 @@ services:
 
   app:
     build: .
+    image: drucktool:local
     restart: unless-stopped
     depends_on:
       db:
@@ -30,6 +31,22 @@ services:
       SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-}
     ports:
       - '${APP_PORT:-3000}:3000'
+
+  # Verschickt E-Mails aus der Outbox. Startet nach der App, damit die Migrationen gelaufen sind.
+  worker:
+    image: drucktool:local
+    command: worker
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://drucktool:${POSTGRES_PASSWORD:-drucktool}@db:5432/drucktool
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      SMTP_URL: ${SMTP_URL:-}
+      MAIL_FROM: ${MAIL_FROM:-Drucktool <noreply@localhost>}
+    healthcheck:
+      disable: true
 
 volumes:
   db-data:

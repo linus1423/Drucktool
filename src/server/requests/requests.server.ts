@@ -6,6 +6,7 @@ import { isStaffRole } from '~/lib/roles'
 import { REQUEST_STATUSES, allowedTransitions, canTransition, TERMINAL_STATUSES, type RequestStatus } from '~/lib/status'
 import { requestInputSchema } from '~/lib/validation'
 import { getDb, schema, type Tx } from '../db/client.server'
+import { notifyAssigned, notifyComment, notifyRequestCreated, notifyStatusChanged } from '../mail/notifications.server'
 
 /** Minimale Sicht auf den handelnden Benutzer, unabhängig von der HTTP-Session. */
 export type Principal = {
@@ -210,6 +211,7 @@ export async function createRequest(user: Principal, input: z.infer<typeof creat
       })
       .returning({ id: requests.id, number: requests.number })
     await tx.insert(requestEvents).values({ requestId: created!.id, actorId: user.id, type: 'created', toStatus: 'new' })
+    await notifyRequestCreated(tx, user, created!.id)
     return created!
   })
 }
@@ -282,6 +284,13 @@ export async function changeStatus(user: Principal, input: z.infer<typeof change
     if (input.note && input.to !== 'quoted') {
       await tx.insert(requestComments).values({ requestId: input.id, authorId: user.id, body: input.note })
     }
+    await notifyStatusChanged(tx, user, {
+      requestId: input.id,
+      from: current.status,
+      to: input.to,
+      note: input.note,
+      quoteAmountCents: values.quoteAmountCents,
+    })
     return { version: updated.version, status: updated.status }
   })
 }
@@ -321,6 +330,7 @@ export async function assignRequest(user: Principal, input: z.infer<typeof assig
         data: { assigneeId: input.assigneeId, assigneeName },
       })
     }
+      await notifyAssigned(tx, user, { requestId: input.id, assigneeId: input.assigneeId })
     return { version: updated.version }
   })
 }
@@ -341,6 +351,7 @@ export async function addComment(user: Principal, input: z.infer<typeof addComme
       .values({ requestId: input.id, authorId: user.id, body: input.body, internal })
       .returning({ id: requestComments.id })
     await tx.update(requests).set({ updatedAt: new Date() }).where(eq(requests.id, input.id))
+    await notifyComment(tx, user, { requestId: input.id, body: input.body, internal })
     return comment!
   })
 }
