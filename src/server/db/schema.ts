@@ -80,6 +80,21 @@ export const sessions = pgTable(
   (t) => [index('sessions_user_idx').on(t.userId)],
 )
 
+/** Verknüpfung eines Benutzers mit einem Konto beim OpenID-Connect-Anbieter. */
+export const oidcAccounts = pgTable(
+  'oidc_accounts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    issuer: text('issuer').notNull(),
+    subject: text('subject').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('oidc_accounts_issuer_subject_unique').on(t.issuer, t.subject), index('oidc_accounts_user_idx').on(t.userId)],
+)
+
 export const requests = pgTable(
   'requests',
   {

@@ -4,10 +4,17 @@ import { loginSchema, registerSchema } from '~/lib/validation'
 import { getDb, schema } from '../db/client.server'
 import { notifyRegistrationReceived } from '../mail/notifications.server'
 import { getDummyHash, hashPassword, verifyPassword } from './password.server'
+import { getOidcSettings } from './oidc.server'
 import { assertRateLimit } from './rate-limit.server'
 import { createSession, destroyCurrentSession, getSessionUser } from './session.server'
 
 export const getCurrentUser = createServerFn({ method: 'GET' }).handler(() => getSessionUser())
+
+/** Welche Anmeldewege die Login-Seite anbieten soll. */
+export const getAuthOptions = createServerFn({ method: 'GET' }).handler(() => {
+  const oidc = getOidcSettings()
+  return { oidc: oidc ? { displayName: oidc.displayName } : null }
+})
 
 export const login = createServerFn({ method: 'POST' })
   .validator(loginSchema)

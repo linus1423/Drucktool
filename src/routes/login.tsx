@@ -7,13 +7,18 @@ import { AuthLayout } from '~/components/AuthLayout'
 import { Alert, Button, Field, fieldError, Input } from '~/components/ui'
 import { errorMessage } from '~/lib/errors'
 import { loginSchema } from '~/lib/validation'
-import { login } from '~/server/auth/auth.functions'
+import { getAuthOptions, login } from '~/server/auth/auth.functions'
 
 export const Route = createFileRoute('/login')({
-  validateSearch: z.object({ redirect: z.string().optional() }),
+  validateSearch: z.object({
+    redirect: z.string().optional(),
+    fehler: z.string().max(300).optional(),
+    hinweis: z.literal('freigabe').optional().catch(undefined),
+  }),
   beforeLoad: ({ context }) => {
     if (context.user) throw redirect({ to: '/anfragen' })
   },
+  loader: () => getAuthOptions(),
   head: () => ({ meta: [{ title: 'Anmelden · Drucktool' }] }),
   component: LoginPage,
 })
@@ -22,7 +27,8 @@ function LoginPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const search = Route.useSearch()
-  const [error, setError] = useState<string | null>(null)
+  const options = Route.useLoaderData()
+  const [error, setError] = useState<string | null>(search.fehler ?? null)
 
   const form = useForm({
     defaultValues: { email: '', password: '' },
@@ -52,6 +58,11 @@ function LoginPage() {
           void form.handleSubmit()
         }}
       >
+        {search.hinweis === 'freigabe' ? (
+          <Alert tone="info">
+            Ihr Konto wurde angelegt und wartet auf Freigabe. Sie erhalten eine E-Mail, sobald Sie sich anmelden können.
+          </Alert>
+        ) : null}
         {error ? <Alert>{error}</Alert> : null}
         <form.Field name="email">
           {(field) => (
@@ -89,6 +100,21 @@ function LoginPage() {
           )}
         </form.Subscribe>
       </form>
+      {options.oidc ? (
+        <div className="mt-6 space-y-4">
+          <div className="flex items-center gap-3 text-xs text-slate-500 uppercase">
+            <span className="h-px flex-1 bg-slate-200" />
+            oder
+            <span className="h-px flex-1 bg-slate-200" />
+          </div>
+          <a
+            href={`/api/auth/oidc/login${search.redirect ? `?redirect=${encodeURIComponent(search.redirect)}` : ''}`}
+            className="flex w-full items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-900 ring-1 ring-slate-300 hover:bg-slate-100"
+          >
+            Anmelden mit {options.oidc.displayName}
+          </a>
+        </div>
+      ) : null}
       <p className="mt-6 text-center text-sm text-slate-600">
         Noch kein Konto?{' '}
         <Link to="/registrieren" className="font-medium text-slate-900 underline">

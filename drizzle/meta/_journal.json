@@ -15,6 +15,13 @@
       "when": 1790785823562,
       "tag": "0001_email_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790797918250,
+      "tag": "0002_oidc_accounts",
+      "breakpoints": true
     }
   ]
 }
