@@ -222,3 +222,116 @@ export const emailOutbox = pgTable(
 export type User = typeof users.$inferSelect
 export type Organisation = typeof organisations.$inferSelect
 export type Request = typeof requests.$inferSelect
+
+// ---------------------------------------------------------------------------
+// Katalog und Preise (Lastenheft Abschnitt 3.2 und 6). Admins pflegen alles im Tool.
+// ---------------------------------------------------------------------------
+
+export const formatKind = pgEnum('format_kind', ['print', 'plot', 'custom'])
+
+/** Endformate. "plot" wird auf dem Plotter gedruckt (A0 bis A2). */
+export const formats = pgTable('formats', {
+  id: text('id').primaryKey(),
+  label: text('label').notNull(),
+  kind: formatKind('kind').notNull().default('print'),
+  widthMm: integer('width_mm'),
+  heightMm: integer('height_mm'),
+  allowsDuplex: boolean('allows_duplex').notNull().default(true),
+  available: boolean('available').notNull().default(true),
+  helpText: text('help_text').notNull().default(''),
+  sortOrder: integer('sort_order').notNull().default(0),
+})
+
+export const bindingPriceUnit = pgEnum('binding_price_unit', ['copy', 'sheet'])
+
+export const bindings = pgTable('bindings', {
+  id: text('id').primaryKey(),
+  label: text('label').notNull(),
+  /** Preis pro Exemplar (oder pro Blatt, z. B. beim Laminieren). */
+  priceCents: integer('price_cents').notNull().default(0),
+  priceUnit: bindingPriceUnit('price_unit').notNull().default('copy'),
+  /** Einmalkosten pro Auftrag, z. B. 7 € bei Leimbindung. */
+  setupFeeCents: integer('setup_fee_cents').notNull().default(0),
+  allowsDuplex: boolean('allows_duplex').notNull().default(true),
+  /** Separates Deckblatt mit Coverfarbe möglich. */
+  allowsCover: boolean('allows_cover').notNull().default(false),
+  /** Vorne und hinten unterschiedliche Coverfarben, durchsichtiges Cover möglich. */
+  allowsSplitCover: boolean('allows_split_cover').notNull().default(false),
+  /** Das Ergebnis wird zugeschnitten (z. B. Leimbindung), randlos geht dann immer. */
+  trimmed: boolean('trimmed').notNull().default(false),
+  available: boolean('available').notNull().default(true),
+  helpText: text('help_text').notNull().default(''),
+  sortOrder: integer('sort_order').notNull().default(0),
+})
+
+/** Zulässige Kombinationen aus Endformat und Bindung. */
+export const formatBindings = pgTable(
+  'format_bindings',
+  {
+    formatId: text('format_id')
+      .notNull()
+      .references(() => formats.id, { onDelete: 'cascade' }),
+    bindingId: text('binding_id')
+      .notNull()
+      .references(() => bindings.id, { onDelete: 'cascade' }),
+  },
+  (t) => [uniqueIndex('format_bindings_unique').on(t.formatId, t.bindingId)],
+)
+
+export const papers = pgTable('papers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  grammage: integer('grammage').notNull(),
+  /** Preis pro Bogen auf dem normalen Drucker. */
+  priceA3Cents: integer('price_a3_cents'),
+  priceSra3Cents: integer('price_sra3_cents'),
+  /** Preise pro Plot (Plotterpapier). */
+  priceA0Cents: integer('price_a0_cents'),
+  priceA1Cents: integer('price_a1_cents'),
+  priceA2Cents: integer('price_a2_cents'),
+  forCover: boolean('for_cover').notNull().default(false),
+  forInner: boolean('for_inner').notNull().default(true),
+  forPlotter: boolean('for_plotter').notNull().default(false),
+  /** Größtes Endformat, das auf diesem Papier möglich ist. */
+  maxFormatId: text('max_format_id').references(() => formats.id, { onDelete: 'set null' }),
+  available: boolean('available').notNull().default(true),
+  helpText: text('help_text').notNull().default(''),
+  sortOrder: integer('sort_order').notNull().default(0),
+  ...timestamps,
+})
+
+export const coverColors = pgTable('cover_colors', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  hex: text('hex'),
+  transparent: boolean('transparent').notNull().default(false),
+  available: boolean('available').notNull().default(true),
+  sortOrder: integer('sort_order').notNull().default(0),
+})
+
+/** Übrige Preise und Texte als Schlüssel/Wert, z. B. Druckpreise pro Image und Mindestpreis. */
+export const settings = pgTable('settings', {
+  key: text('key').primaryKey(),
+  value: jsonb('value').$type<unknown>().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/** Protokoll aller Änderungen an Katalog und Preisen (wer, wann, vorher/nachher). */
+export const catalogChanges = pgTable(
+  'catalog_changes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    actorId: uuid('actor_id').references(() => users.id, { onDelete: 'set null' }),
+    entity: text('entity').notNull(),
+    entityId: text('entity_id').notNull(),
+    before: jsonb('before').$type<JsonObject | null>(),
+    after: jsonb('after').$type<JsonObject | null>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('catalog_changes_created_idx').on(t.createdAt)],
+)
+
+export type Format = typeof formats.$inferSelect
+export type Binding = typeof bindings.$inferSelect
+export type Paper = typeof papers.$inferSelect
+export type CoverColor = typeof coverColors.$inferSelect

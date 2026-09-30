@@ -20,6 +20,7 @@ import { Route as AppProfilRouteImport } from './routes/_app/profil'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppAdminBenutzerRouteImport } from './routes/_app/admin/benutzer'
 import { Route as AppAdminFreigabenRouteImport } from './routes/_app/admin/freigaben'
+import { Route as AppAdminKatalogRouteImport } from './routes/_app/admin/katalog'
 import { Route as AppAnfragenIndexRouteImport } from './routes/_app/anfragen/index'
 import { Route as AppAnfragenRequestIdRouteImport } from './routes/_app/anfragen/$requestId'
 import { Route as AppAnfragenNeuRouteImport } from './routes/_app/anfragen/neu'
@@ -83,6 +84,11 @@ const AppAdminFreigabenRoute = AppAdminFreigabenRouteImport.update({
   path: '/freigaben',
   getParentRoute: () => AppAdminRouteRoute,
 } as any)
+const AppAdminKatalogRoute = AppAdminKatalogRouteImport.update({
+  id: '/katalog',
+  path: '/katalog',
+  getParentRoute: () => AppAdminRouteRoute,
+} as any)
 const AppAnfragenIndexRoute = AppAnfragenIndexRouteImport.update({
   id: '/anfragen/',
   path: '/anfragen/',
@@ -138,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/api/health': typeof ApiHealthRoute
   '/admin/benutzer': typeof AppAdminBenutzerRoute
   '/admin/freigaben': typeof AppAdminFreigabenRoute
+  '/admin/katalog': typeof AppAdminKatalogRoute
   '/anfragen/$requestId': typeof AppAnfragenRequestIdRoute
   '/anfragen/neu': typeof AppAnfragenNeuRoute
   '/anfragen/': typeof AppAnfragenIndexRoute
@@ -158,6 +165,7 @@ export interface FileRoutesByTo {
   '/api/health': typeof ApiHealthRoute
   '/admin/benutzer': typeof AppAdminBenutzerRoute
   '/admin/freigaben': typeof AppAdminFreigabenRoute
+  '/admin/katalog': typeof AppAdminKatalogRoute
   '/anfragen/$requestId': typeof AppAnfragenRequestIdRoute
   '/anfragen/neu': typeof AppAnfragenNeuRoute
   '/anfragen': typeof AppAnfragenIndexRoute
@@ -180,6 +188,7 @@ export interface FileRoutesById {
   '/api/health': typeof ApiHealthRoute
   '/_app/admin/benutzer': typeof AppAdminBenutzerRoute
   '/_app/admin/freigaben': typeof AppAdminFreigabenRoute
+  '/_app/admin/katalog': typeof AppAdminKatalogRoute
   '/_app/anfragen/$requestId': typeof AppAnfragenRequestIdRoute
   '/_app/anfragen/neu': typeof AppAnfragenNeuRoute
   '/_app/anfragen/': typeof AppAnfragenIndexRoute
@@ -202,6 +211,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/admin/benutzer'
     | '/admin/freigaben'
+    | '/admin/katalog'
     | '/anfragen/$requestId'
     | '/anfragen/neu'
     | '/anfragen/'
@@ -222,6 +232,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/admin/benutzer'
     | '/admin/freigaben'
+    | '/admin/katalog'
     | '/anfragen/$requestId'
     | '/anfragen/neu'
     | '/anfragen'
@@ -243,6 +254,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/_app/admin/benutzer'
     | '/_app/admin/freigaben'
+    | '/_app/admin/katalog'
     | '/_app/anfragen/$requestId'
     | '/_app/anfragen/neu'
     | '/_app/anfragen/'
@@ -343,6 +355,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminFreigabenRouteImport
       parentRoute: typeof AppAdminRouteRoute
     }
+    '/_app/admin/katalog': {
+      id: '/_app/admin/katalog'
+      path: '/katalog'
+      fullPath: '/admin/katalog'
+      preLoaderRoute: typeof AppAdminKatalogRouteImport
+      parentRoute: typeof AppAdminRouteRoute
+    }
     '/_app/anfragen/': {
       id: '/_app/anfragen/'
       path: '/anfragen'
@@ -405,6 +424,7 @@ declare module '@tanstack/react-router' {
 interface AppAdminRouteRouteChildren {
   AppAdminBenutzerRoute: typeof AppAdminBenutzerRoute
   AppAdminFreigabenRoute: typeof AppAdminFreigabenRoute
+  AppAdminKatalogRoute: typeof AppAdminKatalogRoute
   AppAdminOrganisationenOrganisationIdRoute: typeof AppAdminOrganisationenOrganisationIdRoute
   AppAdminOrganisationenNeuRoute: typeof AppAdminOrganisationenNeuRoute
   AppAdminOrganisationenIndexRoute: typeof AppAdminOrganisationenIndexRoute
@@ -413,6 +433,7 @@ interface AppAdminRouteRouteChildren {
 const AppAdminRouteRouteChildren: AppAdminRouteRouteChildren = {
   AppAdminBenutzerRoute: AppAdminBenutzerRoute,
   AppAdminFreigabenRoute: AppAdminFreigabenRoute,
+  AppAdminKatalogRoute: AppAdminKatalogRoute,
   AppAdminOrganisationenOrganisationIdRoute:
     AppAdminOrganisationenOrganisationIdRoute,
   AppAdminOrganisationenNeuRoute: AppAdminOrganisationenNeuRoute,
