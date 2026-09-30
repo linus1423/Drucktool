@@ -56,12 +56,12 @@ function AppLayout() {
             ) : null}
           </nav>
           <div className="flex items-center gap-3 text-sm">
-            <div className="text-right leading-tight">
+            <Link to="/konto" className="text-right leading-tight hover:underline">
               <div className="font-medium">{user.name}</div>
               <div className="text-xs text-slate-500">
                 {isStaffRole(user.role) ? ROLE_LABELS[user.role] : user.organisationName}
               </div>
-            </div>
+            </Link>
             <button type="button" onClick={handleLogout} className={navLink}>
               Abmelden
             </button>

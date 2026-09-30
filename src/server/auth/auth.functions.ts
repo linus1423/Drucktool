@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { eq, sql, TransactionRollbackError } from 'drizzle-orm'
 import { loginSchema, registerSchema } from '~/lib/validation'
 import { getDb, schema } from '../db/client.server'
+import { notifyRegistrationReceived } from '../mail/notifications.server'
 import { getDummyHash, hashPassword, verifyPassword } from './password.server'
 import { assertRateLimit } from './rate-limit.server'
 import { createSession, destroyCurrentSession, getSessionUser } from './session.server'
@@ -73,32 +74,33 @@ export const register = createServerFn({ method: 'POST' })
 
     await db
       .transaction(async (tx) => {
-      const [org] = await tx
-        .insert(schema.organisations)
-        .values({
-          name: data.organisationName,
-          email: data.email,
-          phone: data.phone || null,
-          street: data.street || null,
-          zip: data.zip || null,
-          city: data.city || null,
-          status: 'pending',
-        })
-        .returning({ id: schema.organisations.id })
-      const inserted = await tx
-        .insert(schema.users)
-        .values({
-          email: data.email,
-          name: data.name,
-          passwordHash,
-          role: 'customer',
-          status: 'pending',
-          organisationId: org!.id,
-        })
-        .onConflictDoNothing()
-        .returning({ id: schema.users.id })
-      // Parallele Registrierung mit derselben Adresse: angelegte Organisation verwerfen.
-      if (inserted.length === 0) tx.rollback()
+        const [org] = await tx
+          .insert(schema.organisations)
+          .values({
+            name: data.organisationName,
+            email: data.email,
+            phone: data.phone || null,
+            street: data.street || null,
+            zip: data.zip || null,
+            city: data.city || null,
+            status: 'pending',
+          })
+          .returning({ id: schema.organisations.id })
+        const inserted = await tx
+          .insert(schema.users)
+          .values({
+            email: data.email,
+            name: data.name,
+            passwordHash,
+            role: 'customer',
+            status: 'pending',
+            organisationId: org!.id,
+          })
+          .onConflictDoNothing()
+          .returning({ id: schema.users.id })
+        // Parallele Registrierung mit derselben Adresse: angelegte Organisation verwerfen.
+        if (inserted.length === 0) tx.rollback()
+        await notifyRegistrationReceived(tx, { name: data.name, email: data.email, organisationName: data.organisationName })
       })
       .catch((error: unknown) => {
         if (!(error instanceof TransactionRollbackError)) throw error

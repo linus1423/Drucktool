@@ -39,6 +39,27 @@ Nutzer gesehen hat, und werden nur geschrieben, wenn sie noch aktuell ist (`UPDA
 Hat jemand anderes die Anfrage inzwischen geändert, bekommt der Nutzer einen Hinweis und kann neu laden.
 Kommentare hängen nur an und brauchen deshalb keine Versionsprüfung.
 
+## E-Mail-Benachrichtigungen
+
+Das Tool verschickt E-Mails bei neuen Anfragen, Statuswechseln, Nachrichten, Zuweisungen und Registrierungen:
+
+| Ereignis                         | Empfänger                                                                  |
+| -------------------------------- | -------------------------------------------------------------------------- |
+| Kunde stellt Anfrage             | Alle Mitarbeiter                                                           |
+| Mitarbeiter ändert Status        | Alle Kunden der Organisation                                               |
+| Kunde ändert Status / schreibt   | Der zuständige Mitarbeiter, ohne Zuständigen alle Mitarbeiter              |
+| Mitarbeiter schreibt Nachricht   | Alle Kunden der Organisation                                               |
+| Interne Notiz                    | Nur der zuständige Mitarbeiter                                             |
+| Zuweisung                        | Der neu zuständige Mitarbeiter                                             |
+| Neue Registrierung               | Alle Superadmins                                                           |
+| Freigabe / Ablehnung             | Die registrierte Person (immer, unabhängig von der Einstellung)             |
+
+Wer eine Änderung selbst auslöst, bekommt keine Mail. Unter „Mein Konto“ lassen sich Benachrichtigungen abschalten.
+
+Die Mails werden in derselben Transaktion wie die Änderung in die Tabelle `email_outbox` geschrieben und von einem
+eigenen Worker-Prozess verschickt (`pnpm mail:worker`, im Container `worker`). Scheitert der Versand, versucht der
+Worker es mit wachsendem Abstand bis zu acht Mal erneut. Ohne `SMTP_URL` werden Mails nur ins Log geschrieben.
+
 ## Lokale Entwicklung
 
 Voraussetzungen: Node.js 22, pnpm, PostgreSQL 16 (oder `docker compose up db`).
@@ -49,6 +70,7 @@ pnpm install
 pnpm db:migrate   # Schema anlegen
 pnpm db:seed      # ersten Superadmin aus SUPERADMIN_EMAIL/SUPERADMIN_PASSWORD anlegen
 pnpm dev          # http://localhost:3000
+pnpm mail:worker  # optional, in einem zweiten Terminal: verschickt E-Mails
 ```
 
 Weitere Befehle:
@@ -68,7 +90,8 @@ SUPERADMIN_EMAIL=admin@example.com SUPERADMIN_PASSWORD='mindestens-12-zeichen' d
 ```
 
 Der Container spielt beim Start die Migrationen ein und legt den Superadmin an, falls noch keiner existiert
-(`RUN_MIGRATIONS=false` schaltet das ab). Healthcheck: `GET /api/health`.
+(`RUN_MIGRATIONS=false` schaltet das ab). Healthcheck: `GET /api/health`. Der Dienst `worker` nutzt dasselbe Image
+und verschickt die E-Mails.
 
 ## Ausrollen mit Ansible
 
@@ -98,10 +121,11 @@ Ist das Paket in der GitHub Container Registry privat, `drucktool_registry_usern
 | `COOKIE_SECURE`                           | `false` nur ohne HTTPS; Standard in Produktion ist `true`              |
 | `TRUST_PROXY`                             | `true` hinter einem Reverse Proxy, damit Client-IPs erkannt werden     |
 | `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD` | Legt beim ersten Start den Superadmin an                               |
+| `SMTP_URL`                                | SMTP-Server, z. B. `smtps://user:pass@mail.example.com:465`            |
+| `MAIL_FROM`                               | Absender, z. B. `Druckerei Muster <auftraege@example.com>`             |
 
 ## Nächste Schritte
 
 - Bestellformular mit konfigurierbaren Optionen (Material, Bindung, …)
 - PDF-Upload mit Seitenzahl-Erkennung und Formatvorschlag
-- E-Mail-Benachrichtigungen bei Statuswechseln und Kommentaren
 - Anmeldung über OpenID Connect

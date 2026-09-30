@@ -55,6 +55,7 @@ export const users = pgTable(
     reviewedById: uuid('reviewed_by_id'),
     reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+    emailNotifications: boolean('email_notifications').notNull().default(true),
     ...timestamps,
   },
   (t) => [
@@ -153,6 +154,30 @@ export const requestEvents = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('request_events_request_idx').on(t.requestId)],
+)
+
+export const emailStatus = pgEnum('email_status', ['pending', 'sent', 'failed'])
+
+/**
+ * Ausgehende E-Mails. Sie werden in derselben Transaktion wie die auslösende
+ * Änderung geschrieben und von einem Worker verschickt (Transactional Outbox).
+ */
+export const emailOutbox = pgTable(
+  'email_outbox',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    to: text('to').notNull(),
+    subject: text('subject').notNull(),
+    text: text('text').notNull(),
+    html: text('html').notNull(),
+    status: emailStatus('status').notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    lastError: text('last_error'),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+  },
+  (t) => [index('email_outbox_pending_idx').on(t.status, t.nextAttemptAt)],
 )
 
 export type User = typeof users.$inferSelect

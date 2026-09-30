@@ -6,3 +6,6 @@ drucktool_superadmin_password: 'bitte-aendern-mindestens-12-zeichen'
 # Nur nötig, wenn das Image in einer privaten Registry liegt.
 drucktool_registry_username: ''
 drucktool_registry_password: ''
+# SMTP-Server für E-Mail-Benachrichtigungen, z. B. smtps://benutzer:passwort@mail.example.com:465
+# Leer lassen, um keine Mails zu verschicken (sie werden dann nur protokolliert).
+drucktool_smtp_url: ''
