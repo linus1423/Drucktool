@@ -32,14 +32,23 @@ bearbeiten sie über einen Status-Workflow bis zur Auslieferung.
 
 Im Profil sieht jeder seine angemeldeten Geräte und kann sie einzeln oder alle anderen abmelden.
 
-## Status einer Anfrage
+## Status eines Auftrags
 
 ```
-Neu → In Prüfung → Angebot → Freigegeben → Im Druck → Versendet → Abgeschlossen
-            ↕ Rückfrage     ↺ überarbeiten
-Abgelehnt / Storniert (aus den frühen Status heraus)
+Eingereicht → Bestätigt → Fertig
+     ↕ Rückfrage
+Abgelehnt / Storniert
 ```
 
+- **Eingereicht**: Der Kunde hat den Auftrag abgeschickt. Er ist ein Angebot des Kunden, noch kein Vertrag.
+- **Bestätigt**: Ein Mitarbeiter hat den Auftrag angenommen (mit Name und Zeitpunkt am Auftrag). Erst jetzt ist er
+  verbindlich. Solange ein Auftrag bestätigt ist, führen Mitarbeiter einen internen Unterstatus („In Bearbeitung“,
+  „Problem“), den Kunden nie sehen und der keine Mails auslöst.
+- **Rückfrage**: Die Druckerei braucht eine Antwort; der Kunde beantwortet sie und der Auftrag geht zurück auf
+  „Eingereicht“.
+- Kunden können stornieren, bis der Auftrag bestätigt ist.
+
+Die Übersicht zeigt Mitarbeitern standardmäßig die Warteschlange aller offenen Aufträge, daneben die fertigen.
 Die erlaubten Übergänge je Rolle stehen in `src/lib/status.ts`.
 
 ## Schutz vor gleichzeitigen Änderungen
@@ -55,8 +64,8 @@ Das Tool verschickt E-Mails bei neuen Anfragen, Statuswechseln, Nachrichten, Zuw
 
 | Ereignis                         | Empfänger                                                                  |
 | -------------------------------- | -------------------------------------------------------------------------- |
-| Kunde stellt Anfrage             | Alle Mitarbeiter                                                           |
-| Mitarbeiter ändert Status        | Der Kunde, der den Auftrag angelegt hat                                    |
+| Kunde reicht Auftrag ein         | Alle Mitarbeiter, dazu eine Eingangsbestätigung an den Kunden              |
+| Mitarbeiter ändert Status        | Der Kunde, der den Auftrag angelegt hat (nicht bei internen Unterstatus)   |
 | Kunde ändert Status / schreibt   | Der zuständige Mitarbeiter, ohne Zuständigen alle Mitarbeiter              |
 | Mitarbeiter schreibt Nachricht   | Der Kunde, der den Auftrag angelegt hat                                    |
 | Interne Notiz                    | Nur der zuständige Mitarbeiter                                             |

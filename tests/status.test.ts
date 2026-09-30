@@ -9,20 +9,19 @@ describe('Status-Workflow', () => {
     }
   })
 
-  it('lässt Kunden ein Angebot annehmen oder ablehnen', () => {
-    expect(canTransition('quoted', 'approved', 'customer')).toBe(true)
-    expect(canTransition('quoted', 'cancelled', 'customer')).toBe(true)
+  it('lässt Kunden nur Rückfragen beantworten und vor der Bestätigung stornieren', () => {
+    expect(canTransition('on_hold', 'submitted', 'customer')).toBe(true)
+    expect(canTransition('submitted', 'cancelled', 'customer')).toBe(true)
+    expect(canTransition('confirmed', 'cancelled', 'customer')).toBe(false)
+    expect(canTransition('submitted', 'confirmed', 'customer')).toBe(false)
+    expect(canTransition('confirmed', 'completed', 'customer')).toBe(false)
   })
 
-  it('lässt Kunden keine Produktionsschritte auslösen', () => {
-    expect(canTransition('approved', 'printing', 'customer')).toBe(false)
-    expect(canTransition('new', 'in_review', 'customer')).toBe(false)
-    expect(canTransition('in_review', 'quoted', 'customer')).toBe(false)
-  })
-
-  it('verhindert Stornierungen, sobald gedruckt wird', () => {
-    expect(canTransition('printing', 'cancelled', 'staff')).toBe(false)
-    expect(canTransition('printing', 'cancelled', 'customer')).toBe(false)
+  it('führt Aufträge über Bestätigt zu Fertig', () => {
+    expect(canTransition('submitted', 'confirmed', 'staff')).toBe(true)
+    expect(canTransition('submitted', 'completed', 'staff')).toBe(false)
+    expect(canTransition('confirmed', 'completed', 'staff')).toBe(true)
+    expect(canTransition('on_hold', 'confirmed', 'staff')).toBe(true)
   })
 
   it('führt nur zu bekannten Status', () => {

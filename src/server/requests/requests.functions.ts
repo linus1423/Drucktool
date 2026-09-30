@@ -11,6 +11,8 @@ import {
   createRequest,
   createRequestSchema,
   getRequestDetail,
+  internalStatusSchema,
+  setInternalStatus,
   listAssignableStaff,
   listFilterSchema,
   listRequests,
@@ -37,6 +39,10 @@ export const updateRequestFn = createServerFn({ method: 'POST' })
 export const changeStatusFn = createServerFn({ method: 'POST' })
   .validator(changeStatusSchema)
   .handler(async ({ data }) => changeStatus(await requireUser(), data))
+
+export const setInternalStatusFn = createServerFn({ method: 'POST' })
+  .validator(internalStatusSchema)
+  .handler(async ({ data }) => setInternalStatus(await requireStaff(), data))
 
 export const assignRequestFn = createServerFn({ method: 'POST' })
   .validator(assignSchema)

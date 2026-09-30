@@ -3,16 +3,26 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { formatBillingAddress } from '~/lib/address'
 import { RequestFields, toRequestInput, useRequestForm } from '~/components/RequestFields'
-import { Alert, Badge, Button, Card, Field, Input, Select, StatusBadge, Textarea, cx } from '~/components/ui'
+import { Alert, Badge, Button, Card, Field, Select, StatusBadge, Textarea, cx } from '~/components/ui'
 import { errorMessage, isConflictError } from '~/lib/errors'
-import { formatDate, formatDateTime, formatMoney, formatRequestNumber, parseMoneyToCents } from '~/lib/format'
+import { formatDate, formatDateTime, formatRequestNumber } from '~/lib/format'
 import { assignableStaffQuery, requestDetailQuery } from '~/lib/queries'
 import { isStaffRole } from '~/lib/roles'
-import { STATUS_LABELS, transitionLabel, type RequestStatus } from '~/lib/status'
+import {
+  INTERNAL_STATUSES,
+  INTERNAL_STATUS_LABELS,
+  INTERNAL_STATUS_TONES,
+  STATUS_LABELS,
+  hasInternalStatus,
+  transitionLabel,
+  type InternalStatus,
+  type RequestStatus,
+} from '~/lib/status'
 import {
   addCommentFn,
   assignRequestFn,
   changeStatusFn,
+  setInternalStatusFn,
   updateRequestFn,
 } from '~/server/requests/requests.functions'
 
@@ -63,10 +73,14 @@ function RequestDetailPage() {
             {request.title}
           </h1>
           <StatusBadge status={request.status} />
+          {request.internalStatus ? (
+            <Badge className={INTERNAL_STATUS_TONES[request.internalStatus]}>{INTERNAL_STATUS_LABELS[request.internalStatus]}</Badge>
+          ) : null}
         </div>
         <p className="mt-1 text-sm text-slate-600">
           {request.organisationName ? `${request.organisationName} · ` : ''}angelegt von {request.creatorName}
           {request.creatorEmail ? ` (${request.creatorEmail})` : ''} am {formatDateTime(request.createdAt)}
+          {request.confirmedAt ? ` · bestätigt von ${request.confirmedByName ?? 'der Druckerei'} am ${formatDateTime(request.confirmedAt)}` : ''}
         </p>
       </div>
 
@@ -114,18 +128,12 @@ function RequestDetailPage() {
             </Card>
           )}
 
-          {request.quoteAmountCents !== null ? (
-            <Card title="Angebot">
-              <p className="text-2xl font-semibold">{formatMoney(request.quoteAmountCents)}</p>
-              {request.quoteNote ? <p className="mt-2 text-sm whitespace-pre-wrap text-slate-700">{request.quoteNote}</p> : null}
-            </Card>
-          ) : null}
-
           <Comments request={request} staff={staff} />
         </div>
 
         <div className="space-y-6">
           <StatusActions request={request} staff={staff} />
+          {staff && hasInternalStatus(request.status) ? <InternalStatusCard request={request} /> : null}
           {staff ? <Assignment request={request} /> : null}
           <History request={request} />
         </div>
@@ -205,24 +213,13 @@ function StatusActions({ request, staff }: { request: Detail; staff: boolean }) 
   const actor = staff ? 'staff' : 'customer'
   const [target, setTarget] = useState<RequestStatus | null>(null)
   const [note, setNote] = useState('')
-  const [price, setPrice] = useState('')
 
   const mutation = useMutation({
-    mutationFn: async (to: RequestStatus) => {
-      let quoteAmountCents: number | undefined
-      if (to === 'quoted') {
-        const cents = parseMoneyToCents(price)
-        if (cents === null) throw new Error('Bitte einen gültigen Preis angeben, z. B. 249,90')
-        quoteAmountCents = cents
-      }
-      return changeStatusFn({
-        data: { id: request.id, version: request.version, to, note: note.trim() || undefined, quoteAmountCents },
-      })
-    },
+    mutationFn: async (to: RequestStatus) =>
+      changeStatusFn({ data: { id: request.id, version: request.version, to, note: note.trim() || undefined } }),
     onSuccess: async () => {
       setTarget(null)
       setNote('')
-      setPrice('')
       await refresh()
     },
   })
@@ -277,17 +274,17 @@ function StatusActions({ request, staff }: { request: Detail; staff: boolean }) 
             <p className="text-sm">
               Status wechseln zu <strong>{STATUS_LABELS[target]}</strong>
             </p>
-            {target === 'quoted' ? (
-              <Field label="Angebotspreis (netto, EUR)" htmlFor="price">
-                <Input id="price" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="249,90" required />
-              </Field>
+            {target === 'confirmed' ? (
+              <p className="text-sm text-slate-600">
+                Mit der Bestätigung nimmt die Druckerei den Auftrag verbindlich an. Der Kunde wird per E-Mail informiert.
+              </p>
             ) : null}
             <Field
-              label={target === 'quoted' ? 'Hinweise zum Angebot (optional)' : 'Nachricht (optional)'}
+              label={target === 'on_hold' ? 'Rückfrage an den Kunden' : 'Nachricht (optional)'}
               htmlFor="note"
-              hint={target === 'quoted' ? undefined : 'Wird als Kommentar für alle Beteiligten gespeichert.'}
+              hint="Wird als Kommentar für alle Beteiligten gespeichert und in der E-Mail mitgeschickt."
             >
-              <Textarea id="note" rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
+              <Textarea id="note" rows={3} value={note} onChange={(e) => setNote(e.target.value)} required={target === 'on_hold'} />
             </Field>
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setTarget(null)}>
@@ -299,6 +296,43 @@ function StatusActions({ request, staff }: { request: Detail; staff: boolean }) 
             </div>
           </form>
         )}
+      </div>
+    </Card>
+  )
+}
+
+function InternalStatusCard({ request }: { request: Detail }) {
+  const refresh = useRefresh(request.id)
+  const mutation = useMutation({
+    mutationFn: (internalStatus: InternalStatus | null) =>
+      setInternalStatusFn({ data: { id: request.id, version: request.version, internalStatus } }),
+    onSuccess: refresh,
+  })
+
+  return (
+    <Card title="Interner Status">
+      <div className="space-y-3">
+        <ErrorBox
+          error={mutation.error}
+          onReload={() => {
+            mutation.reset()
+            void refresh()
+          }}
+        />
+        <Select
+          aria-label="Interner Status"
+          value={request.internalStatus ?? ''}
+          disabled={mutation.isPending}
+          onChange={(e) => mutation.mutate((e.target.value || null) as InternalStatus | null)}
+        >
+          <option value="">Noch nicht begonnen</option>
+          {INTERNAL_STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {INTERNAL_STATUS_LABELS[s]}
+            </option>
+          ))}
+        </Select>
+        <p className="text-xs text-slate-500">Nur für Mitarbeiter sichtbar. Der Kunde sieht weiterhin „Bestätigt“.</p>
       </div>
     </Card>
   )
@@ -417,11 +451,15 @@ function Comments({ request, staff }: { request: Detail; staff: boolean }) {
 function describeEvent(e: Detail['events'][number]) {
   switch (e.type) {
     case 'created':
-      return 'hat die Anfrage angelegt'
+      return 'hat den Auftrag eingereicht'
     case 'updated':
-      return 'hat die Anfrage bearbeitet'
+      return 'hat den Auftrag bearbeitet'
     case 'status_changed':
       return `Status: ${e.fromStatus ? STATUS_LABELS[e.fromStatus] : '–'} → ${e.toStatus ? STATUS_LABELS[e.toStatus] : '–'}`
+    case 'internal_status_changed': {
+      const to = e.data.to as InternalStatus | null
+      return `Interner Status: ${to ? INTERNAL_STATUS_LABELS[to] : 'zurückgesetzt'}`
+    }
     case 'assigned': {
       const name = typeof e.data.assigneeName === 'string' ? e.data.assigneeName : null
       return name ? `hat ${name} zugewiesen` : 'hat die Zuweisung entfernt'

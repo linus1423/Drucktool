@@ -40,7 +40,7 @@ function NewRequestPage() {
 
   return (
     <div className="max-w-3xl">
-      <PageHeader title="Neue Anfrage" description="Beschreiben Sie Ihren Druckauftrag. Wir melden uns mit einem Angebot." />
+      <PageHeader title="Neue Anfrage" description="Beschreiben Sie Ihren Druckauftrag. Verbindlich wird er, sobald die Druckerei ihn bestätigt." />
       <Card>
         <form
           className="space-y-4"

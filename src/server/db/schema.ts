@@ -12,7 +12,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
-import { REQUEST_STATUSES } from '../../lib/status'
+import { INTERNAL_STATUSES, REQUEST_STATUSES } from '../../lib/status'
 import { USER_ROLES, USER_STATUSES } from '../../lib/roles'
 import type { JsonObject } from '../../lib/json'
 import type { BillingAddress, DeliveryAddress } from '../../lib/address'
@@ -21,6 +21,7 @@ export const userRole = pgEnum('user_role', USER_ROLES)
 export const userStatus = pgEnum('user_status', USER_STATUSES)
 export const organisationStatus = pgEnum('organisation_status', ['pending', 'active', 'disabled'])
 export const requestStatus = pgEnum('request_status', REQUEST_STATUSES)
+export const internalStatus = pgEnum('internal_status', INTERNAL_STATUSES)
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -131,9 +132,12 @@ export const requests = pgTable(
     options: jsonb('options').$type<JsonObject>().notNull().default({}),
     // Kopie der Rechnungsadresse beim Absenden; spätere Profiländerungen wirken nicht zurück.
     billingAddress: jsonb('billing_address').$type<BillingAddress>(),
-    quoteAmountCents: integer('quote_amount_cents'),
-    quoteNote: text('quote_note'),
-    status: requestStatus('status').notNull().default('new'),
+    status: requestStatus('status').notNull().default('submitted'),
+    // Nur für Mitarbeiter sichtbar, solange der Auftrag bestätigt ist.
+    internalStatus: internalStatus('internal_status'),
+    // Die Druckerei nimmt einen Auftrag immer durch einen Mitarbeiter an.
+    confirmedById: uuid('confirmed_by_id').references(() => users.id, { onDelete: 'set null' }),
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
     // Optimistic Locking: jede Änderung erhöht die Version, Updates prüfen die erwartete Version.
     version: integer('version').notNull().default(1),
     ...timestamps,
@@ -168,6 +172,7 @@ export const requestEventType = pgEnum('request_event_type', [
   'created',
   'updated',
   'status_changed',
+  'internal_status_changed',
   'assigned',
   'commented',
 ])

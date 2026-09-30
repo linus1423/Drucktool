@@ -1,75 +1,65 @@
-// Status-Workflow einer Anfrage. Wird von Server und Client gemeinsam genutzt.
+// Status-Workflow eines Auftrags (Lastenheft Abschnitt 4). Wird von Server und Client gemeinsam genutzt.
+//
+//   Eingereicht → Bestätigt / Rückfrage / Abgelehnt → Fertig
+//
+// Solange ein Auftrag bestätigt ist, führen Mitarbeiter einen internen Unterstatus
+// ("In Bearbeitung", "Problem"), den Kunden nie sehen.
 
-export const REQUEST_STATUSES = [
-  'new',
-  'in_review',
-  'on_hold',
-  'quoted',
-  'approved',
-  'printing',
-  'shipped',
-  'completed',
-  'rejected',
-  'cancelled',
-] as const
+export const REQUEST_STATUSES = ['submitted', 'confirmed', 'on_hold', 'completed', 'rejected', 'cancelled'] as const
 
 export type RequestStatus = (typeof REQUEST_STATUSES)[number]
 
 export const STATUS_LABELS: Record<RequestStatus, string> = {
-  new: 'Neu',
-  in_review: 'In Prüfung',
+  submitted: 'Eingereicht',
+  confirmed: 'Bestätigt',
   on_hold: 'Rückfrage',
-  quoted: 'Angebot',
-  approved: 'Freigegeben',
-  printing: 'Im Druck',
-  shipped: 'Versendet',
-  completed: 'Abgeschlossen',
+  completed: 'Fertig',
   rejected: 'Abgelehnt',
   cancelled: 'Storniert',
 }
 
 export const STATUS_TONES: Record<RequestStatus, string> = {
-  new: 'bg-sky-100 text-sky-800',
-  in_review: 'bg-indigo-100 text-indigo-800',
+  submitted: 'bg-sky-100 text-sky-800',
+  confirmed: 'bg-teal-100 text-teal-800',
   on_hold: 'bg-amber-100 text-amber-800',
-  quoted: 'bg-violet-100 text-violet-800',
-  approved: 'bg-teal-100 text-teal-800',
-  printing: 'bg-blue-100 text-blue-800',
-  shipped: 'bg-cyan-100 text-cyan-800',
   completed: 'bg-emerald-100 text-emerald-800',
   rejected: 'bg-rose-100 text-rose-800',
   cancelled: 'bg-slate-200 text-slate-700',
 }
 
-export const TERMINAL_STATUSES: ReadonlySet<RequestStatus> = new Set([
-  'completed',
-  'rejected',
-  'cancelled',
-])
+export const TERMINAL_STATUSES: ReadonlySet<RequestStatus> = new Set(['completed', 'rejected', 'cancelled'])
+
+/** Offen = noch nicht fertig, abgelehnt oder storniert. */
+export const OPEN_STATUSES: RequestStatus[] = REQUEST_STATUSES.filter((s) => !TERMINAL_STATUSES.has(s))
+
+export const INTERNAL_STATUSES = ['in_progress', 'problem'] as const
+export type InternalStatus = (typeof INTERNAL_STATUSES)[number]
+
+export const INTERNAL_STATUS_LABELS: Record<InternalStatus, string> = {
+  in_progress: 'In Bearbeitung',
+  problem: 'Problem',
+}
+
+export const INTERNAL_STATUS_TONES: Record<InternalStatus, string> = {
+  in_progress: 'bg-blue-100 text-blue-800',
+  problem: 'bg-rose-100 text-rose-800',
+}
 
 /** Erlaubte Übergänge für Mitarbeiter (staff, admin, superadmin). */
 const STAFF_TRANSITIONS: Record<RequestStatus, RequestStatus[]> = {
-  new: ['in_review', 'rejected', 'cancelled'],
-  in_review: ['quoted', 'on_hold', 'rejected', 'cancelled'],
-  on_hold: ['in_review', 'rejected', 'cancelled'],
-  quoted: ['approved', 'in_review', 'rejected', 'cancelled'],
-  approved: ['printing', 'cancelled'],
-  printing: ['shipped', 'completed'],
-  shipped: ['completed'],
+  submitted: ['confirmed', 'on_hold', 'rejected'],
+  on_hold: ['confirmed', 'rejected'],
+  confirmed: ['completed', 'on_hold', 'cancelled'],
   completed: [],
   rejected: [],
   cancelled: [],
 }
 
-/** Erlaubte Übergänge für Kunden. */
+/** Erlaubte Übergänge für Kunden: Rückfrage beantworten und stornieren, solange nicht bestätigt. */
 const CUSTOMER_TRANSITIONS: Record<RequestStatus, RequestStatus[]> = {
-  new: ['cancelled'],
-  in_review: ['cancelled'],
-  on_hold: ['in_review', 'cancelled'],
-  quoted: ['approved', 'cancelled'],
-  approved: [],
-  printing: [],
-  shipped: [],
+  submitted: ['cancelled'],
+  on_hold: ['submitted', 'cancelled'],
+  confirmed: [],
   completed: [],
   rejected: [],
   cancelled: [],
@@ -85,25 +75,22 @@ export function canTransition(from: RequestStatus, to: RequestStatus, actor: Act
   return allowedTransitions(from, actor).includes(to)
 }
 
+/** Den internen Unterstatus gibt es nur bei bestätigten Aufträgen. */
+export function hasInternalStatus(status: RequestStatus) {
+  return status === 'confirmed'
+}
+
 /** Beschriftung der Aktion, die zu einem Zielstatus führt. */
 export function transitionLabel(from: RequestStatus, to: RequestStatus, actor: Actor): string {
   if (actor === 'customer') {
-    if (from === 'quoted' && to === 'approved') return 'Angebot annehmen'
-    if (from === 'quoted' && to === 'cancelled') return 'Angebot ablehnen'
-    if (from === 'on_hold' && to === 'in_review') return 'Rückfrage beantwortet'
-    if (to === 'cancelled') return 'Anfrage stornieren'
+    if (from === 'on_hold' && to === 'submitted') return 'Rückfrage beantwortet'
+    if (to === 'cancelled') return 'Auftrag stornieren'
   }
-  if (from === 'quoted' && to === 'in_review') return 'Angebot überarbeiten'
-  if (from === 'quoted' && to === 'approved') return 'Freigabe erfassen'
   const labels: Record<RequestStatus, string> = {
-    new: 'Neu',
-    in_review: 'Prüfung starten',
+    submitted: 'Zurück auf Eingereicht',
+    confirmed: from === 'on_hold' ? 'Bestätigen' : 'Auftrag annehmen',
     on_hold: 'Rückfrage stellen',
-    quoted: 'Angebot senden',
-    approved: 'Freigeben',
-    printing: 'Druck starten',
-    shipped: 'Als versendet markieren',
-    completed: 'Abschließen',
+    completed: 'Als fertig markieren',
     rejected: 'Ablehnen',
     cancelled: 'Stornieren',
   }
