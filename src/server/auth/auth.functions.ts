@@ -32,6 +32,10 @@ export const login = createServerFn({ method: 'POST' })
     if (!user || !user.passwordHash || !valid) {
       throw new Error('E-Mail-Adresse oder Passwort ist falsch')
     }
+    // Mit OIDC_ENFORCE_FOR_STAFF melden sich Mitarbeiter und Admins nur über den Anbieter an.
+    if ((user.role === 'staff' || user.role === 'admin') && getOidcSettings()?.enforceForStaff) {
+      throw new Error('Mitarbeiter melden sich bitte über das Firmenkonto an.')
+    }
     if (user.status === 'pending') {
       throw new Error('Ihr Konto wurde noch nicht freigegeben. Sie erhalten eine Nachricht, sobald es so weit ist.')
     }

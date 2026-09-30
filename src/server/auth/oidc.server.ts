@@ -6,6 +6,8 @@ import * as client from 'openid-client'
  */
 export type NewUserPolicy = 'reject' | 'pending' | 'staff'
 
+export type RoleMapping = { claim: string; adminValues: string[]; staffValues: string[] }
+
 export type OidcSettings = {
   issuer: string
   clientId: string
@@ -15,6 +17,10 @@ export type OidcSettings = {
   newUsers: NewUserPolicy
   /** E-Mail-Adressen auch ohne email_verified-Claim als bestätigt ansehen (z. B. Microsoft Entra ID). */
   trustEmail: boolean
+  /** Rollen aus Token-Claims, z. B. Entra-App-Rollen. null = Rollen werden im Tool gepflegt. */
+  roles: RoleMapping | null
+  /** Mitarbeiter und Admins dürfen sich nicht mit Passwort anmelden (Superadmin schon, als Notfallzugang). */
+  enforceForStaff: boolean
   redirectUri: string
 }
 
@@ -35,8 +41,24 @@ export function getOidcSettings(): OidcSettings | null {
     scope: process.env.OIDC_SCOPE || 'openid email profile',
     newUsers: policy,
     trustEmail: process.env.OIDC_TRUST_EMAIL === 'true',
+    roles: roleMappingFromEnv(),
+    enforceForStaff: process.env.OIDC_ENFORCE_FOR_STAFF === 'true',
     redirectUri: `${appUrl}/api/auth/oidc/callback`,
   }
+}
+
+function list(value: string | undefined) {
+  return (value ?? '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean)
+}
+
+function roleMappingFromEnv(): RoleMapping | null {
+  const adminValues = list(process.env.OIDC_ADMIN_ROLES)
+  const staffValues = list(process.env.OIDC_STAFF_ROLES)
+  if (adminValues.length === 0 && staffValues.length === 0) return null
+  return { claim: process.env.OIDC_ROLE_CLAIM || 'roles', adminValues, staffValues }
 }
 
 let cached: { key: string; config: Promise<client.Configuration> } | undefined

@@ -123,7 +123,11 @@ export async function finishOidcLogin(request: Request) {
     return loginError('Die Anmeldung konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.')
   }
 
-  const result = await resolveOidcUser(issuer, claims, settings.newUsers, settings.trustEmail)
+  const result = await resolveOidcUser(issuer, claims, {
+    policy: settings.newUsers,
+    trustEmail: settings.trustEmail,
+    roles: settings.roles,
+  })
   if (result.kind === 'pending') return redirectTo('/login?hinweis=freigabe')
   if (result.kind === 'denied') return loginError(result.message)
 

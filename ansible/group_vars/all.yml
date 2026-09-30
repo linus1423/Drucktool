@@ -22,3 +22,9 @@ drucktool_oidc_display_name: 'Firmenkonto'
 drucktool_oidc_new_users: pending
 # true bei Anbietern ohne email_verified-Claim, deren Adressen vertrauenswürdig sind (z. B. Entra ID)
 drucktool_oidc_trust_email: false
+# Rollen vom Anbieter übernehmen, z. B. Entra-App-Rollen: ['Drucktool.Admin'] / ['Drucktool.Mitarbeiter']
+drucktool_oidc_role_claim: roles
+drucktool_oidc_admin_roles: []
+drucktool_oidc_staff_roles: []
+# true: Mitarbeiter und Admins melden sich nur noch über den Anbieter an
+drucktool_oidc_enforce_for_staff: false
