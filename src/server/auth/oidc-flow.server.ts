@@ -1,4 +1,5 @@
 import * as client from 'openid-client'
+import { safeRedirect } from '~/lib/redirect'
 import { eq } from 'drizzle-orm'
 import { deleteCookie, getCookie, setCookie } from '@tanstack/react-start/server'
 import { getDb, schema } from '../db/client.server'
@@ -25,9 +26,7 @@ function loginError(message: string) {
 }
 
 /** Nur relative Ziele innerhalb der Anwendung zulassen (kein Open Redirect). */
-export function safeRedirect(target: string | null | undefined) {
-  return target && target.startsWith('/') && !target.startsWith('//') && !target.startsWith('/\\') ? target : '/anfragen'
-}
+export { safeRedirect }
 
 /** Leitet zum Anbieter weiter. State, Nonce und PKCE-Verifier landen in einem kurzlebigen Cookie. */
 export async function startOidcLogin(request: Request) {

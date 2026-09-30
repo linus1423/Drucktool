@@ -165,9 +165,9 @@ function UserForm({ editing, actorRole, onDone }: { editing: Editing; actorRole:
             role === 'customer' ? (
               <form.Field name="organisationId">
                 {(field) => (
-                  <Field label="Organisation" htmlFor="user-org">
-                    <Select id="user-org" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} required>
-                      <option value="">Bitte wählen …</option>
+                  <Field label="Organisation (optional)" htmlFor="user-org">
+                    <Select id="user-org" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)}>
+                      <option value="">Keine</option>
                       {organisations.data?.map((o) => (
                         <option key={o.id} value={o.id}>
                           {o.name}
@@ -200,9 +200,13 @@ function UserForm({ editing, actorRole, onDone }: { editing: Editing; actorRole:
         <form.Field name="password">
           {(field) => (
             <Field
-              label={existing ? 'Neues Passwort' : 'Passwort'}
+              label={existing ? 'Neues Passwort' : 'Passwort (optional)'}
               htmlFor="user-password"
-              hint={existing ? 'Leer lassen, um das Passwort nicht zu ändern.' : 'Mindestens 10 Zeichen'}
+              hint={
+                existing
+                  ? 'Leer lassen, um das Passwort nicht zu ändern.'
+                  : 'Mindestens 10 Zeichen. Ohne Passwort meldet sich die Person per Anmeldelink oder Single Sign-on an.'
+              }
             >
               <Input
                 id="user-password"
@@ -210,7 +214,6 @@ function UserForm({ editing, actorRole, onDone }: { editing: Editing; actorRole:
                 autoComplete="new-password"
                 value={field.state.value}
                 onChange={(e) => field.handleChange(e.target.value)}
-                required={!existing}
               />
             </Field>
           )}

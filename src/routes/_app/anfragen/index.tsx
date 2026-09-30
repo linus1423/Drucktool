@@ -59,7 +59,22 @@ function RequestListPage() {
           </Link>
         ),
       }),
-      ...(staff ? [col.accessor('organisationName', { header: 'Kunde', sortFn: 'text' })] : []),
+      ...(staff
+        ? [
+            col.accessor('creatorName', {
+              header: 'Kunde',
+              sortFn: 'text',
+              cell: (info) => (
+                <>
+                  {info.getValue()}
+                  {info.row.original.organisationName ? (
+                    <span className="block text-xs text-slate-500">{info.row.original.organisationName}</span>
+                  ) : null}
+                </>
+              ),
+            }),
+          ]
+        : []),
       col.accessor('status', { header: 'Status', cell: (info) => <StatusBadge status={info.getValue()} /> }),
       col.accessor('quantity', {
         header: 'Auflage',
@@ -76,7 +91,7 @@ function RequestListPage() {
     <>
       <PageHeader
         title="Anfragen"
-        description={staff ? 'Alle Anfragen der Kunden' : `Anfragen von ${user.organisationName ?? 'Ihrer Organisation'}`}
+        description={staff ? 'Alle Anfragen der Kunden' : 'Ihre Anfragen'}
         actions={
           <Link
             to="/anfragen/neu"

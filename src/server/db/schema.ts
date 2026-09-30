@@ -15,6 +15,7 @@ import {
 import { REQUEST_STATUSES } from '../../lib/status'
 import { USER_ROLES, USER_STATUSES } from '../../lib/roles'
 import type { JsonObject } from '../../lib/json'
+import type { BillingAddress, DeliveryAddress } from '../../lib/address'
 
 export const userRole = pgEnum('user_role', USER_ROLES)
 export const userStatus = pgEnum('user_status', USER_STATUSES)
@@ -56,6 +57,8 @@ export const users = pgTable(
     reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
     emailNotifications: boolean('email_notifications').notNull().default(true),
+    billingAddress: jsonb('billing_address').$type<BillingAddress>(),
+    deliveryAddress: jsonb('delivery_address').$type<DeliveryAddress>(),
     ...timestamps,
   },
   (t) => [
@@ -80,6 +83,20 @@ export const sessions = pgTable(
   (t) => [index('sessions_user_idx').on(t.userId)],
 )
 
+/** Einmal-Links für die Anmeldung per E-Mail. Gespeichert wird nur der SHA-256 des Tokens. */
+export const loginTokens = pgTable(
+  'login_tokens',
+  {
+    id: text('id').primaryKey(),
+    email: text('email').notNull(),
+    redirect: text('redirect'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('login_tokens_email_idx').on(t.email)],
+)
+
 /** Verknüpfung eines Benutzers mit einem Konto beim OpenID-Connect-Anbieter. */
 export const oidcAccounts = pgTable(
   'oidc_accounts',
@@ -100,9 +117,8 @@ export const requests = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     number: integer('number').generatedAlwaysAsIdentity({ startWith: 1001 }).notNull().unique(),
-    organisationId: uuid('organisation_id')
-      .notNull()
-      .references(() => organisations.id, { onDelete: 'restrict' }),
+    // Organisationen sind optional; sichtbar ist ein Auftrag für seinen Ersteller.
+    organisationId: uuid('organisation_id').references(() => organisations.id, { onDelete: 'restrict' }),
     createdById: uuid('created_by_id')
       .notNull()
       .references(() => users.id, { onDelete: 'restrict' }),
@@ -113,6 +129,8 @@ export const requests = pgTable(
     desiredDate: date('desired_date'),
     // Konfigurierbare Produktoptionen (Material, Bindung, ...), folgt mit dem Bestellformular.
     options: jsonb('options').$type<JsonObject>().notNull().default({}),
+    // Kopie der Rechnungsadresse beim Absenden; spätere Profiländerungen wirken nicht zurück.
+    billingAddress: jsonb('billing_address').$type<BillingAddress>(),
     quoteAmountCents: integer('quote_amount_cents'),
     quoteNote: text('quote_note'),
     status: requestStatus('status').notNull().default('new'),
@@ -122,6 +140,7 @@ export const requests = pgTable(
   },
   (t) => [
     index('requests_organisation_idx').on(t.organisationId),
+    index('requests_created_by_idx').on(t.createdById),
     index('requests_status_idx').on(t.status),
     index('requests_assignee_idx').on(t.assigneeId),
   ],

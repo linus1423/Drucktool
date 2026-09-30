@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { formatBillingAddress } from '~/lib/address'
 import { RequestFields, toRequestInput, useRequestForm } from '~/components/RequestFields'
 import { Alert, Badge, Button, Card, Field, Input, Select, StatusBadge, Textarea, cx } from '~/components/ui'
 import { errorMessage, isConflictError } from '~/lib/errors'
@@ -64,7 +65,8 @@ function RequestDetailPage() {
           <StatusBadge status={request.status} />
         </div>
         <p className="mt-1 text-sm text-slate-600">
-          {request.organisationName} · angelegt von {request.creatorName} am {formatDateTime(request.createdAt)}
+          {request.organisationName ? `${request.organisationName} · ` : ''}angelegt von {request.creatorName}
+          {request.creatorEmail ? ` (${request.creatorEmail})` : ''} am {formatDateTime(request.createdAt)}
         </p>
       </div>
 
@@ -96,6 +98,18 @@ function RequestDetailPage() {
                   <dt className="font-medium text-slate-500">Wunschtermin</dt>
                   <dd className="mt-1">{formatDate(request.desiredDate)}</dd>
                 </div>
+                {request.billingAddress ? (
+                  <div>
+                    <dt className="font-medium text-slate-500">Rechnungsadresse</dt>
+                    <dd className="mt-1">
+                      {formatBillingAddress(request.billingAddress).map((line) => (
+                        <span key={line} className="block">
+                          {line}
+                        </span>
+                      ))}
+                    </dd>
+                  </div>
+                ) : null}
               </dl>
             </Card>
           )}

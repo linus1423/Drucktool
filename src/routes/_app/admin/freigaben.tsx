@@ -80,13 +80,13 @@ function RegistrationCard({ registration: r }: { registration: Registration }) {
           <dd className="col-span-2">{formatDateTime(r.createdAt)}</dd>
         </dl>
         <Field
-          label="Organisation"
+          label="Organisation (optional)"
           htmlFor={`org-${r.id}`}
-          hint="Gehört die Person zu einem bestehenden Kunden, hier auswählen. Sonst wird die neue Organisation freigegeben."
+          hint="Gehört die Person zu einer bestehenden Organisation, hier auswählen."
         >
           <Select id={`org-${r.id}`} value={existingOrganisationId} onChange={(e) => setExistingOrganisationId(e.target.value)}>
             <option value="">
-              {r.organisationId ? `Neue Organisation „${r.organisationName}“ freigeben` : 'Bitte Organisation wählen …'}
+              {r.organisationId ? `Neue Organisation „${r.organisationName}“ freigeben` : 'Ohne Organisation'}
             </option>
             {organisations.data?.map((o) => (
               <option key={o.id} value={o.id}>
@@ -100,7 +100,7 @@ function RegistrationCard({ registration: r }: { registration: Registration }) {
             Ablehnen
           </Button>
           <Button
-            disabled={approve.isPending || reject.isPending || (!r.organisationId && !existingOrganisationId)}
+            disabled={approve.isPending || reject.isPending}
             onClick={() => approve.mutate()}
           >
             Freigeben

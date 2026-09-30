@@ -25,11 +25,10 @@ function notFound(): never {
   throw new Error('Anfrage nicht gefunden')
 }
 
-/** Filter, der Kunden auf die Anfragen ihrer eigenen Organisation beschränkt. */
+/** Kunden sehen nur ihre eigenen Aufträge (Lastenheft: Organisationen sind optional). */
 function visibilityFilter(user: Principal): SQL | undefined {
   if (isStaffRole(user.role)) return undefined
-  if (!user.organisationId) return sql`false`
-  return eq(requests.organisationId, user.organisationId)
+  return eq(requests.createdById, user.id)
 }
 
 async function loadForUpdate(tx: Tx, user: Principal, id: string) {
@@ -69,6 +68,7 @@ export const listFilterSchema = z.object({
 
 export async function listRequests(user: Principal, filter: z.infer<typeof listFilterSchema>) {
   const assignee = alias(users, 'assignee')
+  const creator = alias(users, 'creator')
   const conditions: (SQL | undefined)[] = [visibilityFilter(user)]
   if (filter.status) conditions.push(eq(requests.status, filter.status))
   if (filter.open) {
@@ -82,6 +82,8 @@ export async function listRequests(user: Principal, filter: z.infer<typeof listF
       or(
         ilike(requests.title, term),
         ilike(organisations.name, term),
+        ilike(creator.name, term),
+        ilike(creator.email, term),
         Number.isFinite(asNumber) ? eq(requests.number, asNumber) : undefined,
       ),
     )
@@ -98,10 +100,12 @@ export async function listRequests(user: Principal, filter: z.infer<typeof listF
       createdAt: requests.createdAt,
       updatedAt: requests.updatedAt,
       organisationName: organisations.name,
+      creatorName: creator.name,
       assigneeName: assignee.name,
     })
     .from(requests)
-    .innerJoin(organisations, eq(organisations.id, requests.organisationId))
+    .leftJoin(organisations, eq(organisations.id, requests.organisationId))
+    .innerJoin(creator, eq(creator.id, requests.createdById))
     .leftJoin(assignee, eq(assignee.id, requests.assigneeId))
     .where(and(...conditions))
     .orderBy(desc(requests.updatedAt))
@@ -119,10 +123,11 @@ export async function getRequestDetail(user: Principal, id: string) {
       request: requests,
       organisationName: organisations.name,
       creatorName: creator.name,
+      creatorEmail: creator.email,
       assigneeName: assignee.name,
     })
     .from(requests)
-    .innerJoin(organisations, eq(organisations.id, requests.organisationId))
+    .leftJoin(organisations, eq(organisations.id, requests.organisationId))
     .innerJoin(creator, eq(creator.id, requests.createdById))
     .leftJoin(assignee, eq(assignee.id, requests.assigneeId))
     .where(and(eq(requests.id, id), visibilityFilter(user)))
@@ -163,6 +168,7 @@ export async function getRequestDetail(user: Principal, id: string) {
     ...r,
     organisationName: found.organisationName,
     creatorName: found.creatorName,
+    creatorEmail: isStaff ? found.creatorEmail : null,
     // Die Zuständigkeit ist eine interne Information.
     assigneeId: isStaff ? r.assigneeId : null,
     assigneeName: isStaff ? found.assigneeName : null,
@@ -183,27 +189,30 @@ export const createRequestSchema = requestInputSchema.extend({
 })
 
 export async function createRequest(user: Principal, input: z.infer<typeof createRequestSchema>) {
-  let organisationId: string
-  if (isStaffRole(user.role)) {
-    if (!input.organisationId) throw new Error('Bitte eine Organisation auswählen')
-    organisationId = input.organisationId
-  } else {
-    if (!user.organisationId) throw new Error('Ihr Konto ist keiner Organisation zugeordnet')
-    organisationId = user.organisationId
-  }
-
   return getDb().transaction(async (tx) => {
-    const [org] = await tx
-      .select({ status: organisations.status })
-      .from(organisations)
-      .where(eq(organisations.id, organisationId))
-    if (!org || org.status !== 'active') throw new Error('Die Organisation ist nicht aktiv')
+    const [me] = await tx
+      .select({ billingAddress: users.billingAddress, organisationId: users.organisationId })
+      .from(users)
+      .where(eq(users.id, user.id))
+    // Lastenheft 3.1: Die Rechnungsadresse muss vor dem ersten Auftrag hinterlegt sein.
+    if (!isStaffRole(user.role) && !me?.billingAddress) {
+      throw new Error('Bitte hinterlegen Sie zuerst eine Rechnungsadresse in Ihrem Profil.')
+    }
+    const organisationId = isStaffRole(user.role) ? (input.organisationId ?? null) : (me?.organisationId ?? null)
+    if (organisationId) {
+      const [org] = await tx
+        .select({ status: organisations.status })
+        .from(organisations)
+        .where(eq(organisations.id, organisationId))
+      if (!org || org.status !== 'active') throw new Error('Die Organisation ist nicht aktiv')
+    }
 
     const [created] = await tx
       .insert(requests)
       .values({
         organisationId,
         createdById: user.id,
+        billingAddress: me?.billingAddress ?? null,
         title: input.title,
         description: input.description,
         quantity: input.quantity,

@@ -3,6 +3,7 @@ drucktool_backup_dir: /var/backups/drucktool
 drucktool_backup_keep_days: 14
 drucktool_registry_username: ''
 drucktool_registry_password: ''
+drucktool_customer_email_domains: []
 drucktool_smtp_url: ''
 drucktool_mail_from: 'Drucktool <noreply@localhost>'
 drucktool_oidc_issuer: ''

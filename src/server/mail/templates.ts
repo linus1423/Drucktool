@@ -54,7 +54,7 @@ function compose(subject: string, blocks: Block[]): MailContent {
 <p style="margin:0 0 16px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#64748b">Drucktool</p>
 ${body}
 </div>
-<p style="max-width:560px;margin:16px auto 0;font-size:12px;color:#64748b">Diese Nachricht wurde automatisch verschickt. Benachrichtigungen können Sie unter „Mein Konto“ abschalten.</p>
+<p style="max-width:560px;margin:16px auto 0;font-size:12px;color:#64748b">Diese Nachricht wurde automatisch verschickt. Benachrichtigungen können Sie im Profil abschalten.</p>
 </body></html>`
 
   return { subject, text, html }
@@ -70,9 +70,10 @@ function requestButton(r: RequestRef): Block {
   return { kind: 'button', label: 'Anfrage öffnen', href: appUrl(`/anfragen/${r.id}`) }
 }
 
-export function requestCreatedMail(r: RequestRef & { organisationName: string; actorName: string }): MailContent {
+export function requestCreatedMail(r: RequestRef & { organisationName: string | null; actorName: string }): MailContent {
+  const who = r.organisationName ? `${r.actorName} (${r.organisationName})` : r.actorName
   return compose(`Neue Anfrage ${requestLabel(r)}`, [
-    { kind: 'p', text: `${r.actorName} (${r.organisationName}) hat eine neue Anfrage gestellt: ${requestLabel(r)}.` },
+    { kind: 'p', text: `${who} hat eine neue Anfrage gestellt: ${requestLabel(r)}.` },
     requestButton(r),
   ])
 }
@@ -138,5 +139,14 @@ export function registrationRejectedMail(u: { name: string }): MailContent {
       kind: 'p',
       text: 'Ihre Registrierung im Drucktool konnten wir leider nicht freigeben. Bei Fragen wenden Sie sich bitte direkt an uns.',
     },
+  ])
+}
+
+export function loginLinkMail(link: string, minutes: number): MailContent {
+  return compose('Ihr Anmeldelink für das Drucktool', [
+    { kind: 'p', text: 'Hallo,' },
+    { kind: 'p', text: `mit dem folgenden Link melden Sie sich im Drucktool an. Er ist ${minutes} Minuten gültig und funktioniert nur einmal.` },
+    { kind: 'button', label: 'Jetzt anmelden', href: link },
+    { kind: 'p', text: 'Wenn Sie keinen Link angefordert haben, können Sie diese E-Mail ignorieren.' },
   ])
 }
