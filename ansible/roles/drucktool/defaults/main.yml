@@ -11,3 +11,7 @@ drucktool_oidc_client_secret: ''
 drucktool_oidc_display_name: 'Firmenkonto'
 drucktool_oidc_new_users: pending
 drucktool_oidc_trust_email: false
+drucktool_oidc_role_claim: roles
+drucktool_oidc_admin_roles: []
+drucktool_oidc_staff_roles: []
+drucktool_oidc_enforce_for_staff: false

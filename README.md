@@ -78,6 +78,13 @@ Zuordnung bei der Anmeldung:
 
 Gesperrte oder abgelehnte Konten kommen auch über OIDC nicht herein.
 
+**Rollen vom Anbieter (z. B. Entra-App-Rollen):** Sind `OIDC_ADMIN_ROLES` und/oder `OIDC_STAFF_ROLES` gesetzt
+(kommagetrennte Werte aus dem Claim `OIDC_ROLE_CLAIM`, Standard `roles`), bestimmt der Anbieter bei jeder Anmeldung die
+Rolle: Wer eine passende Rolle hat, wird ohne Freigabe als Admin bzw. Mitarbeiter angelegt oder umgestellt. Verliert ein
+Mitarbeiter oder Admin die Rolle, wird die Anmeldung abgelehnt und seine Sitzungen werden beendet. Der Superadmin wird
+nie verändert und bleibt als lokaler Notfallzugang mit Passwort erhalten. Mit `OIDC_ENFORCE_FOR_STAFF=true` können sich
+Mitarbeiter und Admins nur noch über den Anbieter anmelden.
+
 ## Lokale Entwicklung
 
 Voraussetzungen: Node.js 22, pnpm, PostgreSQL 16 (oder `docker compose up db`).
@@ -143,6 +150,7 @@ Ist das Paket in der GitHub Container Registry privat, `drucktool_registry_usern
 | `MAIL_FROM`                               | Absender, z. B. `Druckerei Muster <auftraege@example.com>`             |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | OpenID Connect, siehe oben                                 |
 | `OIDC_DISPLAY_NAME`, `OIDC_NEW_USERS`, `OIDC_TRUST_EMAIL` | Beschriftung und Verhalten der OIDC-Anmeldung          |
+| `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_ROLES`, `OIDC_STAFF_ROLES`, `OIDC_ENFORCE_FOR_STAFF` | Rollen vom Anbieter, siehe oben |
 
 ## Nächste Schritte
 
