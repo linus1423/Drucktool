@@ -1,0 +1,80 @@
+- name: Pflichtvariablen prüfen
+  ansible.builtin.assert:
+    that:
+      - drucktool_postgres_password | length >= 16
+      - "\"'\" not in drucktool_postgres_password"
+      - drucktool_superadmin_email == '' or drucktool_superadmin_password | length >= 12
+    fail_msg: >-
+      Bitte group_vars/vault.yml anlegen (siehe vault.example.yml). Das Datenbankpasswort braucht
+      mindestens 16 Zeichen und darf keine einfachen Anführungszeichen enthalten.
+
+- name: Verzeichnisse anlegen
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+  loop:
+    - "{{ drucktool_dir }}"
+    - "{{ drucktool_backup_dir }}"
+
+- name: Umgebungsdatei schreiben
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ drucktool_dir }}/.env"
+    mode: '0600'
+  notify: Drucktool neu starten
+
+- name: Compose-Datei schreiben
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ drucktool_dir }}/docker-compose.yml"
+    mode: '0640'
+  notify: Drucktool neu starten
+
+- name: Caddyfile schreiben
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: "{{ drucktool_dir }}/Caddyfile"
+    mode: '0640'
+  when: drucktool_domain | length > 0
+  notify: Drucktool neu starten
+
+- name: An der Registry anmelden
+  community.docker.docker_login:
+    registry_url: ghcr.io
+    username: "{{ drucktool_registry_username }}"
+    password: "{{ drucktool_registry_password }}"
+  when: drucktool_registry_username | length > 0
+  no_log: true
+
+- name: Anwendung starten bzw. aktualisieren
+  community.docker.docker_compose_v2:
+    project_src: "{{ drucktool_dir }}"
+    pull: always
+    state: present
+    remove_orphans: true
+  register: drucktool_compose
+
+- name: Auf Healthcheck warten
+  ansible.builtin.uri:
+    url: http://127.0.0.1:3000/api/health
+    status_code: 200
+  register: drucktool_health
+  retries: 30
+  delay: 2
+  until: drucktool_health.status == 200
+
+- name: Backup-Skript installieren
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: /usr/local/bin/drucktool-backup
+    mode: '0750'
+
+- name: Tägliches Datenbank-Backup einrichten
+  ansible.builtin.cron:
+    name: drucktool-backup
+    minute: '15'
+    hour: '2'
+    job: /usr/local/bin/drucktool-backup

@@ -1,0 +1,77 @@
+import { useState } from 'react'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { OrganisationForm } from '~/components/OrganisationForm'
+import { Alert, Card, PageHeader } from '~/components/ui'
+import { USER_STATUS_LABELS } from '~/lib/roles'
+import { organisationQuery } from '~/lib/queries'
+import { saveOrganisationFn } from '~/server/admin/admin.functions'
+
+export const Route = createFileRoute('/_app/admin/organisationen/$organisationId')({
+  loader: ({ context, params }) => context.queryClient.ensureQueryData(organisationQuery(params.organisationId)),
+  head: ({ loaderData }) => ({ meta: [{ title: `${loaderData?.name ?? 'Organisation'} · Drucktool` }] }),
+  component: OrganisationPage,
+})
+
+function OrganisationPage() {
+  const { organisationId } = Route.useParams()
+  const { data: org } = useSuspenseQuery(organisationQuery(organisationId))
+  const queryClient = useQueryClient()
+  const [saved, setSaved] = useState(false)
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <Link to="/admin/organisationen" className="text-sm text-slate-500 hover:text-slate-900">
+          ← Alle Organisationen
+        </Link>
+      </div>
+      <PageHeader title={org.name} />
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card title="Stammdaten" className="lg:col-span-2">
+          <div className="space-y-4">
+            {saved ? <Alert tone="success">Gespeichert.</Alert> : null}
+            <OrganisationForm
+              key={org.updatedAt.toString()}
+              initial={{
+                name: org.name,
+                email: org.email ?? '',
+                phone: org.phone ?? '',
+                street: org.street ?? '',
+                zip: org.zip ?? '',
+                city: org.city ?? '',
+                country: org.country,
+                vatId: org.vatId ?? '',
+                status: org.status,
+              }}
+              submitLabel="Speichern"
+              onSubmit={async (values) => {
+                setSaved(false)
+                await saveOrganisationFn({ data: { ...values, id: org.id } })
+                await queryClient.invalidateQueries({ queryKey: ['admin'] })
+                await queryClient.invalidateQueries({ queryKey: ['organisations'] })
+                setSaved(true)
+              }}
+            />
+          </div>
+        </Card>
+        <Card title="Benutzer">
+          {org.members.length === 0 ? (
+            <p className="text-sm text-slate-500">Keine Benutzer.</p>
+          ) : (
+            <ul className="divide-y divide-slate-100 text-sm">
+              {org.members.map((m) => (
+                <li key={m.id} className="py-2">
+                  <div className="font-medium">{m.name}</div>
+                  <div className="text-slate-500">
+                    {m.email} · {USER_STATUS_LABELS[m.status]}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
+    </div>
+  )
+}

@@ -1,0 +1,35 @@
+# Lokaler Betrieb und Vorlage für den Server. Produktiv wird über Ansible ausgerollt.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: drucktool
+      POSTGRES_USER: drucktool
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-drucktool}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U drucktool -d drucktool']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://drucktool:${POSTGRES_PASSWORD:-drucktool}@db:5432/drucktool
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-}
+    ports:
+      - '${APP_PORT:-3000}:3000'
+
+volumes:
+  db-data:

@@ -1,0 +1,7 @@
+# Kopieren nach inventory.yml und anpassen.
+all:
+  hosts:
+    drucktool:
+      ansible_host: drucktool.example.com
+      ansible_user: deploy
+      ansible_become: true

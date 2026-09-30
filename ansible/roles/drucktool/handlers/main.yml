@@ -1,0 +1,4 @@
+- name: Drucktool neu starten
+  community.docker.docker_compose_v2:
+    project_src: "{{ drucktool_dir }}"
+    state: restarted

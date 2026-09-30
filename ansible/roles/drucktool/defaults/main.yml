@@ -1,0 +1,5 @@
+drucktool_dir: /opt/drucktool
+drucktool_backup_dir: /var/backups/drucktool
+drucktool_backup_keep_days: 14
+drucktool_registry_username: ''
+drucktool_registry_password: ''

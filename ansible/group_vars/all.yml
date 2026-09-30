@@ -1,0 +1,11 @@
+# Öffentliche Einstellungen. Geheimnisse gehören in group_vars/vault.yml (ansible-vault).
+
+# Image aus der GitHub Container Registry (wird von der CI gebaut).
+drucktool_image: ghcr.io/linus1423/drucktool
+drucktool_image_tag: latest
+
+# Domain für HTTPS über Caddy (Let's Encrypt). Leer lassen, um nur Port 3000 freizugeben.
+drucktool_domain: ''
+drucktool_acme_email: ''
+
+drucktool_superadmin_email: ''
