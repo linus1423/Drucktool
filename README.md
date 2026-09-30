@@ -17,10 +17,20 @@ bearbeiten sie über einen Status-Workflow bis zur Auslieferung.
 | Superadmin  | Alles, gibt Registrierungen frei und verwaltet Administratoren                              |
 | Admin       | Organisationen und Benutzer (Mitarbeiter, Kunden) verwalten, Anfragen bearbeiten            |
 | Mitarbeiter | Alle Anfragen bearbeiten, Status wechseln, zuweisen, interne Notizen schreiben             |
-| Kunde       | Anfragen der eigenen Organisation anlegen, verfolgen, kommentieren, Angebote annehmen      |
+| Kunde       | Eigene Aufträge anlegen, verfolgen und kommentieren                                        |
 
-Kunden können sich selbst registrieren. Konto und Organisation bleiben gesperrt, bis ein Superadmin sie unter
-**Freigaben** freigibt (oder die Person einer bestehenden Organisation zuordnet).
+## Anmeldung
+
+- **Kunden** melden sich per Anmeldelink an: E-Mail-Adresse eingeben, Link aus der Mail öffnen, fertig. Beim ersten
+  Link entsteht das Konto, ohne Freigabe durch die Druckerei. Der Link gilt 15 Minuten und nur einmal; gespeichert wird
+  nur ein Hash. Mit `CUSTOMER_EMAIL_DOMAINS` (z. B. `tum.de`) lassen sich neue Konten auf bestimmte Domains
+  beschränken. Vor dem ersten Auftrag hinterlegen Kunden im **Profil** ihre Rechnungsadresse, optional eine
+  Lieferadresse für die Hauspost. Die Rechnungsadresse wird beim Absenden als Kopie am Auftrag gespeichert.
+- **Mitarbeiter und Admins** melden sich über OpenID Connect (z. B. Microsoft Entra ID) oder mit Passwort an, siehe
+  unten.
+- Organisationen sind optional. Kunden sehen nur die Aufträge, die sie selbst angelegt haben.
+
+Im Profil sieht jeder seine angemeldeten Geräte und kann sie einzeln oder alle anderen abmelden.
 
 ## Status einer Anfrage
 
@@ -46,15 +56,16 @@ Das Tool verschickt E-Mails bei neuen Anfragen, Statuswechseln, Nachrichten, Zuw
 | Ereignis                         | Empfänger                                                                  |
 | -------------------------------- | -------------------------------------------------------------------------- |
 | Kunde stellt Anfrage             | Alle Mitarbeiter                                                           |
-| Mitarbeiter ändert Status        | Alle Kunden der Organisation                                               |
+| Mitarbeiter ändert Status        | Der Kunde, der den Auftrag angelegt hat                                    |
 | Kunde ändert Status / schreibt   | Der zuständige Mitarbeiter, ohne Zuständigen alle Mitarbeiter              |
-| Mitarbeiter schreibt Nachricht   | Alle Kunden der Organisation                                               |
+| Mitarbeiter schreibt Nachricht   | Der Kunde, der den Auftrag angelegt hat                                    |
 | Interne Notiz                    | Nur der zuständige Mitarbeiter                                             |
 | Zuweisung                        | Der neu zuständige Mitarbeiter                                             |
-| Neue Registrierung               | Alle Superadmins                                                           |
+| Anmeldelink                      | Die angegebene Adresse (immer, unabhängig von der Einstellung)             |
+| Neue Registrierung über OIDC     | Alle Superadmins (nur bei `OIDC_NEW_USERS=pending`)                        |
 | Freigabe / Ablehnung             | Die registrierte Person (immer, unabhängig von der Einstellung)             |
 
-Wer eine Änderung selbst auslöst, bekommt keine Mail. Unter „Mein Konto“ lassen sich Benachrichtigungen abschalten.
+Wer eine Änderung selbst auslöst, bekommt keine Mail. Im Profil lassen sich Benachrichtigungen abschalten.
 
 Die Mails werden in derselben Transaktion wie die Änderung in die Tabelle `email_outbox` geschrieben und von einem
 eigenen Worker-Prozess verschickt (`pnpm mail:worker`, im Container `worker`). Scheitert der Versand, versucht der
@@ -146,6 +157,7 @@ Ist das Paket in der GitHub Container Registry privat, `drucktool_registry_usern
 | `COOKIE_SECURE`                           | `false` nur ohne HTTPS; Standard in Produktion ist `true`              |
 | `TRUST_PROXY`                             | `true` hinter einem Reverse Proxy, damit Client-IPs erkannt werden     |
 | `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD` | Legt beim ersten Start den Superadmin an                               |
+| `CUSTOMER_EMAIL_DOMAINS`                  | Optional: neue Kundenkonten nur für diese Domains, z. B. `tum.de`       |
 | `SMTP_URL`                                | SMTP-Server, z. B. `smtps://user:pass@mail.example.com:465`            |
 | `MAIL_FROM`                               | Absender, z. B. `Druckerei Muster <auftraege@example.com>`             |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | OpenID Connect, siehe oben                                 |

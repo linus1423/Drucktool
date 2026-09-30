@@ -1,9 +1,11 @@
 import { createServerFn } from '@tanstack/react-start'
-import { eq, sql, TransactionRollbackError } from 'drizzle-orm'
-import { loginSchema, registerSchema } from '~/lib/validation'
+import { eq, sql } from 'drizzle-orm'
+import { z } from 'zod'
+import { emailSchema, loginSchema } from '~/lib/validation'
 import { getDb, schema } from '../db/client.server'
-import { notifyRegistrationReceived } from '../mail/notifications.server'
-import { getDummyHash, hashPassword, verifyPassword } from './password.server'
+import { getDummyHash, verifyPassword } from './password.server'
+import { issueLoginLink, redeemLoginLink } from './magic-link.server'
+import { safeRedirect } from '~/lib/redirect'
 import { getOidcSettings } from './oidc.server'
 import { assertRateLimit } from './rate-limit.server'
 import { createSession, destroyCurrentSession, getSessionUser } from './session.server'
@@ -63,58 +65,27 @@ export const logout = createServerFn({ method: 'POST' }).handler(async () => {
   return { ok: true as const }
 })
 
-/**
- * Selbstregistrierung eines Kunden. Konto und Organisation bleiben im Status
- * "pending", bis ein Superadmin sie freigibt.
- */
-export const register = createServerFn({ method: 'POST' })
-  .validator(registerSchema)
+export const requestLoginLinkFn = createServerFn({ method: 'POST' })
+  .validator(z.object({ email: emailSchema, redirect: z.string().max(500).nullable() }))
   .handler(async ({ data }) => {
-    assertRateLimit('register', 5, 10 * 60_000)
-    const db = getDb()
-    const passwordHash = await hashPassword(data.password)
-
-    const [existing] = await db
-      .select({ id: schema.users.id })
-      .from(schema.users)
-      .where(sql`lower(${schema.users.email}) = ${data.email}`)
-      .limit(1)
-
-    // Gleiche Antwort wie bei Erfolg, damit sich registrierte Adressen nicht ermitteln lassen.
-    if (existing) return { ok: true as const }
-
-    await db
-      .transaction(async (tx) => {
-        const [org] = await tx
-          .insert(schema.organisations)
-          .values({
-            name: data.organisationName,
-            email: data.email,
-            phone: data.phone || null,
-            street: data.street || null,
-            zip: data.zip || null,
-            city: data.city || null,
-            status: 'pending',
-          })
-          .returning({ id: schema.organisations.id })
-        const inserted = await tx
-          .insert(schema.users)
-          .values({
-            email: data.email,
-            name: data.name,
-            passwordHash,
-            role: 'customer',
-            status: 'pending',
-            organisationId: org!.id,
-          })
-          .onConflictDoNothing()
-          .returning({ id: schema.users.id })
-        // Parallele Registrierung mit derselben Adresse: angelegte Organisation verwerfen.
-        if (inserted.length === 0) tx.rollback()
-        await notifyRegistrationReceived(tx, { name: data.name, email: data.email, organisationName: data.organisationName })
-      })
-      .catch((error: unknown) => {
-        if (!(error instanceof TransactionRollbackError)) throw error
-      })
+    assertRateLimit('login-link', 10, 10 * 60_000)
+    assertRateLimit('login-link-address', 3, 10 * 60_000, data.email)
+    await issueLoginLink(data.email, safeRedirect(data.redirect))
     return { ok: true as const }
+  })
+
+export const redeemLoginLinkFn = createServerFn({ method: 'POST' })
+  .validator(z.object({ token: z.string().min(20).max(200) }))
+  .handler(async ({ data }) => {
+    assertRateLimit('login-link-redeem', 20, 10 * 60_000)
+    const result = await redeemLoginLink(data.token)
+    await destroyCurrentSession()
+    await createSession(result.userId)
+    const [user] = await getDb()
+      .select({ role: schema.users.role, billingAddress: schema.users.billingAddress })
+      .from(schema.users)
+      .where(eq(schema.users.id, result.userId))
+    // Kunden ohne Rechnungsadresse landen zuerst im Profil.
+    const needsProfile = user?.role === 'customer' && !user.billingAddress
+    return { redirect: needsProfile ? '/profil?neu=1' : safeRedirect(result.redirect) }
   })

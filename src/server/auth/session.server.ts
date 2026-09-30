@@ -99,3 +99,9 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   const { sessionExpiresAt: _, ...user } = row
   return user
 }
+
+/** Kennung der Sitzung dieses Requests (Hash des Cookies), oder null. */
+export function currentSessionId(): string | null {
+  const token = getCookie(COOKIE_NAME)
+  return token ? hashToken(token) : null
+}

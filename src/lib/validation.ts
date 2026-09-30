@@ -21,17 +21,6 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Bitte Passwort eingeben'),
 })
 
-export const registerSchema = z.object({
-  name: requiredText('Name'),
-  email: emailSchema,
-  password: passwordSchema,
-  organisationName: requiredText('Firmenname'),
-  street: optionalText(),
-  zip: optionalText(20),
-  city: optionalText(),
-  phone: optionalText(50),
-})
-
 export const organisationSchema = z.object({
   name: requiredText('Name'),
   email: z.union([z.literal(''), emailSchema]),
