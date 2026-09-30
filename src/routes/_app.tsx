@@ -52,6 +52,9 @@ function AppLayout() {
                 <Link to="/admin/benutzer" className={navLink} activeProps={navActive}>
                   Benutzer
                 </Link>
+                <Link to="/admin/katalog" className={navLink} activeProps={navActive}>
+                  Katalog und Preise
+                </Link>
               </>
             ) : null}
           </nav>

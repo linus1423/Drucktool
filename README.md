@@ -51,6 +51,21 @@ Abgelehnt / Storniert
 Die Übersicht zeigt Mitarbeitern standardmäßig die Warteschlange aller offenen Aufträge, daneben die fertigen.
 Die erlaubten Übergänge je Rolle stehen in `src/lib/status.ts`.
 
+## Katalog und Preise
+
+Admins pflegen unter „Katalog und Preise“ alles, was Kunden im Bestellformular wählen können:
+
+- **Formate und Bindungen**: welche Bindung zu welchem Endformat erlaubt ist (Matrix aus dem Lastenheft),
+  ob ein Format doppelseitig gedruckt werden kann, Hilfetexte.
+- **Bindungspreise**: Preis pro Exemplar oder pro Blatt (Laminieren), einmalige Kosten pro Auftrag (Leimbindung),
+  ob ein Deckblatt, eine Coverfarbe oder ein Zuschnitt dazugehört.
+- **Papiere**: Grammatur, Preis pro A3- bzw. SRA3-Bogen oder pro Plot (A0 bis A2), wofür das Papier taugt.
+- **Coverfarben** und **Preise und Texte** (Druck pro Image, Mindestpreis, Hauspost, allgemeine Hilfetexte).
+
+Jede Änderung landet mit altem und neuem Stand in `catalog_changes` und ist unter „Änderungen“ sichtbar.
+Die Startwerte kommen aus der Migration `0005_catalog.sql`. Die Druckpreise pro Image und der Mindestpreis sind
+dort nur Platzhalter und müssen vor dem Start gesetzt werden.
+
 ## Schutz vor gleichzeitigen Änderungen
 
 Jede Anfrage hat eine `version`. Änderungen (Status, Bearbeiten, Zuweisung) schicken die Version mit, die der
@@ -175,5 +190,5 @@ Ist das Paket in der GitHub Container Registry privat, `drucktool_registry_usern
 
 ## Nächste Schritte
 
-- Bestellformular mit konfigurierbaren Optionen (Material, Bindung, …)
+- Bestellformular mit den Optionen aus dem Katalog und Preisberechnung
 - PDF-Upload mit Seitenzahl-Erkennung und Formatvorschlag
