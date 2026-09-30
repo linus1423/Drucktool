@@ -71,7 +71,7 @@ function RegistrationCard({ registration: r }: { registration: Registration }) {
           <dt className="text-slate-500">E-Mail</dt>
           <dd className="col-span-2">{r.email}</dd>
           <dt className="text-slate-500">Firma</dt>
-          <dd className="col-span-2">{r.organisationName ?? '–'}</dd>
+          <dd className="col-span-2">{r.organisationName ?? 'Keine Angabe (Anmeldung über Single Sign-on)'}</dd>
           <dt className="text-slate-500">Adresse</dt>
           <dd className="col-span-2">{[r.street, [r.zip, r.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '–'}</dd>
           <dt className="text-slate-500">Telefon</dt>
@@ -85,7 +85,9 @@ function RegistrationCard({ registration: r }: { registration: Registration }) {
           hint="Gehört die Person zu einem bestehenden Kunden, hier auswählen. Sonst wird die neue Organisation freigegeben."
         >
           <Select id={`org-${r.id}`} value={existingOrganisationId} onChange={(e) => setExistingOrganisationId(e.target.value)}>
-            <option value="">Neue Organisation „{r.organisationName}“ freigeben</option>
+            <option value="">
+              {r.organisationId ? `Neue Organisation „${r.organisationName}“ freigeben` : 'Bitte Organisation wählen …'}
+            </option>
             {organisations.data?.map((o) => (
               <option key={o.id} value={o.id}>
                 Zu „{o.name}“ hinzufügen
@@ -97,7 +99,10 @@ function RegistrationCard({ registration: r }: { registration: Registration }) {
           <Button variant="secondary" className="text-rose-700" disabled={reject.isPending || approve.isPending} onClick={() => reject.mutate()}>
             Ablehnen
           </Button>
-          <Button disabled={approve.isPending || reject.isPending} onClick={() => approve.mutate()}>
+          <Button
+            disabled={approve.isPending || reject.isPending || (!r.organisationId && !existingOrganisationId)}
+            onClick={() => approve.mutate()}
+          >
             Freigeben
           </Button>
         </div>

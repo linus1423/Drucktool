@@ -60,6 +60,24 @@ Die Mails werden in derselben Transaktion wie die Änderung in die Tabelle `emai
 eigenen Worker-Prozess verschickt (`pnpm mail:worker`, im Container `worker`). Scheitert der Versand, versucht der
 Worker es mit wachsendem Abstand bis zu acht Mal erneut. Ohne `SMTP_URL` werden Mails nur ins Log geschrieben.
 
+## Anmeldung über OpenID Connect
+
+Neben E-Mail und Passwort kann sich jeder über einen OpenID-Connect-Anbieter anmelden (Keycloak, Microsoft Entra ID,
+Google Workspace, Authentik, …). Beim Anbieter einen Client anlegen, als Redirect-URI
+`<APP_URL>/api/auth/oidc/callback` eintragen und `OIDC_ISSUER`, `OIDC_CLIENT_ID` und `OIDC_CLIENT_SECRET` setzen.
+Die Login-Seite zeigt dann „Anmelden mit …“ (`OIDC_DISPLAY_NAME`).
+
+Zuordnung bei der Anmeldung:
+
+1. Ist das Konto beim Anbieter schon mit einem Benutzer verknüpft, wird dieser angemeldet.
+2. Sonst wird ein bestehender Benutzer mit derselben E-Mail-Adresse verknüpft, sofern der Anbieter die Adresse als
+   bestätigt meldet (`email_verified`). Anbieter ohne diesen Claim (z. B. Entra ID) brauchen `OIDC_TRUST_EMAIL=true`.
+3. Unbekannte Benutzer behandelt `OIDC_NEW_USERS`: `pending` (Standard) legt eine Registrierung an, die ein Superadmin
+   unter „Freigaben“ einer Organisation zuordnet; `staff` legt direkt einen Mitarbeiter an (für einen internen
+   Anbieter); `reject` weist sie ab.
+
+Gesperrte oder abgelehnte Konten kommen auch über OIDC nicht herein.
+
 ## Lokale Entwicklung
 
 Voraussetzungen: Node.js 22, pnpm, PostgreSQL 16 (oder `docker compose up db`).
@@ -123,9 +141,10 @@ Ist das Paket in der GitHub Container Registry privat, `drucktool_registry_usern
 | `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD` | Legt beim ersten Start den Superadmin an                               |
 | `SMTP_URL`                                | SMTP-Server, z. B. `smtps://user:pass@mail.example.com:465`            |
 | `MAIL_FROM`                               | Absender, z. B. `Druckerei Muster <auftraege@example.com>`             |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | OpenID Connect, siehe oben                                 |
+| `OIDC_DISPLAY_NAME`, `OIDC_NEW_USERS`, `OIDC_TRUST_EMAIL` | Beschriftung und Verhalten der OIDC-Anmeldung          |
 
 ## Nächste Schritte
 
 - Bestellformular mit konfigurierbaren Optionen (Material, Bindung, …)
 - PDF-Upload mit Seitenzahl-Erkennung und Formatvorschlag
-- Anmeldung über OpenID Connect
