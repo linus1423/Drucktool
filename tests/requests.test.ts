@@ -9,7 +9,8 @@ process.env.DATABASE_URL = url
 // Die Module lesen DATABASE_URL beim ersten Zugriff, deshalb dynamisch importieren.
 const { getDb, schema } = await import('~/server/db/client.server')
 const requestsModule = await import('~/server/requests/requests.server')
-const { addComment, assignRequest, changeStatus, createRequest, getRequestDetail, listRequests, updateRequest } = requestsModule
+const { addComment, assignRequest, changeStatus, createRequest, getRequestDetail, listRequests, setInternalStatus, updateRequest } =
+  requestsModule
 type Principal = import('~/server/requests/requests.server').Principal
 
 describe.skipIf(!url)('Anfragen (Integration)', () => {
@@ -56,7 +57,7 @@ describe.skipIf(!url)('Anfragen (Integration)', () => {
   it('legt eine Anfrage an und merkt sich die Rechnungsadresse', async () => {
     const created = await createRequest(customer, input)
     const detail = await getRequestDetail(customer, created.id)
-    expect(detail.status).toBe('new')
+    expect(detail.status).toBe('submitted')
     expect(detail.organisationId).toBe(customer.organisationId)
     expect(detail.billingAddress).toEqual(BILLING)
     expect(detail.version).toBe(1)
@@ -83,7 +84,7 @@ describe.skipIf(!url)('Anfragen (Integration)', () => {
 
   it('lehnt veraltete Versionen ab (Optimistic Locking)', async () => {
     const { id } = await createRequest(customer, input)
-    const first = await changeStatus(staff, { id, version: 1, to: 'in_review' })
+    const first = await changeStatus(staff, { id, version: 1, to: 'confirmed' })
     expect(first.version).toBe(2)
     await expect(changeStatus(staff, { id, version: 1, to: 'rejected' })).rejects.toThrow(CONFLICT_MESSAGE)
     await expect(updateRequest(staff, { id, version: 1, ...input, title: 'Neu' })).rejects.toThrow(CONFLICT_MESSAGE)
@@ -93,7 +94,7 @@ describe.skipIf(!url)('Anfragen (Integration)', () => {
   it('lässt bei gleichzeitigen Änderungen genau eine gewinnen', async () => {
     const { id } = await createRequest(customer, input)
     const results = await Promise.allSettled([
-      changeStatus(staff, { id, version: 1, to: 'in_review' }),
+      changeStatus(staff, { id, version: 1, to: 'confirmed' }),
       changeStatus(staff, { id, version: 1, to: 'rejected' }),
       changeStatus(customer, { id, version: 1, to: 'cancelled' }),
     ])
@@ -105,13 +106,36 @@ describe.skipIf(!url)('Anfragen (Integration)', () => {
 
   it('setzt die Status-Rechte durch', async () => {
     const { id } = await createRequest(customer, input)
-    await expect(changeStatus(customer, { id, version: 1, to: 'in_review' })).rejects.toThrow('nicht erlaubt')
-    await changeStatus(staff, { id, version: 1, to: 'in_review' })
-    await expect(changeStatus(staff, { id, version: 2, to: 'quoted' })).rejects.toThrow('Angebotspreis')
-    await changeStatus(staff, { id, version: 2, to: 'quoted', quoteAmountCents: 12_345 })
-    const res = await changeStatus(customer, { id, version: 3, to: 'approved' })
-    expect(res.status).toBe('approved')
+    await expect(changeStatus(customer, { id, version: 1, to: 'confirmed' })).rejects.toThrow('nicht erlaubt')
+    await expect(changeStatus(staff, { id, version: 1, to: 'on_hold' })).rejects.toThrow('Rückfrage')
+    await changeStatus(staff, { id, version: 1, to: 'on_hold', note: 'Welches Papier?' })
+    await changeStatus(customer, { id, version: 2, to: 'submitted', note: '120 g' })
+    const res = await changeStatus(staff, { id, version: 3, to: 'confirmed' })
+    expect(res.status).toBe('confirmed')
     await expect(changeStatus(customer, { id, version: 4, to: 'cancelled' })).rejects.toThrow('nicht erlaubt')
+    const detail = await getRequestDetail(customer, id)
+    expect(detail.confirmedByName).toBe('Mitarbeiterin')
+    expect(detail.confirmedAt).toBeInstanceOf(Date)
+  })
+
+  it('führt einen internen Unterstatus, den Kunden nicht sehen', async () => {
+    const { id } = await createRequest(customer, input)
+    await expect(setInternalStatus(staff, { id, version: 1, internalStatus: 'in_progress' })).rejects.toThrow('bestätigten')
+    await changeStatus(staff, { id, version: 1, to: 'confirmed' })
+    await setInternalStatus(staff, { id, version: 2, internalStatus: 'problem' })
+    await expect(setInternalStatus(customer, { id, version: 3, internalStatus: null })).rejects.toThrow('Keine Berechtigung')
+
+    expect((await getRequestDetail(staff, id)).internalStatus).toBe('problem')
+    const forCustomer = await getRequestDetail(customer, id)
+    expect(forCustomer.internalStatus).toBeNull()
+    expect(forCustomer.events.some((e) => e.type === 'internal_status_changed')).toBe(false)
+    expect((await listRequests(customer, {})).find((r) => r.id === id)?.internalStatus).toBeNull()
+
+    // Mit dem Abschluss verschwindet der Unterstatus.
+    await changeStatus(staff, { id, version: 3, to: 'completed' })
+    expect((await getRequestDetail(staff, id)).internalStatus).toBeNull()
+    expect((await listRequests(staff, { done: true })).some((r) => r.id === id)).toBe(true)
+    expect((await listRequests(staff, { open: true })).some((r) => r.id === id)).toBe(false)
   })
 
   it('zeigt Kunden keine internen Notizen und keine Zuständigkeit', async () => {
@@ -130,10 +154,10 @@ describe.skipIf(!url)('Anfragen (Integration)', () => {
     expect(forStaff.assigneeId).toBe(staff.id)
   })
 
-  it('erlaubt Kunden das Bearbeiten nur solange die Anfrage neu ist', async () => {
+  it('erlaubt Kunden das Bearbeiten nur bis zur Bestätigung', async () => {
     const { id } = await createRequest(customer, input)
     await updateRequest(customer, { id, version: 1, ...input, title: 'Visitenkarten 2' })
-    await changeStatus(staff, { id, version: 2, to: 'in_review' })
+    await changeStatus(staff, { id, version: 2, to: 'confirmed' })
     await expect(updateRequest(customer, { id, version: 3, ...input })).rejects.toThrow('nicht mehr bearbeitet')
   })
 })

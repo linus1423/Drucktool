@@ -1,5 +1,5 @@
 // E-Mail-Vorlagen. Reine Funktionen ohne Datenbankzugriff, damit sie testbar bleiben.
-import { formatMoney, formatRequestNumber } from '~/lib/format'
+import { formatRequestNumber } from '~/lib/format'
 import { STATUS_LABELS, type RequestStatus } from '~/lib/status'
 
 export type MailContent = { subject: string; text: string; html: string }
@@ -67,39 +67,50 @@ function requestLabel(r: RequestRef) {
 }
 
 function requestButton(r: RequestRef): Block {
-  return { kind: 'button', label: 'Anfrage öffnen', href: appUrl(`/anfragen/${r.id}`) }
+  return { kind: 'button', label: 'Auftrag öffnen', href: appUrl(`/anfragen/${r.id}`) }
 }
 
 export function requestCreatedMail(r: RequestRef & { organisationName: string | null; actorName: string }): MailContent {
   const who = r.organisationName ? `${r.actorName} (${r.organisationName})` : r.actorName
-  return compose(`Neue Anfrage ${requestLabel(r)}`, [
-    { kind: 'p', text: `${who} hat eine neue Anfrage gestellt: ${requestLabel(r)}.` },
+  return compose(`Neuer Auftrag ${requestLabel(r)}`, [
+    { kind: 'p', text: `${who} hat einen neuen Auftrag eingereicht: ${requestLabel(r)}.` },
     requestButton(r),
   ])
 }
 
+/** Was der Kunde beim jeweiligen Status erfährt (Lastenheft Abschnitt 7). */
+const STATUS_TEXT: Partial<Record<RequestStatus, string>> = {
+  confirmed:
+    'Die Druckerei hat Ihren Auftrag angenommen. Damit ist der Auftrag verbindlich; wir melden uns, sobald er fertig ist.',
+  on_hold: 'Wir haben eine Rückfrage zu Ihrem Auftrag. Bitte antworten Sie im Drucktool.',
+  completed: 'Ihr Auftrag ist fertig.',
+  rejected: 'Leider können wir Ihren Auftrag nicht annehmen.',
+  cancelled: 'Der Auftrag wurde storniert.',
+  submitted: 'Der Auftrag liegt wieder bei der Druckerei.',
+}
+
 export function statusChangedMail(
-  r: RequestRef & {
-    actorName: string
-    from: RequestStatus
-    to: RequestStatus
-    note?: string | null
-    quoteAmountCents?: number | null
-  },
+  r: RequestRef & { actorName: string; from: RequestStatus; to: RequestStatus; note?: string | null },
 ): MailContent {
   const blocks: Block[] = [
-    {
-      kind: 'p',
-      text: `Der Status Ihrer Anfrage ${requestLabel(r)} hat sich geändert: ${STATUS_LABELS[r.from]} → ${STATUS_LABELS[r.to]}.`,
-    },
+    { kind: 'p', text: `${requestLabel(r)}: ${STATUS_LABELS[r.from]} → ${STATUS_LABELS[r.to]}.` },
   ]
-  if (r.to === 'quoted' && r.quoteAmountCents != null) {
-    blocks.push({ kind: 'p', text: `Angebotspreis: ${formatMoney(r.quoteAmountCents)} (netto). Bitte nehmen Sie das Angebot im Drucktool an oder lehnen Sie es ab.` })
-  }
-  if (r.to === 'on_hold') blocks.push({ kind: 'p', text: 'Wir haben eine Rückfrage an Sie.' })
+  const text = STATUS_TEXT[r.to]
+  if (text) blocks.push({ kind: 'p', text })
   if (r.note) blocks.push({ kind: 'quote', text: r.note })
   blocks.push({ kind: 'p', text: `Geändert von ${r.actorName}.` }, requestButton(r))
   return compose(`${requestLabel(r)}: ${STATUS_LABELS[r.to]}`, blocks)
+}
+
+export function requestReceivedMail(r: RequestRef): MailContent {
+  return compose(`Auftrag eingereicht: ${requestLabel(r)}`, [
+    { kind: 'p', text: `Wir haben Ihren Auftrag ${requestLabel(r)} erhalten.` },
+    {
+      kind: 'p',
+      text: 'Verbindlich wird er erst, wenn ein Mitarbeiter der Druckerei ihn bestätigt. Darüber informieren wir Sie per E-Mail.',
+    },
+    requestButton(r),
+  ])
 }
 
 export function commentMail(r: RequestRef & { actorName: string; body: string; internal: boolean }): MailContent {
@@ -112,7 +123,7 @@ export function commentMail(r: RequestRef & { actorName: string; body: string; i
 
 export function assignedMail(r: RequestRef & { actorName: string }): MailContent {
   return compose(`Ihnen zugewiesen: ${requestLabel(r)}`, [
-    { kind: 'p', text: `${r.actorName} hat Ihnen die Anfrage ${requestLabel(r)} zugewiesen.` },
+    { kind: 'p', text: `${r.actorName} hat Ihnen den Auftrag ${requestLabel(r)} zugewiesen.` },
     requestButton(r),
   ])
 }
