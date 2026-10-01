@@ -67,6 +67,8 @@ export const users = pgTable(
     emailNotifications: boolean('email_notifications').notNull().default(true),
     billingAddress: jsonb('billing_address').$type<BillingAddress>(),
     deliveryAddress: jsonb('delivery_address').$type<DeliveryAddress>(),
+    // Gesetzt, wenn das Konto anonymisiert wurde (DSGVO, Issue #26). Aufträge bleiben erhalten.
+    anonymizedAt: timestamp('anonymized_at', { withTimezone: true }),
     ...timestamps,
   },
   (t) => [

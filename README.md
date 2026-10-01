@@ -56,7 +56,7 @@ Im Profil sieht jeder seine angemeldeten Geräte und kann sie einzeln oder alle 
   älteren Browsern einen Origin/Referer der App (`APP_URL` oder die Adresse der Anfrage), sonst antwortet die App
   mit 403.
 - **Aufräumen:** Der Worker löscht beim Start und dann stündlich abgelaufene Sitzungen, Anmeldelinks,
-  Rate-Limit-Zähler und alte Audit-Einträge. Die Löschungen sind idempotent, mehrere Worker stören sich nicht.
+  Rate-Limit-Zähler und alte Audit-Einträge, dazu die Daten mit Löschfrist (siehe Datenschutz). Die Löschungen sind idempotent, mehrere Worker stören sich nicht.
 
 ## Status eines Auftrags
 
@@ -189,6 +189,25 @@ Mitarbeiter oder Admin die Rolle, wird die Anmeldung abgelehnt und seine Sitzung
 nie verändert und bleibt als lokaler Notfallzugang mit Passwort erhalten. Mit `OIDC_ENFORCE_FOR_STAFF=true` können sich
 Mitarbeiter und Admins nur noch über den Anbieter anmelden.
 
+## Datenschutz
+
+- **Anonymisieren statt Löschen:** In der Benutzerverwaltung lässt sich ein Konto anonymisieren. Name wird zu
+  „Gelöschter Nutzer“, E-Mail-Adresse, Passwort, Rechnungs- und Lieferadresse, Organisation, Sitzungen,
+  OIDC-Verknüpfungen, offene Anmeldelinks, Mails in der Outbox und nicht abgeschickte Uploads werden entfernt, Namen
+  und Adresse auch aus dem Audit-Log. Das Konto ist danach gesperrt, die E-Mail-Adresse wieder frei. Aufträge,
+  Nachrichten und Dateien an Aufträgen bleiben wegen der Aufbewahrungspflichten erhalten, ebenso die beim Absenden am
+  Auftrag gespeicherte Rechnungs- und Lieferadresse. Admins können keine Administratoren anonymisieren, niemand sein
+  eigenes Konto.
+- **Datenauskunft (Art. 15):** „Datenauskunft herunterladen“ in der Benutzerverwaltung liefert alle zu einer Person
+  gespeicherten Daten als JSON (Konto, Sitzungen, Anmeldewege, Aufträge, Nachrichten, Dateien, Audit-Log, E-Mails).
+  Jeder Abruf wird protokolliert.
+- **Löschfristen:** IP-Adressen an Sitzungen nach `SESSION_IP_RETENTION_DAYS` (Standard 30 Tage), abgelehnte
+  Registrierungen samt nie freigegebener Organisation nach `REJECTED_REGISTRATION_RETENTION_DAYS` (Standard 30 Tage),
+  Audit-Log nach `AUDIT_LOG_RETENTION_DAYS` (Standard 365 Tage). Abgelaufene Sitzungen und Anmeldelinks verschwinden
+  stündlich.
+- **Datenschutzerklärung und Impressum:** `PRIVACY_URL` und `IMPRINT_URL` erscheinen als Links in der Fußzeile und
+  auf der Anmeldeseite.
+
 ## Lokale Entwicklung
 
 Voraussetzungen: Node.js 22, pnpm, PostgreSQL 16 (oder `docker compose up db`).
@@ -278,6 +297,9 @@ Ist das Paket in der GitHub Container Registry privat, `drucktool_registry_usern
 | `UPLOAD_MAX_MB`                           | Größte erlaubte Druckdatei in MB, Standard 500                         |
 | `ATTACHMENT_MAX_MB`, `ATTACHMENT_TYPES`   | Anhänge an Nachrichten: Größe in MB (Standard 25), erlaubte Endungen (kommagetrennt) |
 | `AUDIT_LOG_RETENTION_DAYS`                | Aufbewahrung des Audit-Logs in Tagen, Standard 365, `0` = unbegrenzt   |
+| `SESSION_IP_RETENTION_DAYS`               | IP-Adressen an Sitzungen nach so vielen Tagen löschen, Standard 30     |
+| `REJECTED_REGISTRATION_RETENTION_DAYS`    | Abgelehnte Registrierungen nach so vielen Tagen löschen, Standard 30   |
+| `PRIVACY_URL`, `IMPRINT_URL`              | Links auf Datenschutzerklärung und Impressum in der Fußzeile           |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | OpenID Connect, siehe oben                                 |
 | `OIDC_DISPLAY_NAME`, `OIDC_NEW_USERS`, `OIDC_TRUST_EMAIL` | Beschriftung und Verhalten der OIDC-Anmeldung          |
 | `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_ROLES`, `OIDC_STAFF_ROLES`, `OIDC_ENFORCE_FOR_STAFF` | Rollen vom Anbieter, siehe oben |

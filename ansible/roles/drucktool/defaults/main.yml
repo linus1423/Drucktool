@@ -5,6 +5,12 @@ drucktool_upload_max_mb: 500
 drucktool_attachment_max_mb: 25
 # Audit-Log: Einträge nach so vielen Tagen löschen (0 = nie)
 drucktool_audit_log_retention_days: 365
+# Löschfristen in Tagen (0 = nie): IP-Adressen an Sitzungen, abgelehnte Registrierungen
+drucktool_session_ip_retention_days: 30
+drucktool_rejected_registration_retention_days: 30
+# Links auf Datenschutzerklärung und Impressum in der Fußzeile (leer = ausblenden)
+drucktool_privacy_url: ''
+drucktool_imprint_url: ''
 drucktool_registry_username: ''
 drucktool_registry_password: ''
 drucktool_customer_email_domains: []

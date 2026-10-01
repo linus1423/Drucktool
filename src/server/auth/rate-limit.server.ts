@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
-import { eq, sql } from 'drizzle-orm'
+import { eq, inArray, sql } from 'drizzle-orm'
 import { getRequestIP } from '@tanstack/react-start/server'
-import { getDb, schema } from '../db/client.server'
+import { getDb, schema, type Tx } from '../db/client.server'
 
 type Db = ReturnType<typeof getDb>
 const { rateLimits } = schema
@@ -107,4 +107,10 @@ export async function clearLoginFailures(email: string, db: Db = getDb()) {
 export function accountBlockedMessage(ms: number) {
   const minutes = Math.max(1, Math.ceil(ms / 60_000))
   return `Zu viele Fehlversuche für dieses Konto. Bitte versuchen Sie es in ${minutes === 1 ? 'einer Minute' : `${minutes} Minuten`} erneut.`
+}
+
+/** Entfernt die Zähler zu einer E-Mail-Adresse, z. B. beim Anonymisieren eines Kontos. */
+export async function forgetRateLimits(email: string, db: Db | Tx = getDb()) {
+  const keys = ['login-account', 'login-link-address'].map((name) => bucketKey(name, email))
+  await db.delete(rateLimits).where(inArray(rateLimits.key, keys))
 }
