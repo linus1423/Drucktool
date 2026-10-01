@@ -91,6 +91,11 @@ Admins pflegen unter „Katalog und Preise“ alles, was Kunden im Bestellformul
   diese Farben und verwirft eine nicht mehr passende Farbe; der Server prüft dasselbe beim Absenden. Ohne separates
   Deckblatt gelten alle Farben, die die Bindung erlaubt. Die Migration `0014_cover_colors_per_paper.sql` gibt jedem
   bestehenden Deckblattpapier zunächst alle Farben, damit sich für Kunden nichts ändert.
+- **Vorrätige Bogengrößen** je Papier (z. B. A3, SRA3 oder eigene Maße). Am Auftrag wählen Mitarbeiter unter
+  „Druckbogen“, auf welcher davon gedruckt wird, getrennt für Innenteil und Deckblatt. Das ist rein intern: Preis
+  und Status bleiben, der Kunde sieht nichts und bekommt keine Mail. Ohne Auswahl gilt der Bogen aus der
+  Preisberechnung. Die Migration `0017_print_sheets.sql` übernimmt für bestehende Papiere die Bögen, für die ein
+  Preis hinterlegt ist, und für Plotterpapier das größte Format.
 - **Preise und Texte** (Druck pro Image, Mindestpreis, Hauspost, allgemeine Hilfetexte).
 
 Jede Änderung landet mit altem und neuem Stand in `catalog_changes` und ist unter „Änderungen“ sichtbar.

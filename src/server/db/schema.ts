@@ -21,6 +21,7 @@ import type { JsonObject } from '../../lib/json'
 import type { BillingAddress, DeliveryAddress, StoredBillingAddress } from '../../lib/address'
 import { DELIVERY_METHODS } from '../../lib/order'
 import type { OrderSnapshot } from '../../lib/snapshot'
+import type { SheetSize } from '../../lib/catalog'
 import type { ChangeProposal } from '../../lib/proposal'
 
 export const userRole = pgEnum('user_role', USER_ROLES)
@@ -186,6 +187,9 @@ export const requests = pgTable(
     statusChangedAt: timestamp('status_changed_at', { withTimezone: true }).notNull().defaultNow(),
     // Von der Druckerei zugesagter Termin, für Kunden sichtbar.
     promisedDate: date('promised_date'),
+    // Bogen, auf dem gedruckt wird, nur für Mitarbeiter (Issue #88). Kopie der Katalogwerte, null heißt: wie berechnet.
+    printSheet: jsonb('print_sheet').$type<SheetSize>(),
+    coverPrintSheet: jsonb('cover_print_sheet').$type<SheetSize>(),
     // Interne Frist, nur für Mitarbeiter.
     internalDueDate: date('internal_due_date'),
     // Nur für Mitarbeiter sichtbar, solange der Auftrag bestätigt ist.
@@ -271,6 +275,7 @@ export const requestEventType = pgEnum('request_event_type', [
   'change_rejected',
   'change_withdrawn',
   'dates_changed',
+  'print_sheet_changed',
 ])
 
 export const requestEvents = pgTable(
@@ -428,6 +433,8 @@ export const papers = pgTable('papers', {
   forPlotter: boolean('for_plotter').notNull().default(false),
   /** Größtes Endformat, das auf diesem Papier möglich ist. */
   maxFormatId: text('max_format_id').references(() => formats.id, { onDelete: 'set null' }),
+  /** Bogengrößen, in denen das Papier vorrätig ist (Issue #88); daraus wählen Mitarbeiter das Druckformat. */
+  sheetSizes: jsonb('sheet_sizes').$type<SheetSize[]>().notNull().default([]),
   available: boolean('available').notNull().default(true),
   helpText: text('help_text').notNull().default(''),
   sortOrder: integer('sort_order').notNull().default(0),
