@@ -23,8 +23,8 @@ describe.skipIf(!url)('Board (Integration)', async () => {
     const rows = await getDb()
       .insert(schema.users)
       .values([
-        { email: `${tag}-k@test`, name: 'Boardkundin', role: 'customer', status: 'active', billingAddress: BILLING },
-        { email: `${tag}-s@test`, name: 'Boardstaff', role: 'staff', status: 'active' },
+        { email: `${tag}-k@test`, lastName: 'Boardkundin', role: 'customer', status: 'active', billingAddress: BILLING },
+        { email: `${tag}-s@test`, lastName: 'Boardstaff', role: 'staff', status: 'active' },
       ])
       .returning()
     customer = { id: rows[0]!.id, role: 'customer', organisationId: null }
