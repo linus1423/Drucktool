@@ -83,7 +83,7 @@ function readPending(): PendingLogin | null {
 export async function finishOidcLogin(request: Request) {
   const settings = getOidcSettings()
   if (!settings) return loginError('Die Anmeldung über OpenID Connect ist nicht eingerichtet.')
-  assertRateLimit('oidc-callback', 30, 60_000)
+  await assertRateLimit('oidc-callback', 30, 60_000)
 
   const pending = readPending()
   deleteCookie(FLOW_COOKIE, { path: '/api/auth/oidc' })

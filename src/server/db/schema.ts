@@ -19,6 +19,7 @@ import type { JsonObject } from '../../lib/json'
 import type { BillingAddress, DeliveryAddress } from '../../lib/address'
 import { DELIVERY_METHODS } from '../../lib/order'
 import type { OrderSnapshot } from '../../lib/snapshot'
+import type { ChangeProposal } from '../../lib/proposal'
 
 export const userRole = pgEnum('user_role', USER_ROLES)
 export const userStatus = pgEnum('user_status', USER_STATUSES)
@@ -102,6 +103,22 @@ export const loginTokens = pgTable(
   (t) => [index('login_tokens_email_idx').on(t.email)],
 )
 
+/**
+ * Zähler für Rate-Limits und Kontosperren. Liegt in PostgreSQL, damit Limits Neustarts
+ * überstehen und für alle App-Instanzen gelten. Der Schlüssel enthält nur einen Hash
+ * von IP-Adresse bzw. E-Mail-Adresse. Abgelaufene Einträge räumt der Worker auf.
+ */
+export const rateLimits = pgTable(
+  'rate_limits',
+  {
+    key: text('key').primaryKey(),
+    hits: integer('hits').notNull().default(0),
+    windowEndsAt: timestamp('window_ends_at', { withTimezone: true }).notNull(),
+    blockedUntil: timestamp('blocked_until', { withTimezone: true }),
+  },
+  (t) => [index('rate_limits_window_idx').on(t.windowEndsAt)],
+)
+
 /** Verknüpfung eines Benutzers mit einem Konto beim OpenID-Connect-Anbieter. */
 export const oidcAccounts = pgTable(
   'oidc_accounts',
@@ -145,6 +162,8 @@ export const requests = pgTable(
     // Zustimmung zu den Auftragsbedingungen beim verbindlichen Absenden (Lastenheft Schritt 8).
     termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),
     termsVersion: text('terms_version'),
+    // Offener Änderungsvorschlag der Druckerei, wartet auf die Zustimmung des Kunden (Issue #50).
+    proposal: jsonb('proposal').$type<ChangeProposal>(),
     status: requestStatus('status').notNull().default('submitted'),
     // Nur für Mitarbeiter sichtbar, solange der Auftrag bestätigt ist.
     internalStatus: internalStatus('internal_status'),
@@ -188,6 +207,10 @@ export const requestEventType = pgEnum('request_event_type', [
   'internal_status_changed',
   'assigned',
   'commented',
+  'change_proposed',
+  'change_accepted',
+  'change_rejected',
+  'change_withdrawn',
 ])
 
 export const requestEvents = pgTable(

@@ -7,6 +7,8 @@ import { schema, type Tx } from '../db/client.server'
 import { enqueueMail } from './outbox.server'
 import {
   assignedMail,
+  changeAnsweredMail,
+  changeProposedMail,
   commentMail,
   registrationApprovedMail,
   registrationReceivedMail,
@@ -108,6 +110,62 @@ export async function notifyStatusChanged(
     ? await customerRecipients(tx, request.createdById, actor.id)
     : await staffRecipients(tx, request.assigneeId, actor.id)
   await enqueueMail(tx, recipients, content)
+}
+
+// Ein Vorschlag braucht die Zustimmung des Kunden; die Mail geht deshalb auch an Mitarbeiter, die Aufträge
+// für sich selbst angelegt haben.
+export async function notifyChangeProposed(tx: Tx, actor: Actor, input: { requestId: string; reason: string }) {
+  const request = await loadRequest(tx, input.requestId)
+  const [row] = await tx.select({ proposal: requests.proposal }).from(requests).where(eq(requests.id, input.requestId))
+  const p = row?.proposal
+  if (!p) return
+  const recipients = await tx
+    .select({ email: users.email })
+    .from(users)
+    .where(
+      and(
+        eq(users.id, request.createdById),
+        eq(users.status, 'active'),
+        eq(users.emailNotifications, true),
+        ne(users.id, actor.id),
+      ),
+    )
+  await enqueueMail(
+    tx,
+    recipients.map((r) => r.email),
+    changeProposedMail({
+      ...request,
+      actorName: await actorName(tx, actor.id),
+      reason: input.reason,
+      before: request,
+      after: { order: p.order, totalCents: p.totalCents },
+    }),
+  )
+}
+
+/** Antwort des Kunden an den Mitarbeiter, der den Vorschlag gemacht hat. */
+export async function notifyChangeAnswered(
+  tx: Tx,
+  actor: Actor,
+  input: { requestId: string; accepted: boolean; proposedById: string },
+) {
+  const request = await loadRequest(tx, input.requestId)
+  const rows = await tx
+    .select({ email: users.email })
+    .from(users)
+    .where(
+      and(
+        eq(users.id, input.proposedById),
+        eq(users.status, 'active'),
+        eq(users.emailNotifications, true),
+        ne(users.id, actor.id),
+      ),
+    )
+  await enqueueMail(
+    tx,
+    rows.map((r) => r.email),
+    changeAnsweredMail({ ...request, actorName: await actorName(tx, actor.id), accepted: input.accepted }),
+  )
 }
 
 export async function notifyComment(tx: Tx, actor: Actor, input: { requestId: string; body: string; internal: boolean }) {

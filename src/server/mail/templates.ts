@@ -122,6 +122,39 @@ export function requestReceivedMail(r: RequestRef & OrderRef): MailContent {
   ])
 }
 
+export function changeProposedMail(
+  r: RequestRef & { actorName: string; reason: string; before: OrderRef; after: OrderRef },
+): MailContent {
+  const price =
+    r.before.totalCents != null && r.after.totalCents != null && r.before.totalCents !== r.after.totalCents
+      ? `Der Preis ändert sich von ${formatMoney(r.before.totalCents)} auf ${formatMoney(r.after.totalCents)}.`
+      : null
+  return compose(`Änderungsvorschlag zu ${requestLabel(r)}`, [
+    { kind: 'p', text: `${r.actorName} schlägt eine Änderung an Ihrem Auftrag ${requestLabel(r)} vor:` },
+    { kind: 'quote', text: r.reason },
+    ...(price ? [{ kind: 'p', text: price } as Block] : []),
+    { kind: 'p', text: 'Neuer Stand:' },
+    ...orderSummary(r.after),
+    {
+      kind: 'p',
+      text: 'Die Änderung gilt erst, wenn Sie zustimmen. Bitte nehmen Sie den Vorschlag im Drucktool an oder lehnen Sie ihn ab.',
+    },
+    requestButton(r),
+  ])
+}
+
+export function changeAnsweredMail(r: RequestRef & { actorName: string; accepted: boolean }): MailContent {
+  return compose(`Änderung ${r.accepted ? 'angenommen' : 'abgelehnt'}: ${requestLabel(r)}`, [
+    {
+      kind: 'p',
+      text: r.accepted
+        ? `${r.actorName} hat dem Änderungsvorschlag zu ${requestLabel(r)} zugestimmt. Der neue Stand gilt.`
+        : `${r.actorName} hat den Änderungsvorschlag zu ${requestLabel(r)} abgelehnt. Der bisherige Stand gilt weiter, der Auftrag steht auf „Rückfrage“.`,
+    },
+    requestButton(r),
+  ])
+}
+
 export function commentMail(r: RequestRef & { actorName: string; body: string; internal: boolean }): MailContent {
   return compose(`${r.internal ? 'Interne Notiz' : 'Neue Nachricht'} zu ${requestLabel(r)}`, [
     {

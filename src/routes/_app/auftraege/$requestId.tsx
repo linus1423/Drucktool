@@ -3,6 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { formatBillingAddress, formatDeliveryAddress } from '~/lib/address'
 import { formatBytes } from '~/components/FileUpload'
+import { ProposalCard, ProposeChangeForm } from '~/components/ChangeProposal'
 import { RequestFields, useRequestForm } from '~/components/RequestFields'
 import { Alert, Badge, Button, Card, Field, Select, StatusBadge, Textarea, cx } from '~/components/ui'
 import { errorMessage, isConflictError } from '~/lib/errors'
@@ -16,6 +17,7 @@ import {
   INTERNAL_STATUS_LABELS,
   INTERNAL_STATUS_TONES,
   STATUS_LABELS,
+  TERMINAL_STATUSES,
   hasInternalStatus,
   transitionLabel,
   type InternalStatus,
@@ -65,6 +67,9 @@ function RequestDetailPage() {
   const staff = isStaffRole(user.role)
   const { data: request } = useSuspenseQuery(requestDetailQuery(requestId))
   const [editing, setEditing] = useState(false)
+  const [proposing, setProposing] = useState(false)
+  const refresh = useRefresh(requestId)
+  const canPropose = staff && !!request.order && !TERMINAL_STATUSES.has(request.status)
 
   return (
     <div className="space-y-6">
@@ -95,17 +100,29 @@ function RequestDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          {proposing ? (
+            <ProposeChangeForm request={request} onDone={() => setProposing(false)} onChanged={refresh} />
+          ) : (
+            <ProposalCard request={request} staff={staff} onChanged={refresh} onEdit={() => setProposing(true)} />
+          )}
           {editing ? (
             <EditRequest request={request} onDone={() => setEditing(false)} />
           ) : (
             <Card
               title="Auftrag"
               actions={
-                request.canEdit ? (
-                  <Button variant="secondary" onClick={() => setEditing(true)}>
-                    Bearbeiten
-                  </Button>
-                ) : null
+                <div className="flex gap-2">
+                  {canPropose && !request.proposal && !proposing ? (
+                    <Button variant="secondary" onClick={() => setProposing(true)}>
+                      Änderung vorschlagen
+                    </Button>
+                  ) : null}
+                  {request.canEdit ? (
+                    <Button variant="secondary" onClick={() => setEditing(true)}>
+                      Bearbeiten
+                    </Button>
+                  ) : null}
+                </div>
               }
             >
               <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
@@ -505,6 +522,16 @@ function describeEvent(e: Detail['events'][number]) {
     }
     case 'commented':
       return 'hat kommentiert'
+    case 'change_proposed': {
+      const total = typeof e.data.totalCents === 'number' ? e.data.totalCents : null
+      return `hat eine Änderung vorgeschlagen${total != null ? ` (neuer Preis ${formatMoney(total)})` : ''}`
+    }
+    case 'change_accepted':
+      return 'hat der Änderung zugestimmt'
+    case 'change_rejected':
+      return 'hat die Änderung abgelehnt'
+    case 'change_withdrawn':
+      return 'hat den Änderungsvorschlag zurückgezogen'
   }
 }
 

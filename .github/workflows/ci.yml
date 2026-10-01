@@ -3,10 +3,19 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
+    name: Typecheck, Tests, Migrationen
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -25,6 +34,9 @@ jobs:
       TEST_DATABASE_URL: postgres://drucktool:drucktool@localhost:5432/drucktool_test
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Für den Migrationstest gegen den Stand vor dieser Änderung.
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -34,3 +46,130 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - name: Keine ungenerierten Schemaänderungen
+        run: |
+          pnpm exec drizzle-kit check
+          timeout 120 pnpm exec drizzle-kit generate --name ci-pruefung < /dev/null
+          if [ -n "$(git status --porcelain drizzle)" ]; then
+            git status --porcelain drizzle
+            echo '::error::src/server/db/schema.ts enthält Änderungen ohne Migration. Bitte "pnpm db:generate --name <name>" ausführen und die Dateien einchecken.'
+            exit 1
+          fi
+      - name: Migrationen auf dem bisherigen Schema einspielen
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          DATABASE_URL: postgres://drucktool:drucktool@localhost:5432/drucktool_upgrade
+        run: |
+          if [ -z "$BASE_SHA" ] || ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+            echo 'Kein vorheriger Stand vorhanden, Test entfällt.'
+            exit 0
+          fi
+          psql postgres://drucktool:drucktool@localhost:5432/drucktool_test -c 'create database drucktool_upgrade'
+          mkdir -p /tmp/vorher
+          git archive "$BASE_SHA" drizzle | tar -x -C /tmp/vorher
+          echo "Schema von ${BASE_SHA} anlegen …"
+          MIGRATIONS_DIR=/tmp/vorher/drizzle pnpm db:migrate
+          echo 'Neue Migrationen darauf einspielen …'
+          pnpm db:migrate
+
+  ansible:
+    name: Ansible prüfen
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ansible
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install 'ansible-core>=2.17,<2.20' ansible-lint
+      - run: ansible-galaxy collection install -r requirements.yml
+      - run: ansible-lint
+      - run: ansible-playbook -i inventory.example.yml --syntax-check playbook.yml
+
+  smoke:
+    name: Docker-Smoke-Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: version
+        run: echo "version=$(git describe --tags --always)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: drucktool:local
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.version }}
+            GIT_COMMIT=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Image starten, Healthcheck und Anmeldung prüfen
+        run: scripts/smoke/smoke-test.sh
+
+  # Veröffentlicht das Image nur, wenn alle Prüfungen grün sind.
+  image:
+    name: Docker-Image veröffentlichen
+    if: github.event_name == 'push'
+    needs: [check, ansible, smoke]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: version
+        run: echo "version=$(git describe --tags --always)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - name: Image für den Sicherheitsscan bauen
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: drucktool:scan
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.version }}
+            GIT_COMMIT=${{ github.sha }}
+          cache-from: type=gha
+      - name: Auf kritische Sicherheitslücken prüfen
+        # Auf Commit festgelegt (v0.35.0): Versions-Tags dieser Action wurden im März 2026 kompromittiert.
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1
+        with:
+          version: v0.69.3
+          image-ref: drucktool:scan
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/drucktool
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.version }}
+            GIT_COMMIT=${{ github.sha }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
