@@ -1,6 +1,7 @@
 import { queryOptions } from '@tanstack/react-query'
 import { getAdminCatalogFn, getOrderCatalogFn, listCatalogChangesFn } from '~/server/catalog/catalog.functions'
 import { getCurrentUser } from '~/server/auth/auth.functions'
+import { getMyAccountFn } from '~/server/account/account.functions'
 import { getRequestFn, listAssignableStaffFn, listRequestsFn } from '~/server/requests/requests.functions'
 import {
   getOrganisationFn,
@@ -83,3 +84,5 @@ export const catalogChangesQuery = queryOptions({
   queryKey: ['catalog', 'changes'],
   queryFn: () => listCatalogChangesFn(),
 })
+
+export const accountQuery = queryOptions({ queryKey: ['account'], queryFn: () => getMyAccountFn() })

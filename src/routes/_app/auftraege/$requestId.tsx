@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { formatBillingAddress } from '~/lib/address'
-import { RequestFields, toRequestInput, useRequestForm } from '~/components/RequestFields'
+import { formatBillingAddress, formatDeliveryAddress } from '~/lib/address'
+import { formatBytes } from '~/components/FileUpload'
+import { RequestFields, useRequestForm } from '~/components/RequestFields'
 import { Alert, Badge, Button, Card, Field, Select, StatusBadge, Textarea, cx } from '~/components/ui'
 import { errorMessage, isConflictError } from '~/lib/errors'
-import { formatDate, formatDateTime, formatRequestNumber } from '~/lib/format'
+import { formatDate, formatDateTime, formatMoney, formatRequestNumber } from '~/lib/format'
+import { DELIVERY_LABELS } from '~/lib/order'
+import { describeOrder } from '~/lib/snapshot'
 import { assignableStaffQuery, requestDetailQuery } from '~/lib/queries'
 import { isStaffRole } from '~/lib/roles'
 import {
@@ -26,15 +29,17 @@ import {
   updateRequestFn,
 } from '~/server/requests/requests.functions'
 
-export const Route = createFileRoute('/_app/anfragen/$requestId')({
+export const Route = createFileRoute('/_app/auftraege/$requestId')({
   loader: ({ context, params }) => context.queryClient.ensureQueryData(requestDetailQuery(params.requestId)),
   head: ({ loaderData }) => ({
-    meta: [{ title: loaderData ? `${formatRequestNumber(loaderData.number)} ${loaderData.title} · Drucktool` : 'Anfrage · Drucktool' }],
+    meta: [
+      { title: loaderData ? `${formatRequestNumber(loaderData.number)} ${loaderData.title} · Drucktool` : 'Auftrag · Drucktool' },
+    ],
   }),
   errorComponent: ({ error }) => (
     <div className="space-y-4">
       <Alert>{errorMessage(error)}</Alert>
-      <Link to="/anfragen" className="text-sm underline">
+      <Link to="/auftraege" className="text-sm underline">
         Zurück zur Übersicht
       </Link>
     </div>
@@ -64,8 +69,8 @@ function RequestDetailPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link to="/anfragen" className="text-sm text-slate-500 hover:text-slate-900">
-          ← Alle Anfragen
+        <Link to="/auftraege" className="text-sm text-slate-500 hover:text-slate-900">
+          ← Alle Aufträge
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">
@@ -74,13 +79,17 @@ function RequestDetailPage() {
           </h1>
           <StatusBadge status={request.status} />
           {request.internalStatus ? (
-            <Badge className={INTERNAL_STATUS_TONES[request.internalStatus]}>{INTERNAL_STATUS_LABELS[request.internalStatus]}</Badge>
+            <Badge className={INTERNAL_STATUS_TONES[request.internalStatus]}>
+              {INTERNAL_STATUS_LABELS[request.internalStatus]}
+            </Badge>
           ) : null}
         </div>
         <p className="mt-1 text-sm text-slate-600">
           {request.organisationName ? `${request.organisationName} · ` : ''}angelegt von {request.creatorName}
           {request.creatorEmail ? ` (${request.creatorEmail})` : ''} am {formatDateTime(request.createdAt)}
-          {request.confirmedAt ? ` · bestätigt von ${request.confirmedByName ?? 'der Druckerei'} am ${formatDateTime(request.confirmedAt)}` : ''}
+          {request.confirmedAt
+            ? ` · bestätigt von ${request.confirmedByName ?? 'der Druckerei'} am ${formatDateTime(request.confirmedAt)}`
+            : ''}
         </p>
       </div>
 
@@ -90,7 +99,7 @@ function RequestDetailPage() {
             <EditRequest request={request} onDone={() => setEditing(false)} />
           ) : (
             <Card
-              title="Details"
+              title="Auftrag"
               actions={
                 request.canEdit ? (
                   <Button variant="secondary" onClick={() => setEditing(true)}>
@@ -99,24 +108,47 @@ function RequestDetailPage() {
                 ) : null
               }
             >
-              <dl className="grid gap-4 text-sm sm:grid-cols-2">
+              <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+                {request.order ? (
+                  describeOrder(request.order).map(([label, value]) => (
+                    <div key={label}>
+                      <dt className="font-medium text-slate-500">{label}</dt>
+                      <dd className="mt-0.5">{value}</dd>
+                    </div>
+                  ))
+                ) : (
+                  <>
+                    <div>
+                      <dt className="font-medium text-slate-500">Auflage</dt>
+                      <dd className="mt-0.5">{request.quantity?.toLocaleString('de-DE') ?? '–'}</dd>
+                    </div>
+                    <div>
+                      <dt className="font-medium text-slate-500">Wunschtermin</dt>
+                      <dd className="mt-0.5">{formatDate(request.desiredDate)}</dd>
+                    </div>
+                  </>
+                )}
                 <div className="sm:col-span-2">
-                  <dt className="font-medium text-slate-500">Beschreibung</dt>
-                  <dd className="mt-1 whitespace-pre-wrap">{request.description || '–'}</dd>
-                </div>
-                <div>
-                  <dt className="font-medium text-slate-500">Auflage</dt>
-                  <dd className="mt-1">{request.quantity?.toLocaleString('de-DE') ?? '–'}</dd>
-                </div>
-                <div>
-                  <dt className="font-medium text-slate-500">Wunschtermin</dt>
-                  <dd className="mt-1">{formatDate(request.desiredDate)}</dd>
+                  <dt className="font-medium text-slate-500">Bemerkungen</dt>
+                  <dd className="mt-0.5 whitespace-pre-wrap">{request.description || '–'}</dd>
                 </div>
                 {request.billingAddress ? (
                   <div>
                     <dt className="font-medium text-slate-500">Rechnungsadresse</dt>
-                    <dd className="mt-1">
+                    <dd className="mt-0.5">
                       {formatBillingAddress(request.billingAddress).map((line) => (
+                        <span key={line} className="block">
+                          {line}
+                        </span>
+                      ))}
+                    </dd>
+                  </div>
+                ) : null}
+                {request.deliveryMethod === 'house_post' && request.deliveryAddress ? (
+                  <div>
+                    <dt className="font-medium text-slate-500">Lieferadresse (Hauspost)</dt>
+                    <dd className="mt-0.5">
+                      {formatDeliveryAddress(request.deliveryAddress).map((line) => (
                         <span key={line} className="block">
                           {line}
                         </span>
@@ -128,10 +160,12 @@ function RequestDetailPage() {
             </Card>
           )}
 
+          <Files request={request} staff={staff} />
           <Comments request={request} staff={staff} />
         </div>
 
         <div className="space-y-6">
+          <PriceCard request={request} staff={staff} />
           <StatusActions request={request} staff={staff} />
           {staff && hasInternalStatus(request.status) ? <InternalStatusCard request={request} /> : null}
           {staff ? <Assignment request={request} /> : null}
@@ -162,16 +196,11 @@ function EditRequest({ request, onDone }: { request: Detail; onDone: () => void 
   const refresh = useRefresh(request.id)
   const [error, setError] = useState<unknown>(null)
   const form = useRequestForm({
-    defaultValues: {
-      title: request.title,
-      description: request.description,
-      quantity: request.quantity?.toString() ?? '',
-      desiredDate: request.desiredDate ?? '',
-    },
+    defaultValues: { title: request.title, notes: request.description },
     onSubmit: async (values) => {
       setError(null)
       try {
-        await updateRequestFn({ data: { id: request.id, version: request.version, ...toRequestInput(values) } })
+        await updateRequestFn({ data: { id: request.id, version: request.version, ...values } })
         await refresh()
         onDone()
       } catch (e) {
@@ -181,7 +210,7 @@ function EditRequest({ request, onDone }: { request: Detail; onDone: () => void 
   })
 
   return (
-    <Card title="Anfrage bearbeiten">
+    <Card title="Auftrag bearbeiten">
       <form
         className="space-y-4"
         onSubmit={(e) => {
@@ -284,7 +313,13 @@ function StatusActions({ request, staff }: { request: Detail; staff: boolean }) 
               htmlFor="note"
               hint="Wird als Kommentar für alle Beteiligten gespeichert und in der E-Mail mitgeschickt."
             >
-              <Textarea id="note" rows={3} value={note} onChange={(e) => setNote(e.target.value)} required={target === 'on_hold'} />
+              <Textarea
+                id="note"
+                rows={3}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                required={target === 'on_hold'}
+              />
             </Field>
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setTarget(null)}>
@@ -400,7 +435,11 @@ function Comments({ request, staff }: { request: Detail; staff: boolean }) {
                 key={c.id}
                 className={cx(
                   'rounded-md p-3 text-sm ring-1',
-                  c.internal ? 'bg-amber-50 ring-amber-200' : c.authorIsStaff ? 'bg-slate-50 ring-slate-200' : 'bg-white ring-slate-200',
+                  c.internal
+                    ? 'bg-amber-50 ring-amber-200'
+                    : c.authorIsStaff
+                      ? 'bg-slate-50 ring-slate-200'
+                      : 'bg-white ring-slate-200',
                 )}
               >
                 <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
@@ -486,3 +525,81 @@ function History({ request }: { request: Detail }) {
   )
 }
 
+const PDF_STATUS_TEXT = {
+  ok: null,
+  encrypted: 'PDF ist geschützt',
+  unreadable: 'PDF konnte nicht gelesen werden',
+  not_pdf: 'Keine PDF',
+} as const
+
+function Files({ request, staff }: { request: Detail; staff: boolean }) {
+  if (request.files.length === 0) return null
+  return (
+    <Card title="Dateien">
+      <ul className="divide-y divide-slate-100 text-sm">
+        {request.files.map((f) => {
+          const problem = PDF_STATUS_TEXT[f.pdfStatus]
+          return (
+            <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+              <div>
+                <a href={`/api/dateien/${f.id}`} className="font-medium text-slate-900 underline">
+                  {f.filename}
+                </a>
+                <span className="ml-2 text-slate-500">
+                  {f.role === 'cover' ? 'Deckblatt · ' : ''}
+                  {formatBytes(f.sizeBytes)}
+                  {f.pageCount != null ? ` · ${f.pageCount} S.` : ''}
+                  {f.pageWidthMm && f.pageHeightMm ? ` · ${f.pageWidthMm} × ${f.pageHeightMm} mm` : ''}
+                </span>
+              </div>
+              {staff && (problem || f.mixedPageSizes) ? (
+                <Badge className="bg-amber-100 text-amber-800">{problem ?? 'Unterschiedliche Seitengrößen'}</Badge>
+              ) : null}
+            </li>
+          )
+        })}
+      </ul>
+    </Card>
+  )
+}
+
+function PriceCard({ request, staff }: { request: Detail; staff: boolean }) {
+  const order = request.order
+  if (!order) return null
+  const { price } = order
+  return (
+    <Card title="Preis">
+      <dl className="space-y-1 text-sm">
+        {staff && price.lines.length ? (
+          <div className="mb-3 space-y-2 border-b border-slate-100 pb-3">
+            {price.lines.map((line) => (
+              <div key={line.key}>
+                <div className="flex justify-between gap-2">
+                  <dt>{line.label}</dt>
+                  <dd className="whitespace-nowrap">{formatMoney(line.amountCents)}</dd>
+                </div>
+                <div className="text-xs text-slate-500">{line.detail}</div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <div className="flex justify-between">
+          <dt>Druckkosten</dt>
+          <dd>{formatMoney(price.printCents)}</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt>Lieferkosten ({DELIVERY_LABELS[request.deliveryMethod]})</dt>
+          <dd>{formatMoney(price.deliveryCents)}</dd>
+        </div>
+        <div className="flex justify-between text-base font-semibold">
+          <dt>Gesamt</dt>
+          <dd>{formatMoney(price.totalCents)}</dd>
+        </div>
+      </dl>
+      <p className="mt-2 text-xs text-slate-500">
+        Preis zum Zeitpunkt des Absendens
+        {request.termsAcceptedAt ? `, Bedingungen akzeptiert am ${formatDateTime(request.termsAcceptedAt)}` : ''}.
+      </p>
+    </Card>
+  )
+}

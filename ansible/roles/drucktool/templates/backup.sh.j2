@@ -1,7 +1,9 @@
 #!/bin/sh
-# Verwaltet von Ansible. Sichert die Datenbank und löscht alte Backups.
+# Verwaltet von Ansible. Sichert Datenbank und Druckdateien und löscht alte Datenbank-Backups.
 set -eu
 target="{{ drucktool_backup_dir }}/drucktool-$(date +%Y%m%d-%H%M%S).sql.gz"
 docker compose --project-directory "{{ drucktool_dir }}" exec -T db pg_dump -U drucktool drucktool | gzip > "$target"
 chmod 600 "$target"
 find "{{ drucktool_backup_dir }}" -name 'drucktool-*.sql.gz' -mtime +{{ drucktool_backup_keep_days }} -delete
+# Druckdateien werden gespiegelt; gelöschte Dateien verschwinden auch aus der Sicherung.
+rsync -a --delete "{{ drucktool_dir }}/uploads/" "{{ drucktool_backup_dir }}/uploads/"

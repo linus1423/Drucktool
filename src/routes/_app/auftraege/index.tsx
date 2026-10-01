@@ -4,7 +4,8 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { z } from 'zod'
 import { DataTable, dataColumnHelper } from '~/components/DataTable'
 import { Badge, Input, PageHeader, Select, StatusBadge } from '~/components/ui'
-import { formatDate, formatDateTime, formatRequestNumber } from '~/lib/format'
+import { formatDateTime, formatMoney, formatRequestNumber } from '~/lib/format'
+import { DELIVERY_LABELS } from '~/lib/order'
 import { requestListQuery } from '~/lib/queries'
 import { isStaffRole } from '~/lib/roles'
 import { INTERNAL_STATUS_LABELS, INTERNAL_STATUS_TONES, REQUEST_STATUSES, STATUS_LABELS } from '~/lib/status'
@@ -15,11 +16,11 @@ const searchSchema = z.object({
   q: z.string().optional().catch(undefined),
 })
 
-export const Route = createFileRoute('/_app/anfragen/')({
+export const Route = createFileRoute('/_app/auftraege/')({
   validateSearch: searchSchema,
   loaderDeps: ({ search }) => search,
   loader: ({ context, deps }) => context.queryClient.ensureQueryData(requestListQuery(toFilter(deps))),
-  head: () => ({ meta: [{ title: 'Anfragen · Drucktool' }] }),
+  head: () => ({ meta: [{ title: 'Aufträge · Drucktool' }] }),
   component: RequestListPage,
 })
 
@@ -55,7 +56,7 @@ function RequestListPage() {
         header: 'Titel',
         sortFn: 'text',
         cell: (info) => (
-          <Link to="/anfragen/$requestId" params={{ requestId: info.row.original.id }} className="font-medium hover:underline">
+          <Link to="/auftraege/$requestId" params={{ requestId: info.row.original.id }} className="font-medium hover:underline">
             {info.getValue()}
           </Link>
         ),
@@ -89,12 +90,25 @@ function RequestListPage() {
         },
       }),
       col.accessor('quantity', {
-        header: 'Auflage',
+        header: 'Exemplare',
         cell: (info) => info.getValue()?.toLocaleString('de-DE') ?? '–',
       }),
-      col.accessor('desiredDate', { header: 'Wunschtermin', cell: (info) => formatDate(info.getValue()) }),
+      col.accessor('totalCents', { header: 'Preis', cell: (info) => formatMoney(info.getValue()) }),
+      col.accessor('deliveryMethod', {
+        header: 'Lieferung',
+        cell: (info) =>
+          info.getValue() === 'house_post' ? (
+            <Badge className="bg-violet-100 text-violet-800">{DELIVERY_LABELS.house_post}</Badge>
+          ) : (
+            <span className="text-slate-500">{DELIVERY_LABELS.pickup}</span>
+          ),
+      }),
       ...(staff ? [col.accessor('assigneeName', { header: 'Zuständig', cell: (info) => info.getValue() ?? '–' })] : []),
-      col.accessor('updatedAt', { header: 'Zuletzt geändert', sortFn: 'datetime', cell: (info) => formatDateTime(info.getValue()) }),
+      col.accessor('updatedAt', {
+        header: 'Zuletzt geändert',
+        sortFn: 'datetime',
+        cell: (info) => formatDateTime(info.getValue()),
+      }),
     ],
     [staff],
   )
@@ -102,22 +116,22 @@ function RequestListPage() {
   return (
     <>
       <PageHeader
-        title="Anfragen"
-        description={staff ? 'Alle Anfragen der Kunden' : 'Ihre Anfragen'}
+        title="Aufträge"
+        description={staff ? 'Alle Aufträge der Kunden' : 'Ihre Aufträge'}
         actions={
           <Link
-            to="/anfragen/neu"
+            to="/auftraege/neu"
             className="inline-flex items-center rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
           >
-            Neue Anfrage
+            Neuer Auftrag
           </Link>
         }
       />
       <DataTable
         data={data}
         columns={columns}
-        onRowClick={(row) => navigate({ to: '/anfragen/$requestId', params: { requestId: row.id } })}
-        emptyText="Keine Anfragen gefunden."
+        onRowClick={(row) => navigate({ to: '/auftraege/$requestId', params: { requestId: row.id } })}
+        emptyText="Keine Aufträge gefunden."
         toolbar={
           <>
             <form

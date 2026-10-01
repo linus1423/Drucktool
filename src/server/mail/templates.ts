@@ -1,5 +1,6 @@
 // E-Mail-Vorlagen. Reine Funktionen ohne Datenbankzugriff, damit sie testbar bleiben.
-import { formatRequestNumber } from '~/lib/format'
+import { formatMoney, formatRequestNumber } from '~/lib/format'
+import { describeOrder, type OrderSnapshot } from '~/lib/snapshot'
 import { STATUS_LABELS, type RequestStatus } from '~/lib/status'
 
 export type MailContent = { subject: string; text: string; html: string }
@@ -10,12 +11,7 @@ export function appUrl(path = '') {
 }
 
 function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }
 
 type Block = { kind: 'p'; text: string } | { kind: 'quote'; text: string } | { kind: 'button'; label: string; href: string }
@@ -61,19 +57,31 @@ ${body}
 }
 
 type RequestRef = { id: string; number: number; title: string }
+type OrderRef = { order?: OrderSnapshot | null; totalCents?: number | null; deliveryMethod?: 'pickup' | 'house_post' }
+
+/** Zusammenfassung der gewählten Optionen und des Preises, falls der Auftrag aus dem Wizard kommt. */
+function orderSummary(r: OrderRef): Block[] {
+  if (!r.order) return []
+  const rows = describeOrder(r.order).map(([label, value]) => `${label}: ${value}`)
+  if (r.totalCents != null) rows.push(`Preis: ${formatMoney(r.totalCents)}`)
+  return [{ kind: 'quote', text: rows.join('\n') }]
+}
 
 function requestLabel(r: RequestRef) {
   return `${formatRequestNumber(r.number)} ${r.title}`
 }
 
 function requestButton(r: RequestRef): Block {
-  return { kind: 'button', label: 'Auftrag öffnen', href: appUrl(`/anfragen/${r.id}`) }
+  return { kind: 'button', label: 'Auftrag öffnen', href: appUrl(`/auftraege/${r.id}`) }
 }
 
-export function requestCreatedMail(r: RequestRef & { organisationName: string | null; actorName: string }): MailContent {
+export function requestCreatedMail(
+  r: RequestRef & OrderRef & { organisationName: string | null; actorName: string },
+): MailContent {
   const who = r.organisationName ? `${r.actorName} (${r.organisationName})` : r.actorName
   return compose(`Neuer Auftrag ${requestLabel(r)}`, [
     { kind: 'p', text: `${who} hat einen neuen Auftrag eingereicht: ${requestLabel(r)}.` },
+    ...orderSummary(r),
     requestButton(r),
   ])
 }
@@ -83,28 +91,29 @@ const STATUS_TEXT: Partial<Record<RequestStatus, string>> = {
   confirmed:
     'Die Druckerei hat Ihren Auftrag angenommen. Damit ist der Auftrag verbindlich; wir melden uns, sobald er fertig ist.',
   on_hold: 'Wir haben eine Rückfrage zu Ihrem Auftrag. Bitte antworten Sie im Drucktool.',
-  completed: 'Ihr Auftrag ist fertig.',
+  completed: 'Ihr Auftrag ist fertig und liegt zur Abholung im Regal der Druckerei bereit.',
   rejected: 'Leider können wir Ihren Auftrag nicht annehmen.',
   cancelled: 'Der Auftrag wurde storniert.',
   submitted: 'Der Auftrag liegt wieder bei der Druckerei.',
 }
 
+const COMPLETED_HOUSE_POST = 'Ihr Auftrag ist fertig und geht mit der nächsten Hauspost an die angegebene Adresse.'
+
 export function statusChangedMail(
-  r: RequestRef & { actorName: string; from: RequestStatus; to: RequestStatus; note?: string | null },
+  r: RequestRef & OrderRef & { actorName: string; from: RequestStatus; to: RequestStatus; note?: string | null },
 ): MailContent {
-  const blocks: Block[] = [
-    { kind: 'p', text: `${requestLabel(r)}: ${STATUS_LABELS[r.from]} → ${STATUS_LABELS[r.to]}.` },
-  ]
-  const text = STATUS_TEXT[r.to]
+  const blocks: Block[] = [{ kind: 'p', text: `${requestLabel(r)}: ${STATUS_LABELS[r.from]} → ${STATUS_LABELS[r.to]}.` }]
+  const text = r.to === 'completed' && r.deliveryMethod === 'house_post' ? COMPLETED_HOUSE_POST : STATUS_TEXT[r.to]
   if (text) blocks.push({ kind: 'p', text })
   if (r.note) blocks.push({ kind: 'quote', text: r.note })
   blocks.push({ kind: 'p', text: `Geändert von ${r.actorName}.` }, requestButton(r))
   return compose(`${requestLabel(r)}: ${STATUS_LABELS[r.to]}`, blocks)
 }
 
-export function requestReceivedMail(r: RequestRef): MailContent {
+export function requestReceivedMail(r: RequestRef & OrderRef): MailContent {
   return compose(`Auftrag eingereicht: ${requestLabel(r)}`, [
     { kind: 'p', text: `Wir haben Ihren Auftrag ${requestLabel(r)} erhalten.` },
+    ...orderSummary(r),
     {
       kind: 'p',
       text: 'Verbindlich wird er erst, wenn ein Mitarbeiter der Druckerei ihn bestätigt. Darüber informieren wir Sie per E-Mail.',
@@ -115,7 +124,10 @@ export function requestReceivedMail(r: RequestRef): MailContent {
 
 export function commentMail(r: RequestRef & { actorName: string; body: string; internal: boolean }): MailContent {
   return compose(`${r.internal ? 'Interne Notiz' : 'Neue Nachricht'} zu ${requestLabel(r)}`, [
-    { kind: 'p', text: `${r.actorName} hat ${r.internal ? 'eine interne Notiz' : 'eine Nachricht'} zu ${requestLabel(r)} geschrieben:` },
+    {
+      kind: 'p',
+      text: `${r.actorName} hat ${r.internal ? 'eine interne Notiz' : 'eine Nachricht'} zu ${requestLabel(r)} geschrieben:`,
+    },
     { kind: 'quote', text: r.body },
     requestButton(r),
   ])
@@ -138,7 +150,7 @@ export function registrationReceivedMail(u: { name: string; email: string; organ
 export function registrationApprovedMail(u: { name: string }): MailContent {
   return compose('Ihr Konto wurde freigegeben', [
     { kind: 'p', text: `Hallo ${u.name},` },
-    { kind: 'p', text: 'Ihr Konto im Drucktool wurde freigegeben. Sie können sich jetzt anmelden und Anfragen stellen.' },
+    { kind: 'p', text: 'Ihr Konto im Drucktool wurde freigegeben. Sie können sich jetzt anmelden und Aufträge aufgeben.' },
     { kind: 'button', label: 'Zur Anmeldung', href: appUrl('/login') },
   ])
 }
@@ -156,7 +168,10 @@ export function registrationRejectedMail(u: { name: string }): MailContent {
 export function loginLinkMail(link: string, minutes: number): MailContent {
   return compose('Ihr Anmeldelink für das Drucktool', [
     { kind: 'p', text: 'Hallo,' },
-    { kind: 'p', text: `mit dem folgenden Link melden Sie sich im Drucktool an. Er ist ${minutes} Minuten gültig und funktioniert nur einmal.` },
+    {
+      kind: 'p',
+      text: `mit dem folgenden Link melden Sie sich im Drucktool an. Er ist ${minutes} Minuten gültig und funktioniert nur einmal.`,
+    },
     { kind: 'button', label: 'Jetzt anmelden', href: link },
     { kind: 'p', text: 'Wenn Sie keinen Link angefordert haben, können Sie diese E-Mail ignorieren.' },
   ])

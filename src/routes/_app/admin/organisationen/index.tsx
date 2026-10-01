@@ -21,7 +21,7 @@ const columns = [
   col.accessor('city', { header: 'Ort', cell: (i) => i.getValue() ?? '–' }),
   col.accessor('email', { header: 'E-Mail', cell: (i) => i.getValue() ?? '–' }),
   col.accessor('memberCount', { header: 'Benutzer' }),
-  col.accessor('requestCount', { header: 'Anfragen' }),
+  col.accessor('requestCount', { header: 'Aufträge' }),
   col.accessor('status', {
     header: 'Status',
     cell: (i) => <Badge className={ORG_STATUS[i.getValue()].className}>{ORG_STATUS[i.getValue()].label}</Badge>,

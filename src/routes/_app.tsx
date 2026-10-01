@@ -32,12 +32,12 @@ function AppLayout() {
     <div className="min-h-screen">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-4 py-3">
-          <Link to="/anfragen" className="mr-4 text-lg font-semibold tracking-tight">
+          <Link to="/auftraege" className="mr-4 text-lg font-semibold tracking-tight">
             Drucktool
           </Link>
           <nav className="flex flex-1 flex-wrap gap-1">
-            <Link to="/anfragen" className={navLink} activeProps={navActive}>
-              Anfragen
+            <Link to="/auftraege" className={navLink} activeProps={navActive}>
+              Aufträge
             </Link>
             {user.role === 'superadmin' ? (
               <Link to="/admin/freigaben" className={navLink} activeProps={navActive}>

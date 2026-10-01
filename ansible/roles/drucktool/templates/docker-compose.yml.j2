@@ -22,6 +22,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      # Hochgeladene Druckdateien, gehört dem Benutzer node (UID 1000) im Container.
+      - ./uploads:/app/uploads
     ports:
 {% if drucktool_domain %}
       # Nur lokal erreichbar, Caddy übernimmt HTTPS.

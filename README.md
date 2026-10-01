@@ -64,7 +64,33 @@ Admins pflegen unter „Katalog und Preise“ alles, was Kunden im Bestellformul
 
 Jede Änderung landet mit altem und neuem Stand in `catalog_changes` und ist unter „Änderungen“ sichtbar.
 Die Startwerte kommen aus der Migration `0005_catalog.sql`. Die Druckpreise pro Image und der Mindestpreis sind
-dort nur Platzhalter und müssen vor dem Start gesetzt werden.
+dort nur Platzhalter und müssen vor dem Start gesetzt werden. Ebenso ist der Text der Auftragsbedingungen
+(„Preise und Texte“) nur ein Platzhalter.
+
+## Neuer Auftrag
+
+Kunden und Mitarbeiter legen Aufträge in sieben Schritten an: Datei, Format, Bindung, Papier (mit optionalem
+Deckblatt und Coverfarbe), Optionen, Lieferung und Absenden. Jeder Schritt zeigt nur, was zum bisher Gewählten
+passt; nicht wählbare Optionen sind ausgegraut und nennen den Grund. Rechts steht laufend der Preis.
+
+Die Datei kommt zuerst, weil das Drucktool aus dem PDF Seitenzahl und Seitenformat liest und daraus das Format
+vorschlägt. Das Lastenheft sieht den Upload erst nach den Optionen vor.
+
+**Preisberechnung** (`src/lib/pricing.ts`): Die Seiten werden auf den kleinsten passenden Druckbogen ausgeschossen
+(A4, A3 oder SRA3). Klicks = Bögen × Seiten, A4-Bögen zum A4-Preis, A3 und SRA3 zum A3-Preis. Papier zählt pro A3-
+bzw. SRA3-Bogen (zwei A4-Bögen = ein A3-Bogen). Randlos druckt auf SRA3 mit 3 mm Beschnitt. Plots kosten einen festen
+Preis pro Seite. Dazu kommen Bindung (pro Exemplar oder pro Blatt), einmalige Kosten, Deckblatt (jede Deckblattseite
+ein einseitiger Bogen), dann der Mindestpreis und die Lieferung. Kunden sehen nur Druck- und Lieferkosten.
+
+Beim Absenden rechnet der Server neu. Weicht der Preis von der Vorschau ab, weil sich der Katalog geändert hat,
+wird der Auftrag nicht angelegt und der Kunde sieht den neuen Preis. Angelegte Aufträge speichern Auswahl, Preis und
+die verwendeten Katalogwerte (`requests.order`); spätere Preisänderungen ändern daran nichts. Die Zustimmung zu den
+Auftragsbedingungen wird mit Zeitpunkt und Fassung (Hash des Textes) gespeichert.
+
+**Dateien** liegen unter `UPLOAD_DIR` (Standard `data/uploads`), in der Datenbank stehen Name, Größe, SHA-256 und
+das Ergebnis der PDF-Prüfung. Auch verschlüsselte oder nicht lesbare PDFs werden angenommen; die Druckerei sieht
+dann einen Hinweis. Hochgeladene Dateien, die nach 24 Stunden zu keinem Auftrag gehören, werden gelöscht.
+Herunterladen dürfen Mitarbeiter und der Kunde, dem der Auftrag gehört.
 
 ## Schutz vor gleichzeitigen Änderungen
 
@@ -151,13 +177,14 @@ SUPERADMIN_EMAIL=admin@example.com SUPERADMIN_PASSWORD='mindestens-12-zeichen' d
 
 Der Container spielt beim Start die Migrationen ein und legt den Superadmin an, falls noch keiner existiert
 (`RUN_MIGRATIONS=false` schaltet das ab). Healthcheck: `GET /api/health`. Der Dienst `worker` nutzt dasselbe Image
-und verschickt die E-Mails.
+und verschickt die E-Mails. Druckdateien liegen im Volume `uploads`.
 
 ## Ausrollen mit Ansible
 
 Die CI baut bei jedem Push auf `main` ein Image nach `ghcr.io/linus1423/drucktool`. Das Playbook installiert
 Docker auf einem Debian/Ubuntu-Server, schreibt Compose-Datei und Umgebung nach `/opt/drucktool`, startet die
-Anwendung, richtet optional HTTPS über Caddy ein und legt ein tägliches Datenbank-Backup an.
+Anwendung, richtet optional HTTPS über Caddy ein und legt ein tägliches Backup an: einen Dump der Datenbank und
+einen Spiegel der Druckdateien aus `/opt/drucktool/uploads` nach `/var/backups/drucktool/uploads`.
 
 ```sh
 cd ansible
@@ -184,11 +211,13 @@ Ist das Paket in der GitHub Container Registry privat, `drucktool_registry_usern
 | `CUSTOMER_EMAIL_DOMAINS`                  | Optional: neue Kundenkonten nur für diese Domains, z. B. `tum.de`       |
 | `SMTP_URL`                                | SMTP-Server, z. B. `smtps://user:pass@mail.example.com:465`            |
 | `MAIL_FROM`                               | Absender, z. B. `Druckerei Muster <auftraege@example.com>`             |
+| `UPLOAD_DIR`                              | Ablage für Druckdateien, Standard `data/uploads` (im Image `/app/uploads`) |
+| `UPLOAD_MAX_MB`                           | Größte erlaubte Druckdatei in MB, Standard 500                         |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | OpenID Connect, siehe oben                                 |
 | `OIDC_DISPLAY_NAME`, `OIDC_NEW_USERS`, `OIDC_TRUST_EMAIL` | Beschriftung und Verhalten der OIDC-Anmeldung          |
 | `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_ROLES`, `OIDC_STAFF_ROLES`, `OIDC_ENFORCE_FOR_STAFF` | Rollen vom Anbieter, siehe oben |
 
 ## Nächste Schritte
 
-- Bestellformular mit den Optionen aus dem Katalog und Preisberechnung
-- PDF-Upload mit Seitenzahl-Erkennung und Formatvorschlag
+- Änderungen durch die Druckerei, denen der Kunde zustimmt (#50)
+- Weitere offene Punkte stehen als Issues im Repository.
