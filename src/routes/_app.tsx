@@ -2,6 +2,7 @@ import { createFileRoute, Link, Outlet, redirect, useRouter } from '@tanstack/re
 import { useQueryClient } from '@tanstack/react-query'
 import { ROLE_LABELS, isAdminRole, isStaffRole } from '~/lib/roles'
 import { logout } from '~/server/auth/auth.functions'
+import { LegalLinks } from '~/components/LegalLinks'
 
 export const Route = createFileRoute('/_app')({
   beforeLoad: ({ context, location }) => {
@@ -57,6 +58,11 @@ function AppLayout() {
                 </Link>
               </>
             ) : null}
+            {user.role === 'superadmin' ? (
+              <Link to="/admin/protokoll" className={navLink} activeProps={navActive}>
+                Protokoll
+              </Link>
+            ) : null}
           </nav>
           <div className="flex items-center gap-3 text-sm">
             <Link to="/profil" className="text-right leading-tight hover:underline">
@@ -74,6 +80,7 @@ function AppLayout() {
       <main className="mx-auto max-w-7xl px-4 py-8">
         <Outlet />
       </main>
+      <LegalLinks className="pb-8" />
     </div>
   )
 }

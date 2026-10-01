@@ -1,6 +1,6 @@
 import { queryOptions } from '@tanstack/react-query'
 import { getAdminCatalogFn, getOrderCatalogFn, listCatalogChangesFn } from '~/server/catalog/catalog.functions'
-import { getCurrentUser } from '~/server/auth/auth.functions'
+import { getCurrentUser, getSiteLinksFn } from '~/server/auth/auth.functions'
 import { getMyAccountFn } from '~/server/account/account.functions'
 import { getRequestFn, listAssignableStaffFn, listRequestsFn } from '~/server/requests/requests.functions'
 import {
@@ -10,6 +10,8 @@ import {
   listPendingRegistrationsFn,
   listUsersFn,
 } from '~/server/admin/admin.functions'
+import { listAuditLogFn } from '~/server/audit/audit.functions'
+import type { AuditFilter } from '~/server/audit/audit.server'
 import type { RequestStatus } from './status'
 
 export type RequestListFilter = {
@@ -23,6 +25,12 @@ export const currentUserQuery = queryOptions({
   queryKey: ['current-user'],
   queryFn: () => getCurrentUser(),
   staleTime: 60_000,
+})
+
+export const siteLinksQuery = queryOptions({
+  queryKey: ['site-links'],
+  queryFn: () => getSiteLinksFn(),
+  staleTime: Infinity,
 })
 
 export const requestListQuery = (filter: RequestListFilter) =>
@@ -86,3 +94,9 @@ export const catalogChangesQuery = queryOptions({
 })
 
 export const accountQuery = queryOptions({ queryKey: ['account'], queryFn: () => getMyAccountFn() })
+
+export const auditLogQuery = (filter: AuditFilter) =>
+  queryOptions({
+    queryKey: ['admin', 'audit', filter],
+    queryFn: () => listAuditLogFn({ data: filter }),
+  })

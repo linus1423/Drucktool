@@ -1,13 +1,35 @@
-import { and, eq, inArray, isNull, lt } from 'drizzle-orm'
+import { and, eq, inArray, isNull, lt, or } from 'drizzle-orm'
 import { isStaffRole } from '~/lib/roles'
 import { getDb, schema, type Tx } from '../db/client.server'
 import type { Principal } from '../requests/requests.server'
 import { analysePdf } from './pdf.server'
-import { removeStored, storagePath, storeStream } from './storage.server'
+import { maxAttachmentBytes, maxUploadBytes, openStored, removeStored, storagePath, storeStream } from './storage.server'
 
-const { requestFiles, requests } = schema
+const { requestFiles, requests, requestComments } = schema
 
-export type FileRole = 'main' | 'cover'
+export type FileRole = 'main' | 'cover' | 'attachment'
+
+export const MAX_ATTACHMENTS = 10
+
+const DEFAULT_ATTACHMENT_TYPES = 'pdf,png,jpg,jpeg,gif,webp,tif,tiff,svg,eps,ai,psd,txt,csv,docx,xlsx,pptx,odt,ods,zip'
+
+/** Erlaubte Dateiendungen für Anhänge, per ATTACHMENT_TYPES anpassbar (kommagetrennt). */
+export function attachmentTypes() {
+  return (process.env.ATTACHMENT_TYPES || DEFAULT_ATTACHMENT_TYPES)
+    .split(',')
+    .map((t) => t.trim().toLowerCase().replace(/^\./, ''))
+    .filter(Boolean)
+}
+
+export class AttachmentTypeError extends Error {
+  constructor() {
+    super(`Dieser Dateityp ist als Anhang nicht erlaubt. Erlaubt: ${attachmentTypes().join(', ')}.`)
+  }
+}
+
+export function uploadLimit(role: FileRole) {
+  return role === 'attachment' ? maxAttachmentBytes() : maxUploadBytes()
+}
 
 export class EmptyUploadError extends Error {
   constructor() {
@@ -47,7 +69,11 @@ export async function createUpload(
   input: { role: FileRole; filename: string; mimeType: string; body: AsyncIterable<Uint8Array> | NodeJS.ReadableStream },
 ) {
   await cleanupOrphans()
-  const stored = await storeStream(input.body)
+  if (input.role === 'attachment') {
+    const ext = input.filename.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1]
+    if (!ext || !attachmentTypes().includes(ext)) throw new AttachmentTypeError()
+  }
+  const stored = await storeStream(input.body, uploadLimit(input.role))
   if (stored.sizeBytes === 0) {
     await removeStored(stored.key)
     throw new EmptyUploadError()
@@ -90,12 +116,16 @@ export async function cleanupOrphans(now = Date.now()) {
 /** Datei für den Download: Mitarbeiter immer, Kunden nur eigene Uploads und Dateien eigener Aufträge. */
 export async function fileForDownload(user: Principal, id: string) {
   const [row] = await getDb()
-    .select({ file: requestFiles, requestCreatorId: requests.createdById })
+    .select({ file: requestFiles, requestCreatorId: requests.createdById, commentInternal: requestComments.internal })
     .from(requestFiles)
     .leftJoin(requests, eq(requests.id, requestFiles.requestId))
+    .leftJoin(requestComments, eq(requestComments.id, requestFiles.commentId))
     .where(eq(requestFiles.id, id))
   if (!row) return null
-  const allowed = isStaffRole(user.role) || (row.file.requestId ? row.requestCreatorId === user.id : row.file.ownerId === user.id)
+  if (isStaffRole(user.role)) return row.file
+  // Anhänge interner Notizen sind für Kunden tabu, auch am eigenen Auftrag.
+  if (row.commentInternal) return null
+  const allowed = row.file.requestId ? row.requestCreatorId === user.id : row.file.ownerId === user.id
   return allowed ? row.file : null
 }
 
@@ -103,6 +133,25 @@ export async function fileForDownload(user: Principal, id: string) {
  * Ordnet beim Absenden die hochgeladenen Dateien dem Auftrag zu. Nur eigene,
  * noch nicht verwendete Uploads mit passender Rolle werden akzeptiert.
  */
+/**
+ * Kopiert eine Datei eines früheren Auftrags als neuen, noch nicht zugeordneten Upload (Nachbestellung).
+ * Die Kopie liegt getrennt auf der Platte, damit das Löschen eines Auftrags die andere nicht berührt.
+ */
+export async function copyAsUpload(user: Principal, source: typeof requestFiles.$inferSelect) {
+  const stored = await storeStream(openStored(source.storageKey), Number.MAX_SAFE_INTEGER)
+  try {
+    const { id: _id, requestId: _r, ownerId: _o, storageKey: _k, createdAt: _c, ...rest } = source
+    const [row] = await getDb()
+      .insert(requestFiles)
+      .values({ ...rest, ownerId: user.id, storageKey: stored.key, sha256: stored.sha256, sizeBytes: stored.sizeBytes })
+      .returning()
+    return publicFile(row!)
+  } catch (e) {
+    await removeStored(stored.key)
+    throw e
+  }
+}
+
 export async function claimFiles(tx: Tx, user: Principal, requestId: string, ids: { main: string; cover: string | null }) {
   const wanted = [ids.main, ...(ids.cover ? [ids.cover] : [])]
   const rows = await tx
@@ -118,11 +167,44 @@ export async function claimFiles(tx: Tx, user: Principal, requestId: string, ids
   return { main, cover: cover ?? null }
 }
 
+/** Druck- und Deckblattdateien eines Auftrags; Anhänge hängen an ihren Nachrichten. */
 export async function listRequestFiles(requestId: string) {
   const rows = await getDb()
     .select()
     .from(requestFiles)
-    .where(eq(requestFiles.requestId, requestId))
+    .where(and(eq(requestFiles.requestId, requestId), or(eq(requestFiles.role, 'main'), eq(requestFiles.role, 'cover'))))
     .orderBy(requestFiles.createdAt)
   return rows.map(publicFile)
+}
+
+/** Ordnet hochgeladene Anhänge einer Nachricht zu. Nur eigene, noch freie Anhänge. */
+export async function claimAttachments(tx: Tx, user: Principal, requestId: string, commentId: string, ids: string[]) {
+  if (ids.length === 0) return []
+  const rows = await tx
+    .select()
+    .from(requestFiles)
+    .where(
+      and(
+        inArray(requestFiles.id, ids),
+        eq(requestFiles.ownerId, user.id),
+        eq(requestFiles.role, 'attachment'),
+        isNull(requestFiles.requestId),
+      ),
+    )
+    .for('update')
+  if (rows.length !== new Set(ids).size) throw new Error('Ein Anhang wurde nicht gefunden. Bitte erneut hochladen.')
+  await tx.update(requestFiles).set({ requestId, commentId }).where(inArray(requestFiles.id, ids))
+  return rows.map(publicFile)
+}
+
+export async function listCommentAttachments(commentIds: string[]) {
+  if (commentIds.length === 0) return new Map<string, PublicFile[]>()
+  const rows = await getDb()
+    .select()
+    .from(requestFiles)
+    .where(inArray(requestFiles.commentId, commentIds))
+    .orderBy(requestFiles.createdAt)
+  const map = new Map<string, PublicFile[]>()
+  for (const r of rows) map.set(r.commentId!, [...(map.get(r.commentId!) ?? []), publicFile(r)])
+  return map
 }

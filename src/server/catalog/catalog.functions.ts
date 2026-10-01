@@ -1,9 +1,12 @@
 import { createServerFn } from '@tanstack/react-start'
 import { bindingUpdateSchema, coverColorSchema, formatUpdateSchema, paperSchema, pricingSchema, textsSchema } from '~/lib/catalog'
+import { deadlineSettingsSchema } from '~/lib/deadlines'
 import { requireAdmin, requireUser } from '../auth/guards.server'
 import {
   formatBindingSchema,
   getCatalog,
+  getDeadlineSettings,
+  saveDeadlineSettings,
   listCatalogChanges,
   saveCoverColor,
   savePaper,
@@ -22,8 +25,13 @@ export const getOrderCatalogFn = createServerFn({ method: 'GET' }).handler(async
 
 export const getAdminCatalogFn = createServerFn({ method: 'GET' }).handler(async () => {
   await requireAdmin()
-  return getCatalog()
+  const [catalog, deadlines] = await Promise.all([getCatalog(), getDeadlineSettings()])
+  return { ...catalog, deadlines }
 })
+
+export const saveDeadlineSettingsFn = createServerFn({ method: 'POST' })
+  .validator(deadlineSettingsSchema)
+  .handler(async ({ data }) => saveDeadlineSettings(await requireAdmin(), data))
 
 export const listCatalogChangesFn = createServerFn({ method: 'GET' }).handler(async () => {
   await requireAdmin()

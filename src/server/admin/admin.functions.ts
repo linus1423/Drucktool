@@ -17,6 +17,7 @@ import {
   updateUser,
   updateUserSchema,
 } from './admin.server'
+import { anonymizeUser } from '../privacy/privacy.server'
 
 export const listPendingRegistrationsFn = createServerFn({ method: 'GET' }).handler(async () => {
   await requireSuperadmin()
@@ -51,10 +52,7 @@ export const getOrganisationFn = createServerFn({ method: 'GET' })
 
 export const saveOrganisationFn = createServerFn({ method: 'POST' })
   .validator(saveOrganisationSchema)
-  .handler(async ({ data }) => {
-    await requireAdmin()
-    return saveOrganisation(data)
-  })
+  .handler(async ({ data }) => saveOrganisation(await requireAdmin(), data))
 
 export const listUsersFn = createServerFn({ method: 'GET' }).handler(async () => {
   await requireAdmin()
@@ -68,3 +66,11 @@ export const createUserFn = createServerFn({ method: 'POST' })
 export const updateUserFn = createServerFn({ method: 'POST' })
   .validator(updateUserSchema)
   .handler(async ({ data }) => updateUser(await requireAdmin(), data))
+
+/** Entfernt die personenbezogenen Daten eines Kontos (DSGVO). Aufträge bleiben erhalten. */
+export const anonymizeUserFn = createServerFn({ method: 'POST' })
+  .validator(z.object({ id: z.uuid() }))
+  .handler(async ({ data }) => {
+    await anonymizeUser(await requireAdmin(), data.id)
+    return { ok: true as const }
+  })

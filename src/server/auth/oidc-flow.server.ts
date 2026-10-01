@@ -6,6 +6,7 @@ import { getDb, schema } from '../db/client.server'
 import { getOidcClient, getOidcSettings } from './oidc.server'
 import { resolveOidcUser } from './oidc-users.server'
 import { assertRateLimit } from './rate-limit.server'
+import { auditLogin } from '../audit/audit.server'
 import { createSession, destroyCurrentSession } from './session.server'
 
 const FLOW_COOKIE = 'drucktool_oidc'
@@ -83,7 +84,7 @@ function readPending(): PendingLogin | null {
 export async function finishOidcLogin(request: Request) {
   const settings = getOidcSettings()
   if (!settings) return loginError('Die Anmeldung über OpenID Connect ist nicht eingerichtet.')
-  assertRateLimit('oidc-callback', 30, 60_000)
+  await assertRateLimit('oidc-callback', 30, 60_000)
 
   const pending = readPending()
   deleteCookie(FLOW_COOKIE, { path: '/api/auth/oidc' })
@@ -127,11 +128,19 @@ export async function finishOidcLogin(request: Request) {
     trustEmail: settings.trustEmail,
     roles: settings.roles,
   })
-  if (result.kind === 'pending') return redirectTo('/login?hinweis=freigabe')
-  if (result.kind === 'denied') return loginError(result.message)
+  const email = typeof claims.email === 'string' ? claims.email.toLowerCase() : null
+  if (result.kind === 'pending') {
+    await auditLogin('failed', { userId: null, method: 'oidc', email, reason: 'pending' })
+    return redirectTo('/login?hinweis=freigabe')
+  }
+  if (result.kind === 'denied') {
+    await auditLogin('failed', { userId: null, method: 'oidc', email, reason: 'denied' })
+    return loginError(result.message)
+  }
 
   await destroyCurrentSession()
   await createSession(result.userId)
+  await auditLogin('succeeded', { userId: result.userId, method: 'oidc' })
   await getDb().update(schema.users).set({ lastLoginAt: new Date() }).where(eq(schema.users.id, result.userId))
   return redirectTo(pending.redirect)
 }

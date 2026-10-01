@@ -1,12 +1,15 @@
 import type { ReactNode } from 'react'
 import type { QueryClient } from '@tanstack/react-query'
 import { HeadContent, Link, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router'
-import { currentUserQuery } from '~/lib/queries'
+import { currentUserQuery, siteLinksQuery } from '~/lib/queries'
 import appCss from '~/styles.css?url'
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   beforeLoad: async ({ context }) => {
-    const user = await context.queryClient.ensureQueryData(currentUserQuery)
+    const [user] = await Promise.all([
+      context.queryClient.ensureQueryData(currentUserQuery),
+      context.queryClient.ensureQueryData(siteLinksQuery),
+    ])
     return { user }
   },
   head: () => ({

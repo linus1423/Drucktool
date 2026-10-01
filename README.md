@@ -14,7 +14,7 @@ bearbeiten sie über einen Status-Workflow bis zur Auslieferung.
 
 | Rolle       | Rechte                                                                                     |
 | ----------- | ------------------------------------------------------------------------------------------ |
-| Superadmin  | Alles, gibt Registrierungen frei und verwaltet Administratoren                              |
+| Superadmin  | Alles, gibt Registrierungen frei, verwaltet Administratoren, sieht das Protokoll            |
 | Admin       | Organisationen und Benutzer (Mitarbeiter, Kunden) verwalten, Anfragen bearbeiten            |
 | Mitarbeiter | Alle Anfragen bearbeiten, Status wechseln, zuweisen, interne Notizen schreiben             |
 | Kunde       | Eigene Aufträge anlegen, verfolgen und kommentieren                                        |
@@ -31,6 +31,32 @@ bearbeiten sie über einen Status-Workflow bis zur Auslieferung.
 - Organisationen sind optional. Kunden sehen nur die Aufträge, die sie selbst angelegt haben.
 
 Im Profil sieht jeder seine angemeldeten Geräte und kann sie einzeln oder alle anderen abmelden.
+
+## Sicherheit
+
+- **Rate-Limits** stehen in PostgreSQL (Tabelle `rate_limits`) und gelten damit über Neustarts und mehrere Instanzen
+  hinweg. Pro IP: 10 Passwort-Logins pro Minute, 10 Anmeldelinks pro 10 Minuten (3 pro Adresse). Gespeichert wird nur
+  ein Hash von IP bzw. E-Mail-Adresse.
+- **Kontosperre:** Nach 5 falschen Passwörtern innerhalb von 15 Minuten wird die Anmeldung für diese E-Mail-Adresse
+  gesperrt, unabhängig von der IP: erst 1 Minute, bei jedem weiteren Fehlversuch doppelt so lange, höchstens eine
+  Stunde. Eine erfolgreiche Anmeldung setzt den Zähler zurück. Unbekannte Adressen werden genauso gezählt, damit die
+  Sperre nichts über vorhandene Konten verrät.
+- **Audit-Log:** Freigaben und Ablehnungen von Registrierungen, Anlegen und Ändern von Benutzern und Organisationen
+  (Vorher/Nachher, IP, Zeitpunkt) sowie alle Anmeldungen, erfolgreich oder nicht, landen in der Tabelle `audit_log`.
+  Admin-Aktionen werden in derselben Transaktion wie die Änderung geschrieben. Passwörter und Hashes stehen nie im
+  Log, nur ob ein Passwort gesetzt wurde. Superadmins sehen das Protokoll unter **Protokoll** (`/admin/protokoll`) mit
+  Filter nach Benutzer, Organisation, Aktion und Zeitraum. Einträge werden nach `AUDIT_LOG_RETENTION_DAYS` Tagen
+  gelöscht (Standard 365, 0 = nie).
+- **Security-Header** setzt die App selbst (Middleware in `src/start.ts`), damit sie auch ohne Caddy gelten:
+  Content-Security-Policy mit Nonce pro Antwort für die Inline-Skripte von TanStack Start (`script-src 'self'
+  'nonce-…'`, `frame-ancestors 'none'`, `object-src 'none'`), `X-Content-Type-Options`, `Referrer-Policy`,
+  `X-Frame-Options`, `Permissions-Policy` und Cross-Origin-Header. `Strict-Transport-Security` nur mit HTTPS (gleiche
+  Regel wie `COOKIE_SECURE`). Im Vite-Dev-Server entfällt die CSP.
+- **CSRF:** Schreibende Anfragen (POST-Server-Funktionen, Upload) brauchen `Sec-Fetch-Site: same-origin` bzw. bei
+  älteren Browsern einen Origin/Referer der App (`APP_URL` oder die Adresse der Anfrage), sonst antwortet die App
+  mit 403.
+- **Aufräumen:** Der Worker löscht beim Start und dann stündlich abgelaufene Sitzungen, Anmeldelinks,
+  Rate-Limit-Zähler und alte Audit-Einträge, dazu die Daten mit Löschfrist (siehe Datenschutz). Die Löschungen sind idempotent, mehrere Worker stören sich nicht.
 
 ## Status eines Auftrags
 
@@ -92,6 +118,17 @@ das Ergebnis der PDF-Prüfung. Auch verschlüsselte oder nicht lesbare PDFs werd
 dann einen Hinweis. Hochgeladene Dateien, die nach 24 Stunden zu keinem Auftrag gehören, werden gelöscht.
 Herunterladen dürfen Mitarbeiter und der Kunde, dem der Auftrag gehört.
 
+An Nachrichten lassen sich bis zu zehn Dateien anhängen (z. B. korrigierte Druckdaten, Logos, Fotos). Sie liegen in
+derselben Ablage. Anhänge interner Notizen sehen nur Mitarbeiter.
+
+## Änderungen durch die Druckerei
+
+Mitarbeiter können Optionen und Preis eines Auftrags nicht direkt ändern, sondern schlagen über „Änderung
+vorschlagen“ einen neuen Stand vor, optional mit manuell gesetztem Preis und immer mit Begründung. Der Auftrag geht
+auf „Rückfrage“, der Kunde bekommt eine E-Mail und sieht Vorher und Nachher. Erst wenn er zustimmt, gilt der neue
+Stand samt Preis, und der Auftrag kehrt in seinen vorherigen Status zurück. Lehnt er ab, bleibt alles, wie es war.
+Solange ein Vorschlag offen ist, kann der Auftrag nur storniert oder abgelehnt werden. Alle Schritte stehen im Verlauf.
+
 ## Schutz vor gleichzeitigen Änderungen
 
 Jede Anfrage hat eine `version`. Änderungen (Status, Bearbeiten, Zuweisung) schicken die Version mit, die der
@@ -106,10 +143,9 @@ Das Tool verschickt E-Mails bei neuen Anfragen, Statuswechseln, Nachrichten, Zuw
 | Ereignis                         | Empfänger                                                                  |
 | -------------------------------- | -------------------------------------------------------------------------- |
 | Kunde reicht Auftrag ein         | Alle Mitarbeiter, dazu eine Eingangsbestätigung an den Kunden              |
-| Mitarbeiter ändert Status        | Der Kunde, der den Auftrag angelegt hat (nicht bei internen Unterstatus)   |
-| Kunde ändert Status / schreibt   | Der zuständige Mitarbeiter, ohne Zuständigen alle Mitarbeiter              |
-| Mitarbeiter schreibt Nachricht   | Der Kunde, der den Auftrag angelegt hat                                    |
-| Interne Notiz                    | Nur der zuständige Mitarbeiter                                             |
+| Statuswechsel / Nachricht        | Alle Beobachter des Auftrags; bei Aktionen des Kunden ohne Zuständigen alle Mitarbeiter |
+| Interne Notiz                    | Nur beobachtende Mitarbeiter, nie Kunden                                   |
+| Erwähnung mit `@Name`            | Der erwähnte Mitarbeiter (eigene Mail statt der allgemeinen)                |
 | Zuweisung                        | Der neu zuständige Mitarbeiter                                             |
 | Anmeldelink                      | Die angegebene Adresse (immer, unabhängig von der Einstellung)             |
 | Neue Registrierung über OIDC     | Alle Superadmins (nur bei `OIDC_NEW_USERS=pending`)                        |
@@ -117,9 +153,16 @@ Das Tool verschickt E-Mails bei neuen Anfragen, Statuswechseln, Nachrichten, Zuw
 
 Wer eine Änderung selbst auslöst, bekommt keine Mail. Im Profil lassen sich Benachrichtigungen abschalten.
 
+Ersteller und Zuständiger beobachten einen Auftrag automatisch. Auf der Detailseite lässt sich das Beobachten pro
+Auftrag an- und abschalten; Mitarbeiter können so auch fremde Aufträge verfolgen und sehen, wer sonst beobachtet.
+Mitarbeiter erwähnen sich in Nachrichten und internen Notizen mit `@Name` (Auswahl unter dem Eingabefeld); Erwähnte
+beobachten den Auftrag danach. Kunden können niemanden erwähnen. Die Ansicht „Für mich“ in der Auftragsliste zeigt alle
+beobachteten Aufträge.
+
 Die Mails werden in derselben Transaktion wie die Änderung in die Tabelle `email_outbox` geschrieben und von einem
 eigenen Worker-Prozess verschickt (`pnpm mail:worker`, im Container `worker`). Scheitert der Versand, versucht der
-Worker es mit wachsendem Abstand bis zu acht Mal erneut. Ohne `SMTP_URL` werden Mails nur ins Log geschrieben.
+Worker es mit wachsendem Abstand bis zu acht Mal erneut. Ohne `SMTP_URL` werden Mails nur ins Log geschrieben. Derselbe
+Worker räumt stündlich abgelaufene Daten auf (siehe Sicherheit).
 
 ## Anmeldung über OpenID Connect
 
@@ -145,6 +188,25 @@ Rolle: Wer eine passende Rolle hat, wird ohne Freigabe als Admin bzw. Mitarbeite
 Mitarbeiter oder Admin die Rolle, wird die Anmeldung abgelehnt und seine Sitzungen werden beendet. Der Superadmin wird
 nie verändert und bleibt als lokaler Notfallzugang mit Passwort erhalten. Mit `OIDC_ENFORCE_FOR_STAFF=true` können sich
 Mitarbeiter und Admins nur noch über den Anbieter anmelden.
+
+## Datenschutz
+
+- **Anonymisieren statt Löschen:** In der Benutzerverwaltung lässt sich ein Konto anonymisieren. Name wird zu
+  „Gelöschter Nutzer“, E-Mail-Adresse, Passwort, Rechnungs- und Lieferadresse, Organisation, Sitzungen,
+  OIDC-Verknüpfungen, offene Anmeldelinks, Mails in der Outbox und nicht abgeschickte Uploads werden entfernt, Namen
+  und Adresse auch aus dem Audit-Log. Das Konto ist danach gesperrt, die E-Mail-Adresse wieder frei. Aufträge,
+  Nachrichten und Dateien an Aufträgen bleiben wegen der Aufbewahrungspflichten erhalten, ebenso die beim Absenden am
+  Auftrag gespeicherte Rechnungs- und Lieferadresse. Admins können keine Administratoren anonymisieren, niemand sein
+  eigenes Konto.
+- **Datenauskunft (Art. 15):** „Datenauskunft herunterladen“ in der Benutzerverwaltung liefert alle zu einer Person
+  gespeicherten Daten als JSON (Konto, Sitzungen, Anmeldewege, Aufträge, Nachrichten, Dateien, Audit-Log, E-Mails).
+  Jeder Abruf wird protokolliert.
+- **Löschfristen:** IP-Adressen an Sitzungen nach `SESSION_IP_RETENTION_DAYS` (Standard 30 Tage), abgelehnte
+  Registrierungen samt nie freigegebener Organisation nach `REJECTED_REGISTRATION_RETENTION_DAYS` (Standard 30 Tage),
+  Audit-Log nach `AUDIT_LOG_RETENTION_DAYS` (Standard 365 Tage). Abgelaufene Sitzungen und Anmeldelinks verschwinden
+  stündlich.
+- **Datenschutzerklärung und Impressum:** `PRIVACY_URL` und `IMPRINT_URL` erscheinen als Links in der Fußzeile und
+  auf der Anmeldeseite.
 
 ## Lokale Entwicklung
 
@@ -179,9 +241,29 @@ Der Container spielt beim Start die Migrationen ein und legt den Superadmin an, 
 (`RUN_MIGRATIONS=false` schaltet das ab). Healthcheck: `GET /api/health`. Der Dienst `worker` nutzt dasselbe Image
 und verschickt die E-Mails. Druckdateien liegen im Volume `uploads`.
 
+## CI
+
+`.github/workflows/ci.yml` läuft bei jedem Pull Request und jedem Push auf `main`:
+
+- **Typecheck, Tests, Migrationen**: `pnpm typecheck`, `pnpm test` (mit Datenbank), `pnpm build`. Danach prüft
+  `drizzle-kit`, dass `src/server/db/schema.ts` keine Änderungen ohne Migration enthält, und die neuen Migrationen
+  werden auf eine Datenbank mit dem Schema des vorherigen Stands (Basis des PRs) eingespielt.
+- **Ansible prüfen**: `ansible-lint` und `ansible-playbook --syntax-check`.
+- **Docker-Smoke-Test**: baut das Image, startet es mit `docker compose`, wartet auf `/api/health` und meldet sich in
+  einem echten Browser (Playwright) mit dem Superadmin an. Lokal: `docker compose build && scripts/smoke/smoke-test.sh`
+  (nutzt Port 3200, änderbar mit `SMOKE_PORT`).
+- **Docker-Image veröffentlichen** (nur bei Push auf `main` oder Tag `v*`, und nur wenn alle Prüfungen grün sind):
+  scannt das Image mit Trivy (bricht bei behebbaren kritischen Lücken ab) und veröffentlicht es mit SBOM und
+  Provenance-Nachweis. Tags: `latest` (main), `sha-<commit>`, bei Releases `v1.2.0` und `1.2.0`.
+
+Dependabot (`.github/dependabot.yml`) schlägt montags gruppierte Updates für npm-Pakete, GitHub Actions und
+Docker-Images vor. Patch-Updates können automatisch gemergt werden, wenn die CI grün ist: dazu die Repository-Variable
+`DEPENDABOT_AUTOMERGE=true` setzen, „Allow auto-merge“ aktivieren und `main` mit Pflicht-Checks schützen.
+
 ## Ausrollen mit Ansible
 
-Die CI baut bei jedem Push auf `main` ein Image nach `ghcr.io/linus1423/drucktool`. Das Playbook installiert
+Die CI veröffentlicht bei jedem Push auf `main` und bei jedem Tag `v*` ein Image nach `ghcr.io/linus1423/drucktool`
+(siehe [CI](#ci)). Das Playbook installiert
 Docker auf einem Debian/Ubuntu-Server, schreibt Compose-Datei und Umgebung nach `/opt/drucktool`, startet die
 Anwendung, richtet optional HTTPS über Caddy ein und legt ein tägliches Backup an: einen Dump der Datenbank und
 einen Spiegel der Druckdateien aus `/opt/drucktool/uploads` nach `/var/backups/drucktool/uploads`.
@@ -213,11 +295,15 @@ Ist das Paket in der GitHub Container Registry privat, `drucktool_registry_usern
 | `MAIL_FROM`                               | Absender, z. B. `Druckerei Muster <auftraege@example.com>`             |
 | `UPLOAD_DIR`                              | Ablage für Druckdateien, Standard `data/uploads` (im Image `/app/uploads`) |
 | `UPLOAD_MAX_MB`                           | Größte erlaubte Druckdatei in MB, Standard 500                         |
+| `ATTACHMENT_MAX_MB`, `ATTACHMENT_TYPES`   | Anhänge an Nachrichten: Größe in MB (Standard 25), erlaubte Endungen (kommagetrennt) |
+| `AUDIT_LOG_RETENTION_DAYS`                | Aufbewahrung des Audit-Logs in Tagen, Standard 365, `0` = unbegrenzt   |
+| `SESSION_IP_RETENTION_DAYS`               | IP-Adressen an Sitzungen nach so vielen Tagen löschen, Standard 30     |
+| `REJECTED_REGISTRATION_RETENTION_DAYS`    | Abgelehnte Registrierungen nach so vielen Tagen löschen, Standard 30   |
+| `PRIVACY_URL`, `IMPRINT_URL`              | Links auf Datenschutzerklärung und Impressum in der Fußzeile           |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | OpenID Connect, siehe oben                                 |
 | `OIDC_DISPLAY_NAME`, `OIDC_NEW_USERS`, `OIDC_TRUST_EMAIL` | Beschriftung und Verhalten der OIDC-Anmeldung          |
 | `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_ROLES`, `OIDC_STAFF_ROLES`, `OIDC_ENFORCE_FOR_STAFF` | Rollen vom Anbieter, siehe oben |
 
 ## Nächste Schritte
 
-- Änderungen durch die Druckerei, denen der Kunde zustimmt (#50)
 - Weitere offene Punkte stehen als Issues im Repository.

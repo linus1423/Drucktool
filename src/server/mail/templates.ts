@@ -1,5 +1,5 @@
 // E-Mail-Vorlagen. Reine Funktionen ohne Datenbankzugriff, damit sie testbar bleiben.
-import { formatMoney, formatRequestNumber } from '~/lib/format'
+import { formatDate, formatMoney, formatRequestNumber } from '~/lib/format'
 import { describeOrder, type OrderSnapshot } from '~/lib/snapshot'
 import { STATUS_LABELS, type RequestStatus } from '~/lib/status'
 
@@ -100,10 +100,16 @@ const STATUS_TEXT: Partial<Record<RequestStatus, string>> = {
 const COMPLETED_HOUSE_POST = 'Ihr Auftrag ist fertig und geht mit der nächsten Hauspost an die angegebene Adresse.'
 
 export function statusChangedMail(
-  r: RequestRef & OrderRef & { actorName: string; from: RequestStatus; to: RequestStatus; note?: string | null },
+  r: RequestRef &
+    OrderRef & { actorName: string; from: RequestStatus; to: RequestStatus; note?: string | null; forStaff?: boolean },
 ): MailContent {
   const blocks: Block[] = [{ kind: 'p', text: `${requestLabel(r)}: ${STATUS_LABELS[r.from]} → ${STATUS_LABELS[r.to]}.` }]
-  const text = r.to === 'completed' && r.deliveryMethod === 'house_post' ? COMPLETED_HOUSE_POST : STATUS_TEXT[r.to]
+  // Die Erklärtexte richten sich an Kunden; beobachtende Mitarbeiter bekommen nur den Wechsel.
+  const text = r.forStaff
+    ? null
+    : r.to === 'completed' && r.deliveryMethod === 'house_post'
+      ? COMPLETED_HOUSE_POST
+      : STATUS_TEXT[r.to]
   if (text) blocks.push({ kind: 'p', text })
   if (r.note) blocks.push({ kind: 'quote', text: r.note })
   blocks.push({ kind: 'p', text: `Geändert von ${r.actorName}.` }, requestButton(r))
@@ -122,13 +128,69 @@ export function requestReceivedMail(r: RequestRef & OrderRef): MailContent {
   ])
 }
 
-export function commentMail(r: RequestRef & { actorName: string; body: string; internal: boolean }): MailContent {
+export function changeProposedMail(
+  r: RequestRef & { actorName: string; reason: string; before: OrderRef; after: OrderRef },
+): MailContent {
+  const price =
+    r.before.totalCents != null && r.after.totalCents != null && r.before.totalCents !== r.after.totalCents
+      ? `Der Preis ändert sich von ${formatMoney(r.before.totalCents)} auf ${formatMoney(r.after.totalCents)}.`
+      : null
+  return compose(`Änderungsvorschlag zu ${requestLabel(r)}`, [
+    { kind: 'p', text: `${r.actorName} schlägt eine Änderung an Ihrem Auftrag ${requestLabel(r)} vor:` },
+    { kind: 'quote', text: r.reason },
+    ...(price ? [{ kind: 'p', text: price } as Block] : []),
+    { kind: 'p', text: 'Neuer Stand:' },
+    ...orderSummary(r.after),
+    {
+      kind: 'p',
+      text: 'Die Änderung gilt erst, wenn Sie zustimmen. Bitte nehmen Sie den Vorschlag im Drucktool an oder lehnen Sie ihn ab.',
+    },
+    requestButton(r),
+  ])
+}
+
+export function changeAnsweredMail(r: RequestRef & { actorName: string; accepted: boolean }): MailContent {
+  return compose(`Änderung ${r.accepted ? 'angenommen' : 'abgelehnt'}: ${requestLabel(r)}`, [
+    {
+      kind: 'p',
+      text: r.accepted
+        ? `${r.actorName} hat dem Änderungsvorschlag zu ${requestLabel(r)} zugestimmt. Der neue Stand gilt.`
+        : `${r.actorName} hat den Änderungsvorschlag zu ${requestLabel(r)} abgelehnt. Der bisherige Stand gilt weiter, der Auftrag steht auf „Rückfrage“.`,
+    },
+    requestButton(r),
+  ])
+}
+
+export function promisedDateMail(r: RequestRef & { actorName: string; date: string | null }): MailContent {
+  const text = r.date
+    ? `Die Druckerei hat für ${requestLabel(r)} einen Termin zugesagt: ${formatDate(r.date)}.`
+    : `Der zugesagte Termin für ${requestLabel(r)} wurde aufgehoben. Wir melden uns mit einem neuen Termin.`
+  return compose(`Termin für ${requestLabel(r)}`, [{ kind: 'p', text }, requestButton(r)])
+}
+
+export function commentMail(
+  r: RequestRef & { actorName: string; body: string; internal: boolean; attachmentNames?: string[] },
+): MailContent {
+  const files = r.attachmentNames ?? []
   return compose(`${r.internal ? 'Interne Notiz' : 'Neue Nachricht'} zu ${requestLabel(r)}`, [
     {
       kind: 'p',
       text: `${r.actorName} hat ${r.internal ? 'eine interne Notiz' : 'eine Nachricht'} zu ${requestLabel(r)} geschrieben:`,
     },
+    ...(r.body ? [{ kind: 'quote', text: r.body } as Block] : []),
+    ...(files.length ? [{ kind: 'p', text: `Anhänge: ${files.join(', ')}` } as Block] : []),
+    requestButton(r),
+  ])
+}
+
+export function mentionMail(r: RequestRef & { actorName: string; body: string; internal: boolean }): MailContent {
+  return compose(`${r.actorName} hat Sie erwähnt: ${requestLabel(r)}`, [
+    {
+      kind: 'p',
+      text: `${r.actorName} hat Sie in ${r.internal ? 'einer internen Notiz' : 'einer Nachricht'} zu ${requestLabel(r)} erwähnt:`,
+    },
     { kind: 'quote', text: r.body },
+    { kind: 'p', text: 'Sie beobachten den Auftrag jetzt und bekommen weitere Nachrichten dazu.' },
     requestButton(r),
   ])
 }

@@ -1,10 +1,11 @@
 import { createServerFn } from '@tanstack/react-start'
-import { eq, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { emailSchema, loginSchema } from '~/lib/validation'
 import { getDb, schema } from '../db/client.server'
-import { getDummyHash, verifyPassword } from './password.server'
-import { issueLoginLink, redeemLoginLink } from './magic-link.server'
+import { authenticateWithPassword } from './login.server'
+import { LinkLoginError, issueLoginLink, redeemLoginLink } from './magic-link.server'
+import { auditLogin } from '../audit/audit.server'
 import { safeRedirect } from '~/lib/redirect'
 import { getOidcSettings } from './oidc.server'
 import { assertRateLimit } from './rate-limit.server'
@@ -18,42 +19,18 @@ export const getAuthOptions = createServerFn({ method: 'GET' }).handler(() => {
   return { oidc: oidc ? { displayName: oidc.displayName } : null }
 })
 
+/** Links auf Datenschutzerklärung und Impressum (PRIVACY_URL, IMPRINT_URL), für die Fußzeile. */
+export const getSiteLinksFn = createServerFn({ method: 'GET' }).handler(() => ({
+  privacyUrl: process.env.PRIVACY_URL || null,
+  imprintUrl: process.env.IMPRINT_URL || null,
+}))
+
 export const login = createServerFn({ method: 'POST' })
   .validator(loginSchema)
   .handler(async ({ data }) => {
-    assertRateLimit('login', 10, 60_000)
+    await assertRateLimit('login', 10, 60_000)
+    const user = await authenticateWithPassword(data.email, data.password)
     const db = getDb()
-    const [user] = await db
-      .select()
-      .from(schema.users)
-      .where(sql`lower(${schema.users.email}) = ${data.email}`)
-      .limit(1)
-
-    const hash = user?.passwordHash ?? (await getDummyHash())
-    const valid = await verifyPassword(hash, data.password)
-    if (!user || !user.passwordHash || !valid) {
-      throw new Error('E-Mail-Adresse oder Passwort ist falsch')
-    }
-    // Mit OIDC_ENFORCE_FOR_STAFF melden sich Mitarbeiter und Admins nur über den Anbieter an.
-    if ((user.role === 'staff' || user.role === 'admin') && getOidcSettings()?.enforceForStaff) {
-      throw new Error('Mitarbeiter melden sich bitte über das Firmenkonto an.')
-    }
-    if (user.status === 'pending') {
-      throw new Error('Ihr Konto wurde noch nicht freigegeben. Sie erhalten eine Nachricht, sobald es so weit ist.')
-    }
-    if (user.status !== 'active') {
-      throw new Error('Ihr Konto ist nicht aktiv. Bitte wenden Sie sich an die Druckerei.')
-    }
-    if (user.organisationId) {
-      const [org] = await db
-        .select({ status: schema.organisations.status })
-        .from(schema.organisations)
-        .where(eq(schema.organisations.id, user.organisationId))
-      if (org && org.status !== 'active') {
-        throw new Error('Ihre Organisation ist nicht aktiv. Bitte wenden Sie sich an die Druckerei.')
-      }
-    }
-
     await destroyCurrentSession()
     await createSession(user.id)
     await db.update(schema.users).set({ lastLoginAt: new Date() }).where(eq(schema.users.id, user.id))
@@ -68,8 +45,8 @@ export const logout = createServerFn({ method: 'POST' }).handler(async () => {
 export const requestLoginLinkFn = createServerFn({ method: 'POST' })
   .validator(z.object({ email: emailSchema, redirect: z.string().max(500).nullable() }))
   .handler(async ({ data }) => {
-    assertRateLimit('login-link', 10, 10 * 60_000)
-    assertRateLimit('login-link-address', 3, 10 * 60_000, data.email)
+    await assertRateLimit('login-link', 10, 10 * 60_000)
+    await assertRateLimit('login-link-address', 3, 10 * 60_000, data.email)
     await issueLoginLink(data.email, safeRedirect(data.redirect))
     return { ok: true as const }
   })
@@ -77,8 +54,13 @@ export const requestLoginLinkFn = createServerFn({ method: 'POST' })
 export const redeemLoginLinkFn = createServerFn({ method: 'POST' })
   .validator(z.object({ token: z.string().min(20).max(200) }))
   .handler(async ({ data }) => {
-    assertRateLimit('login-link-redeem', 20, 10 * 60_000)
-    const result = await redeemLoginLink(data.token)
+    await assertRateLimit('login-link-redeem', 20, 10 * 60_000)
+    const result = await redeemLoginLink(data.token).catch(async (error: unknown) => {
+      if (error instanceof LinkLoginError) {
+        await auditLogin('failed', { userId: error.userId, method: 'link', reason: error.reason })
+      }
+      throw error
+    })
     await destroyCurrentSession()
     await createSession(result.userId)
     const [user] = await getDb()

@@ -6,6 +6,7 @@ import { getDb, schema } from '../db/client.server'
 import { enqueueMail } from '../mail/outbox.server'
 import { appUrl, loginLinkMail } from '../mail/templates'
 import { getOidcSettings } from './oidc.server'
+import { auditLogin } from '../audit/audit.server'
 
 export const LINK_MINUTES = 15
 const { users, loginTokens } = schema
@@ -73,6 +74,17 @@ export async function issueLoginLink(email: string, redirect: string | null): Pr
 
 export type LinkLogin = { userId: string; redirect: string | null; isNew: boolean }
 
+/** Fehlgeschlagene Anmeldung per Link, mit den Angaben für das Audit-Log. */
+export class LinkLoginError extends Error {
+  constructor(
+    message: string,
+    readonly userId: string | null,
+    readonly reason: string,
+  ) {
+    super(message)
+  }
+}
+
 /** Löst einen Link ein. Legt beim ersten Mal ein Kundenkonto an. */
 export async function redeemLoginLink(token: string): Promise<LinkLogin> {
   return getDb().transaction(async (tx) => {
@@ -81,7 +93,7 @@ export async function redeemLoginLink(token: string): Promise<LinkLogin> {
       .set({ usedAt: new Date() })
       .where(and(eq(loginTokens.id, hashToken(token)), isNull(loginTokens.usedAt), gt(loginTokens.expiresAt, new Date())))
       .returning({ email: loginTokens.email, redirect: loginTokens.redirect })
-    if (!link) throw new Error(INVALID)
+    if (!link) throw new LinkLoginError(INVALID, null, 'invalid_link')
 
     const [existing] = await tx
       .select({ id: users.id, role: users.role, status: users.status })
@@ -95,16 +107,20 @@ export async function redeemLoginLink(token: string): Promise<LinkLogin> {
         .insert(users)
         .values({ email: link.email, name: link.email.split('@')[0]!, role: 'customer', status: 'active' })
         .returning({ id: users.id })
+      await auditLogin('succeeded', { userId: created!.id, method: 'link' }, tx)
       return { userId: created!.id, redirect: link.redirect, isNew: true }
     }
 
-    if (existing.status === 'disabled' || existing.status === 'rejected') throw new Error(INACTIVE)
-    if (staffMustUseSso(existing.role)) throw new Error(STAFF_SSO)
+    if (existing.status === 'disabled' || existing.status === 'rejected') {
+      throw new LinkLoginError(INACTIVE, existing.id, 'inactive')
+    }
+    if (staffMustUseSso(existing.role)) throw new LinkLoginError(STAFF_SSO, existing.id, 'sso_required')
     // Die Adresse ist durch den Link bestätigt; eine Freigabe ist nicht mehr nötig.
     await tx
       .update(users)
       .set({ status: 'active', lastLoginAt: new Date(), updatedAt: new Date() })
       .where(eq(users.id, existing.id))
+    await auditLogin('succeeded', { userId: existing.id, method: 'link' }, tx)
     return { userId: existing.id, redirect: link.redirect, isNew: false }
   })
 }

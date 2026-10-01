@@ -30,6 +30,8 @@ services:
       SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-}
       SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-}
       UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-500}
+      PRIVACY_URL: ${PRIVACY_URL:-}
+      IMPRINT_URL: ${IMPRINT_URL:-}
     volumes:
       - uploads:/app/uploads
     ports:
@@ -48,6 +50,9 @@ services:
       APP_URL: ${APP_URL:-http://localhost:3000}
       SMTP_URL: ${SMTP_URL:-}
       MAIL_FROM: ${MAIL_FROM:-Drucktool <noreply@localhost>}
+      AUDIT_LOG_RETENTION_DAYS: ${AUDIT_LOG_RETENTION_DAYS:-365}
+      SESSION_IP_RETENTION_DAYS: ${SESSION_IP_RETENTION_DAYS:-30}
+      REJECTED_REGISTRATION_RETENTION_DAYS: ${REJECTED_REGISTRATION_RETENTION_DAYS:-30}
     healthcheck:
       disable: true
 

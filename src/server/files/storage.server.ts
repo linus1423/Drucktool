@@ -17,6 +17,12 @@ export function maxUploadBytes() {
   return (Number.isFinite(mb) && mb > 0 ? mb : 500) * 1024 * 1024
 }
 
+/** Größter Anhang an einer Nachricht (Issue #8), Standard 25 MB. */
+export function maxAttachmentBytes() {
+  const mb = Number(process.env.ATTACHMENT_MAX_MB || 25)
+  return (Number.isFinite(mb) && mb > 0 ? mb : 25) * 1024 * 1024
+}
+
 export class UploadTooLargeError extends Error {
   constructor(limit: number) {
     super(`Die Datei ist zu groß (höchstens ${Math.round(limit / 1024 / 1024)} MB).`)
