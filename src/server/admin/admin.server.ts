@@ -5,9 +5,14 @@ import { emailSchema, organisationSchema, passwordSchema } from '~/lib/validatio
 import { getDb, schema, type Tx } from '../db/client.server'
 import { hashPassword } from '../auth/password.server'
 import { notifyRegistrationDecision } from '../mail/notifications.server'
+import { auditSnapshot, writeAudit } from '../audit/audit.server'
 import type { Principal } from '../requests/requests.server'
 
 const { users, organisations, requests, sessions } = schema
+
+// Felder, die im Audit-Log festgehalten werden (keine Passwörter oder Hashes).
+const USER_AUDIT_FIELDS = ['name', 'email', 'role', 'status', 'organisationId'] as const
+const ORG_AUDIT_FIELDS = ['name', 'email', 'phone', 'street', 'zip', 'city', 'country', 'vatId', 'status'] as const
 
 // ---------------------------------------------------------------------------
 // Freigabe von Registrierungen (nur Superadmin)
@@ -62,6 +67,16 @@ export async function approveRegistration(actor: Principal, input: z.infer<typeo
       .update(users)
       .set({ status: 'active', organisationId, reviewedById: actor.id, reviewedAt: new Date(), updatedAt: new Date() })
       .where(eq(users.id, user.id))
+    await writeAudit(tx, {
+      actorId: actor.id,
+      action: 'registration.approved',
+      targetType: 'user',
+      targetId: user.id,
+      organisationId,
+      before: auditSnapshot(user, USER_AUDIT_FIELDS),
+      after: auditSnapshot({ ...user, status: 'active', organisationId }, USER_AUDIT_FIELDS),
+      data: input.existingOrganisationId ? { existingOrganisation: true } : {},
+    })
 
     if (user.organisationId && user.organisationId !== organisationId) {
       await deleteOrganisationIfUnused(tx, user.organisationId)
@@ -87,6 +102,15 @@ export async function rejectRegistration(actor: Principal, userId: string) {
       .update(users)
       .set({ status: 'rejected', reviewedById: actor.id, reviewedAt: new Date(), updatedAt: new Date() })
       .where(eq(users.id, user.id))
+    await writeAudit(tx, {
+      actorId: actor.id,
+      action: 'registration.rejected',
+      targetType: 'user',
+      targetId: user.id,
+      organisationId: user.organisationId,
+      before: auditSnapshot(user, USER_AUDIT_FIELDS),
+      after: auditSnapshot({ ...user, status: 'rejected' }, USER_AUDIT_FIELDS),
+    })
     if (user.organisationId) {
       await tx
         .update(organisations)
@@ -96,8 +120,6 @@ export async function rejectRegistration(actor: Principal, userId: string) {
     await notifyRegistrationDecision(tx, user, false)
   })
 }
-
-
 
 async function deleteOrganisationIfUnused(tx: Tx, organisationId: string) {
   const [org] = await tx
@@ -167,7 +189,7 @@ export async function getOrganisation(id: string) {
 
 export const saveOrganisationSchema = organisationSchema.extend({ id: z.uuid().optional() })
 
-export async function saveOrganisation(input: z.infer<typeof saveOrganisationSchema>) {
+export async function saveOrganisation(actor: Principal, input: z.infer<typeof saveOrganisationSchema>) {
   const values = {
     name: input.name,
     email: input.email || null,
@@ -179,24 +201,43 @@ export async function saveOrganisation(input: z.infer<typeof saveOrganisationSch
     vatId: input.vatId || null,
     status: input.status,
   }
-  const db = getDb()
-  if (input.id) {
-    const [row] = await db
-      .update(organisations)
-      .set({ ...values, updatedAt: new Date() })
-      .where(eq(organisations.id, input.id))
-      .returning({ id: organisations.id })
-    if (!row) throw new Error('Organisation nicht gefunden')
-    if (input.status === 'disabled') {
-      // Mitglieder einer deaktivierten Organisation werden abgemeldet.
-      await db.execute(
-        sql`delete from ${sessions} where ${sessions.userId} in (select ${users.id} from ${users} where ${users.organisationId} = ${input.id})`,
-      )
+  return getDb().transaction(async (tx) => {
+    if (input.id) {
+      const [before] = await tx.select().from(organisations).where(eq(organisations.id, input.id)).for('update')
+      if (!before) throw new Error('Organisation nicht gefunden')
+      const [row] = await tx
+        .update(organisations)
+        .set({ ...values, updatedAt: new Date() })
+        .where(eq(organisations.id, input.id))
+        .returning()
+      if (input.status === 'disabled') {
+        // Mitglieder einer deaktivierten Organisation werden abgemeldet.
+        await tx.execute(
+          sql`delete from ${sessions} where ${sessions.userId} in (select ${users.id} from ${users} where ${users.organisationId} = ${input.id})`,
+        )
+      }
+      await writeAudit(tx, {
+        actorId: actor.id,
+        action: 'organisation.updated',
+        targetType: 'organisation',
+        targetId: input.id,
+        organisationId: input.id,
+        before: auditSnapshot(before, ORG_AUDIT_FIELDS),
+        after: auditSnapshot(row, ORG_AUDIT_FIELDS),
+      })
+      return { id: row!.id }
     }
-    return row
-  }
-  const [row] = await db.insert(organisations).values(values).returning({ id: organisations.id })
-  return row!
+    const [row] = await tx.insert(organisations).values(values).returning()
+    await writeAudit(tx, {
+      actorId: actor.id,
+      action: 'organisation.created',
+      targetType: 'organisation',
+      targetId: row!.id,
+      organisationId: row!.id,
+      after: auditSnapshot(row, ORG_AUDIT_FIELDS),
+    })
+    return { id: row!.id }
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -241,26 +282,37 @@ export const createUserSchema = z.object({ ...userFields, password: z.union([z.l
 export async function createUser(actor: Principal, input: z.infer<typeof createUserSchema>) {
   assertMayManageRole(actor, input.role)
   const organisationId = input.role === 'customer' ? input.organisationId : null
-  const db = getDb()
-  const [taken] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(sql`lower(${users.email}) = ${input.email}`)
-  if (taken) throw new Error('Diese E-Mail-Adresse ist bereits vergeben')
-  const [row] = await db
-    .insert(users)
-    .values({
-      name: input.name,
-      email: input.email,
-      role: input.role,
+  const passwordHash = input.password ? await hashPassword(input.password) : null
+  return getDb().transaction(async (tx) => {
+    const [taken] = await tx
+      .select({ id: users.id })
+      .from(users)
+      .where(sql`lower(${users.email}) = ${input.email}`)
+    if (taken) throw new Error('Diese E-Mail-Adresse ist bereits vergeben')
+    const [row] = await tx
+      .insert(users)
+      .values({
+        name: input.name,
+        email: input.email,
+        role: input.role,
+        organisationId,
+        passwordHash,
+        status: 'active',
+        reviewedById: actor.id,
+        reviewedAt: new Date(),
+      })
+      .returning()
+    await writeAudit(tx, {
+      actorId: actor.id,
+      action: 'user.created',
+      targetType: 'user',
+      targetId: row!.id,
       organisationId,
-      passwordHash: input.password ? await hashPassword(input.password) : null,
-      status: 'active',
-      reviewedById: actor.id,
-      reviewedAt: new Date(),
+      after: auditSnapshot(row, USER_AUDIT_FIELDS),
+      data: { passwordSet: !!passwordHash },
     })
-    .returning({ id: users.id })
-  return row!
+    return { id: row!.id }
+  })
 }
 
 export const updateUserSchema = z.object({
@@ -271,52 +323,67 @@ export const updateUserSchema = z.object({
 })
 
 export async function updateUser(actor: Principal, input: z.infer<typeof updateUserSchema>) {
-  const db = getDb()
-  const [current] = await db.select().from(users).where(eq(users.id, input.id))
-  if (!current) throw new Error('Benutzer nicht gefunden')
-  assertMayManageRole(actor, current.role)
-  assertMayManageRole(actor, input.role)
-  // Registrierungen gibt nur der Superadmin frei, auch nicht auf dem Umweg über die Benutzerverwaltung.
-  if (current.status === 'pending' && input.status !== 'pending' && actor.role !== 'superadmin') {
-    throw new Error('Registrierungen kann nur ein Superadmin freigeben')
-  }
-  if (current.id === actor.id && (input.role !== current.role || input.status !== current.status)) {
-    throw new Error('Sie können Ihre eigene Rolle und Ihren Status nicht ändern')
-  }
-  if (current.role === 'superadmin' && (input.role !== 'superadmin' || input.status !== 'active')) {
-    const [others] = await db
-      .select({ n: count() })
-      .from(users)
-      .where(and(eq(users.role, 'superadmin'), eq(users.status, 'active'), ne(users.id, current.id)))
-    if ((others?.n ?? 0) === 0) throw new Error('Der letzte aktive Superadmin kann nicht entfernt werden')
-  }
-  const organisationId = input.role === 'customer' ? input.organisationId : null
+  const passwordHash = input.password ? await hashPassword(input.password) : null
+  await getDb().transaction(async (tx) => {
+    const [current] = await tx.select().from(users).where(eq(users.id, input.id)).for('update')
+    if (!current) throw new Error('Benutzer nicht gefunden')
+    assertMayManageRole(actor, current.role)
+    assertMayManageRole(actor, input.role)
+    // Registrierungen gibt nur der Superadmin frei, auch nicht auf dem Umweg über die Benutzerverwaltung.
+    if (current.status === 'pending' && input.status !== 'pending' && actor.role !== 'superadmin') {
+      throw new Error('Registrierungen kann nur ein Superadmin freigeben')
+    }
+    if (current.id === actor.id && (input.role !== current.role || input.status !== current.status)) {
+      throw new Error('Sie können Ihre eigene Rolle und Ihren Status nicht ändern')
+    }
+    if (current.role === 'superadmin' && (input.role !== 'superadmin' || input.status !== 'active')) {
+      const [others] = await tx
+        .select({ n: count() })
+        .from(users)
+        .where(and(eq(users.role, 'superadmin'), eq(users.status, 'active'), ne(users.id, current.id)))
+      if ((others?.n ?? 0) === 0) throw new Error('Der letzte aktive Superadmin kann nicht entfernt werden')
+    }
+    const organisationId = input.role === 'customer' ? input.organisationId : null
 
-  if (input.email !== current.email.toLowerCase()) {
-    const [taken] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(and(sql`lower(${users.email}) = ${input.email}`, ne(users.id, current.id)))
-    if (taken) throw new Error('Diese E-Mail-Adresse ist bereits vergeben')
-  }
+    if (input.email !== current.email.toLowerCase()) {
+      const [taken] = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(and(sql`lower(${users.email}) = ${input.email}`, ne(users.id, current.id)))
+      if (taken) throw new Error('Diese E-Mail-Adresse ist bereits vergeben')
+    }
 
-  await db
-    .update(users)
-    .set({
-      name: input.name,
-      email: input.email,
-      role: input.role,
-      status: input.status,
-      organisationId,
-      ...(input.password ? { passwordHash: await hashPassword(input.password) } : {}),
-      updatedAt: new Date(),
+    const [updated] = await tx
+      .update(users)
+      .set({
+        name: input.name,
+        email: input.email,
+        role: input.role,
+        status: input.status,
+        organisationId,
+        ...(passwordHash ? { passwordHash } : {}),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, current.id))
+      .returning()
+
+    // Bei geänderten Rechten oder Passwort alte Sitzungen beenden.
+    const privilegesChanged =
+      input.role !== current.role || input.status !== current.status || organisationId !== current.organisationId
+    const sessionsRevoked = (privilegesChanged || !!passwordHash) && current.id !== actor.id
+    if (sessionsRevoked) {
+      await tx.delete(sessions).where(eq(sessions.userId, current.id))
+    }
+    await writeAudit(tx, {
+      actorId: actor.id,
+      action: 'user.updated',
+      targetType: 'user',
+      targetId: current.id,
+      organisationId: organisationId ?? current.organisationId,
+      before: auditSnapshot(current, USER_AUDIT_FIELDS),
+      after: auditSnapshot(updated, USER_AUDIT_FIELDS),
+      // Nur, dass ein Passwort gesetzt wurde, nie das Passwort selbst.
+      data: { passwordChanged: !!passwordHash, sessionsRevoked },
     })
-    .where(eq(users.id, current.id))
-
-  // Bei geänderten Rechten oder Passwort alte Sitzungen beenden.
-  const privilegesChanged =
-    input.role !== current.role || input.status !== current.status || organisationId !== current.organisationId
-  if ((privilegesChanged || input.password) && current.id !== actor.id) {
-    await db.delete(sessions).where(eq(sessions.userId, current.id))
-  }
+  })
 }

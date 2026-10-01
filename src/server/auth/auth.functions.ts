@@ -4,7 +4,8 @@ import { z } from 'zod'
 import { emailSchema, loginSchema } from '~/lib/validation'
 import { getDb, schema } from '../db/client.server'
 import { authenticateWithPassword } from './login.server'
-import { issueLoginLink, redeemLoginLink } from './magic-link.server'
+import { LinkLoginError, issueLoginLink, redeemLoginLink } from './magic-link.server'
+import { auditLogin } from '../audit/audit.server'
 import { safeRedirect } from '~/lib/redirect'
 import { getOidcSettings } from './oidc.server'
 import { assertRateLimit } from './rate-limit.server'
@@ -48,7 +49,12 @@ export const redeemLoginLinkFn = createServerFn({ method: 'POST' })
   .validator(z.object({ token: z.string().min(20).max(200) }))
   .handler(async ({ data }) => {
     await assertRateLimit('login-link-redeem', 20, 10 * 60_000)
-    const result = await redeemLoginLink(data.token)
+    const result = await redeemLoginLink(data.token).catch(async (error: unknown) => {
+      if (error instanceof LinkLoginError) {
+        await auditLogin('failed', { userId: error.userId, method: 'link', reason: error.reason })
+      }
+      throw error
+    })
     await destroyCurrentSession()
     await createSession(result.userId)
     const [user] = await getDb()

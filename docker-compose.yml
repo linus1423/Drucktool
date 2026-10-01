@@ -48,6 +48,7 @@ services:
       APP_URL: ${APP_URL:-http://localhost:3000}
       SMTP_URL: ${SMTP_URL:-}
       MAIL_FROM: ${MAIL_FROM:-Drucktool <noreply@localhost>}
+      AUDIT_LOG_RETENTION_DAYS: ${AUDIT_LOG_RETENTION_DAYS:-365}
     healthcheck:
       disable: true
 

@@ -1,11 +1,25 @@
-// Aufräumjob für abgelaufene Daten. Läuft im Worker beim Start und dann stündlich.
+// Aufräumjob für abgelaufene Daten und Löschfristen. Läuft im Worker beim Start und dann stündlich.
 // Alle Schritte sind einfache DELETEs und damit idempotent: laufen mehrere Worker
 // gleichzeitig, löscht einer die Zeilen und der andere findet nichts mehr.
-import { and, isNull, lte, or, sql } from 'drizzle-orm'
+import { and, isNull, lt, lte, or, sql } from 'drizzle-orm'
 import { schema, type getDb } from '../db/client.server'
 
 type Db = ReturnType<typeof getDb>
-const { sessions, loginTokens, rateLimits } = schema
+const { sessions, loginTokens, rateLimits, auditLog } = schema
+
+/** Aufbewahrungsdauer des Audit-Logs in Tagen (AUDIT_LOG_RETENTION_DAYS, Standard 365, 0 = unbegrenzt). */
+export function auditRetentionDays() {
+  const raw = process.env.AUDIT_LOG_RETENTION_DAYS
+  const days = raw === undefined || raw === '' ? 365 : Number(raw)
+  return Number.isFinite(days) && days > 0 ? Math.floor(days) : 0
+}
+
+/** Löscht Audit-Einträge, die älter als die Aufbewahrungsdauer sind. */
+export async function purgeAuditLog(db: Db, days = auditRetentionDays()) {
+  if (days <= 0) return 0
+  const result = await db.delete(auditLog).where(lt(auditLog.createdAt, sql`now() - make_interval(days => ${days})`))
+  return result.count
+}
 
 export const CLEANUP_INTERVAL_MS = 60 * 60_000
 
@@ -19,10 +33,13 @@ export async function purgeExpired(db: Db): Promise<CleanupResult> {
   const expiredLimits = await db
     .delete(rateLimits)
     .where(and(lte(rateLimits.windowEndsAt, now), or(isNull(rateLimits.blockedUntil), lte(rateLimits.blockedUntil, now))))
+  // Audit-Log nach AUDIT_LOG_RETENTION_DAYS (Standard 365 Tage).
+  const auditEntries = await purgeAuditLog(db)
   return {
     sessions: expiredSessions.count,
     loginTokens: expiredTokens.count,
     rateLimits: expiredLimits.count,
+    auditLog: auditEntries,
   }
 }
 

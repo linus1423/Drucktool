@@ -14,7 +14,7 @@ bearbeiten sie über einen Status-Workflow bis zur Auslieferung.
 
 | Rolle       | Rechte                                                                                     |
 | ----------- | ------------------------------------------------------------------------------------------ |
-| Superadmin  | Alles, gibt Registrierungen frei und verwaltet Administratoren                              |
+| Superadmin  | Alles, gibt Registrierungen frei, verwaltet Administratoren, sieht das Protokoll            |
 | Admin       | Organisationen und Benutzer (Mitarbeiter, Kunden) verwalten, Anfragen bearbeiten            |
 | Mitarbeiter | Alle Anfragen bearbeiten, Status wechseln, zuweisen, interne Notizen schreiben             |
 | Kunde       | Eigene Aufträge anlegen, verfolgen und kommentieren                                        |
@@ -41,8 +41,14 @@ Im Profil sieht jeder seine angemeldeten Geräte und kann sie einzeln oder alle 
   gesperrt, unabhängig von der IP: erst 1 Minute, bei jedem weiteren Fehlversuch doppelt so lange, höchstens eine
   Stunde. Eine erfolgreiche Anmeldung setzt den Zähler zurück. Unbekannte Adressen werden genauso gezählt, damit die
   Sperre nichts über vorhandene Konten verrät.
-- **Aufräumen:** Der Worker löscht beim Start und dann stündlich abgelaufene Sitzungen, Anmeldelinks und
-  Rate-Limit-Zähler. Die Löschungen sind idempotent, mehrere Worker stören sich nicht.
+- **Audit-Log:** Freigaben und Ablehnungen von Registrierungen, Anlegen und Ändern von Benutzern und Organisationen
+  (Vorher/Nachher, IP, Zeitpunkt) sowie alle Anmeldungen, erfolgreich oder nicht, landen in der Tabelle `audit_log`.
+  Admin-Aktionen werden in derselben Transaktion wie die Änderung geschrieben. Passwörter und Hashes stehen nie im
+  Log, nur ob ein Passwort gesetzt wurde. Superadmins sehen das Protokoll unter **Protokoll** (`/admin/protokoll`) mit
+  Filter nach Benutzer, Organisation, Aktion und Zeitraum. Einträge werden nach `AUDIT_LOG_RETENTION_DAYS` Tagen
+  gelöscht (Standard 365, 0 = nie).
+- **Aufräumen:** Der Worker löscht beim Start und dann stündlich abgelaufene Sitzungen, Anmeldelinks,
+  Rate-Limit-Zähler und alte Audit-Einträge. Die Löschungen sind idempotent, mehrere Worker stören sich nicht.
 
 ## Status eines Auftrags
 
@@ -234,6 +240,7 @@ Ist das Paket in der GitHub Container Registry privat, `drucktool_registry_usern
 | `MAIL_FROM`                               | Absender, z. B. `Druckerei Muster <auftraege@example.com>`             |
 | `UPLOAD_DIR`                              | Ablage für Druckdateien, Standard `data/uploads` (im Image `/app/uploads`) |
 | `UPLOAD_MAX_MB`                           | Größte erlaubte Druckdatei in MB, Standard 500                         |
+| `AUDIT_LOG_RETENTION_DAYS`                | Aufbewahrung des Audit-Logs in Tagen, Standard 365, `0` = unbegrenzt   |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | OpenID Connect, siehe oben                                 |
 | `OIDC_DISPLAY_NAME`, `OIDC_NEW_USERS`, `OIDC_TRUST_EMAIL` | Beschriftung und Verhalten der OIDC-Anmeldung          |
 | `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_ROLES`, `OIDC_STAFF_ROLES`, `OIDC_ENFORCE_FOR_STAFF` | Rollen vom Anbieter, siehe oben |
