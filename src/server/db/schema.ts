@@ -22,6 +22,7 @@ import type { BillingAddress, DeliveryAddress, StoredBillingAddress } from '../.
 import { DELIVERY_METHODS } from '../../lib/order'
 import type { OrderSnapshot } from '../../lib/snapshot'
 import type { SheetSize } from '../../lib/catalog'
+import type { MailBlock } from '../../lib/mail-templates'
 import type { ChangeProposal } from '../../lib/proposal'
 
 export const userRole = pgEnum('user_role', USER_ROLES)
@@ -468,6 +469,17 @@ export const paperCoverColors = pgTable(
 export const requestNumberCounters = pgTable('request_number_counters', {
   month: integer('month').primaryKey(),
   last: integer('last').notNull(),
+})
+
+/** Von Admins angepasste E-Mail-Vorlagen (Issue #89); fehlt eine Zeile, gilt der Standard aus src/lib/mail-templates.ts. */
+export const mailTemplates = pgTable('mail_templates', {
+  key: text('key').primaryKey(),
+  subject: text('subject').notNull(),
+  mode: text('mode').$type<'blocks' | 'html'>().notNull().default('blocks'),
+  blocks: jsonb('blocks').$type<MailBlock[]>().notNull().default([]),
+  html: text('html').notNull().default(''),
+  updatedById: uuid('updated_by_id').references(() => users.id, { onDelete: 'set null' }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
 /** Übrige Preise und Texte als Schlüssel/Wert, z. B. Druckpreise pro Image und Mindestpreis. */

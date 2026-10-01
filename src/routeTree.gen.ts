@@ -21,6 +21,7 @@ import { Route as AnfragenIndexRouteImport } from './routes/anfragen/index'
 import { Route as AnfragenSplatRouteImport } from './routes/anfragen/$'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppAdminBenutzerRouteImport } from './routes/_app/admin/benutzer'
+import { Route as AppAdminEmailsRouteImport } from './routes/_app/admin/emails'
 import { Route as AppAdminFreigabenRouteImport } from './routes/_app/admin/freigaben'
 import { Route as AppAdminKatalogRouteImport } from './routes/_app/admin/katalog'
 import { Route as AppAdminProtokollRouteImport } from './routes/_app/admin/protokoll'
@@ -94,6 +95,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
 const AppAdminBenutzerRoute = AppAdminBenutzerRouteImport.update({
   id: '/benutzer',
   path: '/benutzer',
+  getParentRoute: () => AppAdminRouteRoute,
+} as any)
+const AppAdminEmailsRoute = AppAdminEmailsRouteImport.update({
+  id: '/emails',
+  path: '/emails',
   getParentRoute: () => AppAdminRouteRoute,
 } as any)
 const AppAdminFreigabenRoute = AppAdminFreigabenRouteImport.update({
@@ -188,6 +194,7 @@ export interface FileRoutesByFullPath {
   '/api/health': typeof ApiHealthRoute
   '/anfragen/': typeof AnfragenIndexRoute
   '/admin/benutzer': typeof AppAdminBenutzerRoute
+  '/admin/emails': typeof AppAdminEmailsRoute
   '/admin/freigaben': typeof AppAdminFreigabenRoute
   '/admin/katalog': typeof AppAdminKatalogRoute
   '/admin/protokoll': typeof AppAdminProtokollRoute
@@ -216,6 +223,7 @@ export interface FileRoutesByTo {
   '/api/health': typeof ApiHealthRoute
   '/anfragen': typeof AnfragenIndexRoute
   '/admin/benutzer': typeof AppAdminBenutzerRoute
+  '/admin/emails': typeof AppAdminEmailsRoute
   '/admin/freigaben': typeof AppAdminFreigabenRoute
   '/admin/katalog': typeof AppAdminKatalogRoute
   '/admin/protokoll': typeof AppAdminProtokollRoute
@@ -246,6 +254,7 @@ export interface FileRoutesById {
   '/api/health': typeof ApiHealthRoute
   '/anfragen/': typeof AnfragenIndexRoute
   '/_app/admin/benutzer': typeof AppAdminBenutzerRoute
+  '/_app/admin/emails': typeof AppAdminEmailsRoute
   '/_app/admin/freigaben': typeof AppAdminFreigabenRoute
   '/_app/admin/katalog': typeof AppAdminKatalogRoute
   '/_app/admin/protokoll': typeof AppAdminProtokollRoute
@@ -276,6 +285,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/anfragen/'
     | '/admin/benutzer'
+    | '/admin/emails'
     | '/admin/freigaben'
     | '/admin/katalog'
     | '/admin/protokoll'
@@ -304,6 +314,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/anfragen'
     | '/admin/benutzer'
+    | '/admin/emails'
     | '/admin/freigaben'
     | '/admin/katalog'
     | '/admin/protokoll'
@@ -333,6 +344,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/anfragen/'
     | '/_app/admin/benutzer'
+    | '/_app/admin/emails'
     | '/_app/admin/freigaben'
     | '/_app/admin/katalog'
     | '/_app/admin/protokoll'
@@ -453,6 +465,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminBenutzerRouteImport
       parentRoute: typeof AppAdminRouteRoute
     }
+    '/_app/admin/emails': {
+      id: '/_app/admin/emails'
+      path: '/emails'
+      fullPath: '/admin/emails'
+      preLoaderRoute: typeof AppAdminEmailsRouteImport
+      parentRoute: typeof AppAdminRouteRoute
+    }
     '/_app/admin/freigaben': {
       id: '/_app/admin/freigaben'
       path: '/freigaben'
@@ -563,6 +582,7 @@ declare module '@tanstack/react-router' {
 
 interface AppAdminRouteRouteChildren {
   AppAdminBenutzerRoute: typeof AppAdminBenutzerRoute
+  AppAdminEmailsRoute: typeof AppAdminEmailsRoute
   AppAdminFreigabenRoute: typeof AppAdminFreigabenRoute
   AppAdminKatalogRoute: typeof AppAdminKatalogRoute
   AppAdminProtokollRoute: typeof AppAdminProtokollRoute
@@ -573,6 +593,7 @@ interface AppAdminRouteRouteChildren {
 
 const AppAdminRouteRouteChildren: AppAdminRouteRouteChildren = {
   AppAdminBenutzerRoute: AppAdminBenutzerRoute,
+  AppAdminEmailsRoute: AppAdminEmailsRoute,
   AppAdminFreigabenRoute: AppAdminFreigabenRoute,
   AppAdminKatalogRoute: AppAdminKatalogRoute,
   AppAdminProtokollRoute: AppAdminProtokollRoute,

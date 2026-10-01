@@ -11,6 +11,7 @@ import {
   listUsersFn,
 } from '~/server/admin/admin.functions'
 import { listAuditLogFn } from '~/server/audit/audit.functions'
+import { listMailTemplatesFn } from '~/server/mail/mail-templates.functions'
 import type { AuditFilter } from '~/server/audit/audit.server'
 import type { RequestStatus } from './status'
 
@@ -100,3 +101,8 @@ export const auditLogQuery = (filter: AuditFilter) =>
     queryKey: ['admin', 'audit', filter],
     queryFn: () => listAuditLogFn({ data: filter }),
   })
+
+export const mailTemplatesQuery = queryOptions({
+  queryKey: ['admin', 'mail-templates'],
+  queryFn: () => listMailTemplatesFn(),
+})
