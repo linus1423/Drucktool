@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { MoneyInput } from '~/components/MoneyInput'
 import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select, Textarea, cx } from '~/components/ui'
 import { BINDING_UNIT_LABELS, type CatalogTexts, type PaperInput, type Pricing } from '~/lib/catalog'
+import type { DeadlineSettings } from '~/lib/deadlines'
 import { errorMessage } from '~/lib/errors'
 import { formatDateTime, formatMoney } from '~/lib/format'
 import { adminCatalogQuery, catalogChangesQuery } from '~/lib/queries'
@@ -13,6 +14,7 @@ import {
   savePaperFn,
   savePricingFn,
   saveTextsFn,
+  saveDeadlineSettingsFn,
   setFormatBindingFn,
   updateBindingFn,
   updateFormatFn,
@@ -568,8 +570,10 @@ const PRICE_FIELDS: { key: keyof Pricing; label: string; hint?: string }[] = [
 function PricingTab({ catalog }: { catalog: Catalog }) {
   const [pricing, setPricing] = useState(catalog.pricing)
   const [texts, setTexts] = useState(catalog.texts)
+  const [deadlines, setDeadlines] = useState(catalog.deadlines)
   const savePricing = useSave(savePricingFn)
   const saveTexts = useSave(saveTextsFn)
+  const saveDeadlines = useSave(saveDeadlineSettingsFn)
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -614,9 +618,40 @@ function PricingTab({ catalog }: { catalog: Catalog }) {
           />
         </div>
       </Card>
+      <Card title="Hinweis „wartet lange“">
+        <div className="space-y-3">
+          <p className="text-sm text-slate-600">
+            Aufträge, die länger als hier angegeben im selben Status stehen, werden in der Liste hervorgehoben.
+          </p>
+          {DEADLINE_FIELDS.map((f) => (
+            <Field key={f.key} label={f.label} htmlFor={`deadline-${f.key}`}>
+              <Input
+                id={`deadline-${f.key}`}
+                type="number"
+                min={1}
+                max={365}
+                className="w-28"
+                value={deadlines[f.key]}
+                onChange={(e) => setDeadlines({ ...deadlines, [f.key]: Number(e.target.value) })}
+              />
+            </Field>
+          ))}
+          <SaveRow
+            mutation={saveDeadlines}
+            dirty={JSON.stringify(deadlines) !== JSON.stringify(catalog.deadlines)}
+            onSave={() => saveDeadlines.mutate({ data: deadlines })}
+          />
+        </div>
+      </Card>
     </div>
   )
 }
+
+const DEADLINE_FIELDS: { key: keyof DeadlineSettings; label: string }[] = [
+  { key: 'staleSubmittedDays', label: 'Tage bis „Eingereicht“ als lange wartend gilt' },
+  { key: 'staleOnHoldDays', label: 'Tage bis „Rückfrage“ als lange wartend gilt' },
+  { key: 'staleConfirmedDays', label: 'Tage bis „Bestätigt“ als lange wartend gilt' },
+]
 
 function TextField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   const id = `text-${label}`
@@ -673,9 +708,12 @@ const FIELD_LABELS: Record<string, string> = {
   turnaround: 'Bearbeitungsdauer',
   plots: 'Was sind Plots?',
   terms: 'Auftragsbedingungen',
+  staleSubmittedDays: 'Wartet lange: Eingereicht',
+  staleOnHoldDays: 'Wartet lange: Rückfrage',
+  staleConfirmedDays: 'Wartet lange: Bestätigt',
 }
 
-const SETTING_LABELS: Record<string, string> = { pricing: 'Preise', texts: 'Hilfetexte' }
+const SETTING_LABELS: Record<string, string> = { pricing: 'Preise', texts: 'Hilfetexte', deadlines: 'Fristen' }
 
 function formatValue(key: string, v: unknown) {
   if (v === null || v === undefined || v === '') return '–'

@@ -1,5 +1,5 @@
 // E-Mail-Vorlagen. Reine Funktionen ohne Datenbankzugriff, damit sie testbar bleiben.
-import { formatMoney, formatRequestNumber } from '~/lib/format'
+import { formatDate, formatMoney, formatRequestNumber } from '~/lib/format'
 import { describeOrder, type OrderSnapshot } from '~/lib/snapshot'
 import { STATUS_LABELS, type RequestStatus } from '~/lib/status'
 
@@ -153,6 +153,13 @@ export function changeAnsweredMail(r: RequestRef & { actorName: string; accepted
     },
     requestButton(r),
   ])
+}
+
+export function promisedDateMail(r: RequestRef & { actorName: string; date: string | null }): MailContent {
+  const text = r.date
+    ? `Die Druckerei hat für ${requestLabel(r)} einen Termin zugesagt: ${formatDate(r.date)}.`
+    : `Der zugesagte Termin für ${requestLabel(r)} wurde aufgehoben. Wir melden uns mit einem neuen Termin.`
+  return compose(`Termin für ${requestLabel(r)}`, [{ kind: 'p', text }, requestButton(r)])
 }
 
 export function commentMail(r: RequestRef & { actorName: string; body: string; internal: boolean }): MailContent {

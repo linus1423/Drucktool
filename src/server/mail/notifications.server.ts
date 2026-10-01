@@ -10,6 +10,7 @@ import {
   changeAnsweredMail,
   changeProposedMail,
   commentMail,
+  promisedDateMail,
   registrationApprovedMail,
   registrationReceivedMail,
   registrationRejectedMail,
@@ -165,6 +166,15 @@ export async function notifyChangeAnswered(
     tx,
     rows.map((r) => r.email),
     changeAnsweredMail({ ...request, actorName: await actorName(tx, actor.id), accepted: input.accepted }),
+  )
+}
+
+export async function notifyPromisedDate(tx: Tx, actor: Actor, input: { requestId: string; date: string | null }) {
+  const request = await loadRequest(tx, input.requestId)
+  await enqueueMail(
+    tx,
+    await customerRecipients(tx, request.createdById, actor.id),
+    promisedDateMail({ ...request, actorName: await actorName(tx, actor.id), date: input.date }),
   )
 }
 
