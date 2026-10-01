@@ -7,6 +7,7 @@ import postgres from 'postgres'
 import * as schema from '../src/server/db/schema'
 import { hashPassword } from '../src/server/auth/password.server'
 import { splitName } from '../src/lib/name'
+import { logger } from '../src/server/log.server'
 
 const url = process.env.DATABASE_URL
 if (!url) throw new Error('DATABASE_URL ist nicht gesetzt')
@@ -19,9 +20,9 @@ const db = drizzle(client, { schema })
 const existing = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.role, 'superadmin')).limit(1)
 
 if (existing.length > 0) {
-  console.log('Superadmin existiert bereits, nichts zu tun')
+  logger.info('Superadmin existiert bereits, nichts zu tun')
 } else if (!email || !password) {
-  console.log('Kein Superadmin vorhanden. SUPERADMIN_EMAIL und SUPERADMIN_PASSWORD setzen, um einen anzulegen.')
+  logger.info('Kein Superadmin vorhanden. SUPERADMIN_EMAIL und SUPERADMIN_PASSWORD setzen, um einen anzulegen.')
 } else if (password.length < 12) {
   throw new Error('SUPERADMIN_PASSWORD muss mindestens 12 Zeichen lang sein')
 } else {
@@ -34,7 +35,7 @@ if (existing.length > 0) {
       .update(schema.users)
       .set({ role: 'superadmin', status: 'active', updatedAt: new Date() })
       .where(eq(schema.users.id, taken[0].id))
-    console.log(`Bestehender Benutzer ${email} wurde zum Superadmin gemacht`)
+    logger.info('Bestehender Benutzer wurde zum Superadmin gemacht', { email })
   } else {
     await db.insert(schema.users).values({
       email,
@@ -43,7 +44,7 @@ if (existing.length > 0) {
       role: 'superadmin',
       status: 'active',
     })
-    console.log(`Superadmin ${email} angelegt`)
+    logger.info('Superadmin angelegt', { email })
   }
 }
 
@@ -57,7 +58,7 @@ async function seedExampleCoverColors() {
   const byName = (name: string) => colors.find((c) => c.name === name)
   const white = byName('Weiß')
   if (!white) {
-    console.log('Coverfarbe „Weiß“ fehlt, Beispiel-Coverfarben übersprungen')
+    logger.info('Coverfarbe „Weiß“ fehlt, Beispiel-Coverfarben übersprungen')
     return
   }
   const colored = ['Weiß', 'Dunkelblau', 'Dunkelrot', 'Durchsichtig'].flatMap((n) => byName(n) ?? [])
@@ -101,7 +102,7 @@ async function seedExampleCoverColors() {
     thin.map((p) => p.id),
     colored.map((c) => c.id),
   )
-  console.log(`Beispiel-Coverfarben gesetzt: 250 g/m² nur Weiß, 160 g/m² ${colored.map((c) => c.name).join(', ')}`)
+  logger.info(`Beispiel-Coverfarben gesetzt: 250 g/m² nur Weiß, 160 g/m² ${colored.map((c) => c.name).join(', ')}`)
 }
 
 if (process.env.SEED_EXAMPLE_CATALOG === 'true') await seedExampleCoverColors()

@@ -3,6 +3,7 @@
 // mehrere Worker gleichzeitig, erledigt einer die Zeilen und der andere findet nichts mehr.
 import { and, eq, inArray, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm'
 import { schema, type getDb, type Tx } from '../db/client.server'
+import { logger } from '../log.server'
 
 type Db = ReturnType<typeof getDb>
 const { sessions, loginTokens, rateLimits, auditLog, users, organisations, organisationMembers } = schema
@@ -145,12 +146,12 @@ export async function purgeExpired(db: Db): Promise<CleanupResult> {
 }
 
 /** Führt den Aufräumjob aus und schreibt das Ergebnis ins Log. Fehler beenden den Worker nicht. */
-export async function runCleanup(db: Db, log: (message: string) => void = console.log) {
+export async function runCleanup(db: Db) {
   try {
     const result = await purgeExpired(db)
     const removed = Object.entries(result).filter(([, n]) => n > 0)
-    if (removed.length) log(`[cleanup] Gelöscht: ${removed.map(([k, n]) => `${k}=${n}`).join(', ')}`)
+    if (removed.length) logger.info('Abgelaufene Daten gelöscht', Object.fromEntries(removed))
   } catch (error) {
-    console.error('[cleanup] Aufräumen fehlgeschlagen', error)
+    logger.error('Aufräumen fehlgeschlagen', { err: error })
   }
 }

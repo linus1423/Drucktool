@@ -8,6 +8,7 @@ import { resolveOidcUser } from './oidc-users.server'
 import { assertRateLimit } from './rate-limit.server'
 import { auditLogin } from '../audit/audit.server'
 import { createSession, destroyCurrentSession } from './session.server'
+import { logger } from '../log.server'
 
 const FLOW_COOKIE = 'drucktool_oidc'
 
@@ -37,7 +38,7 @@ export async function startOidcLogin(request: Request) {
   try {
     config = await getOidcClient(settings)
   } catch (error) {
-    console.error('[oidc] Discovery fehlgeschlagen', error)
+    logger.error('OIDC-Discovery fehlgeschlagen', { err: error })
     return loginError('Der Anmeldedienst ist gerade nicht erreichbar. Bitte versuchen Sie es später erneut.')
   }
 
@@ -119,7 +120,7 @@ export async function finishOidcLogin(request: Request) {
       claims = { ...claims, email: info.email, email_verified: info.email_verified, name: claims.name ?? info.name }
     }
   } catch (error) {
-    console.error('[oidc] Anmeldung fehlgeschlagen', error)
+    logger.error('OIDC-Anmeldung fehlgeschlagen', { err: error })
     return loginError('Die Anmeldung konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.')
   }
 
