@@ -71,6 +71,30 @@ export const CUSTOM_MIN_MM = 20
 /** Ein Deckblatt besteht aus höchstens zwei Seiten: vorne und hinten. */
 export const MAX_COVER_PAGES = 2
 
+/**
+ * Seiten der Druckdatei, die bei einem Deckblatt aus der Druckdatei je Deckblatt
+ * genutzt werden: doppelseitig Außen- und Innenseite, einseitig nur die Außenseite.
+ */
+export function coverPagesPerSheet(duplex: boolean) {
+  return duplex ? 2 : 1
+}
+
+/**
+ * Welche Seiten der Druckdatei auf das Deckblattpapier kommen, oder null, wenn das
+ * Deckblatt eine eigene Datei hat. Für Hinweise im Wizard und auf der Detailseite.
+ */
+export function coverPagesFromMainFile(spec: Pick<OrderSpec, 'coverPages' | 'coverFromMainFile' | 'duplex' | 'pages'>) {
+  if (!spec.coverFromMainFile || !spec.coverPages) return null
+  const perSheet = coverPagesPerSheet(spec.duplex)
+  const range = (from: number, to: number) => (from === to ? `Seite ${from}` : `Seiten ${from}–${to}`)
+  return {
+    /** Seiten, die damit nicht mehr im Innenteil gedruckt werden */
+    taken: perSheet * spec.coverPages,
+    front: range(1, perSheet),
+    back: spec.coverPages === 2 ? range(spec.pages - perSheet + 1, spec.pages) : null,
+  }
+}
+
 export const orderSpecSchema = z.object({
   formatId: z.string().min(1, 'Bitte ein Format wählen').max(50),
   customWidthMm: z.number().int().min(CUSTOM_MIN_MM).max(CUSTOM_MAX_MM.long).nullable(),
@@ -78,9 +102,15 @@ export const orderSpecSchema = z.object({
   bindingId: z.string().min(1, 'Bitte eine Bindung wählen').max(50),
   duplex: z.boolean(),
   paperId: z.uuid('Bitte ein Papier wählen'),
-  /** Separates Deckblatt mit eigener Datei und eigenem Papier. */
+  /** Separates Deckblatt auf eigenem Papier. */
   coverPaperId: z.uuid().nullable(),
+  /** Deckblätter: 1 = nur vorne, 2 = vorne und hinten. Mit eigener Datei deren Seitenzahl. */
   coverPages: z.number().int().min(1).max(MAX_COVER_PAGES).nullable(),
+  /**
+   * Ohne eigene Deckblatt-Datei (Issue #85) kommt das Deckblatt aus der Druckdatei:
+   * die ersten Seiten für vorne, ggf. die letzten für hinten. Fehlt in älteren Aufträgen.
+   */
+  coverFromMainFile: z.boolean().default(false),
   coverColorId: z.uuid().nullable(),
   coverBackColorId: z.uuid().nullable(),
   borderless: z.boolean(),
@@ -347,7 +377,21 @@ export function resolveOrder(
       const ok = paperChoices(catalog, format, size, 'cover').find((c) => c.item.id === coverPaper!.id)
       if (!ok?.allowed) errors.push(`${coverPaper.name}: ${ok?.reason ?? 'nicht als Deckblatt wählbar'}`)
     }
-    if (!spec.coverPages) errors.push('Bitte die Datei für das Deckblatt hochladen.')
+    if (!spec.coverPages) {
+      errors.push(
+        spec.coverFromMainFile
+          ? 'Bitte angeben, ob das Deckblatt nur vorne oder vorne und hinten ist.'
+          : 'Bitte die Datei für das Deckblatt hochladen.',
+      )
+    }
+    const fromMain = coverPagesFromMainFile(spec)
+    if (fromMain && fromMain.taken >= spec.pages) {
+      errors.push(
+        `Für ein Deckblatt aus der Druckdatei braucht die Datei mehr als ${fromMain.taken} Seiten. Bitte eine eigene Deckblatt-Datei hochladen.`,
+      )
+    }
+  } else if (spec.coverFromMainFile) {
+    errors.push('Ein Deckblatt ist nicht ausgewählt.')
   }
 
   const colorFor = (id: string | null, label: string) => {

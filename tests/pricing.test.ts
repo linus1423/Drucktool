@@ -85,6 +85,14 @@ describe('Auswahlregeln', () => {
     )
   })
 
+  it('erlaubt ein Deckblatt ohne eigene Datei aus der Druckdatei', () => {
+    const cover = { bindingId: 'plastic_comb', coverPaperId: PAPER.card, coverFromMainFile: true }
+    expect(errors({ ...cover, pages: 10, coverPages: 2 })).toEqual([])
+    expect(errors({ ...cover, pages: 10 })).toContain('Bitte angeben, ob das Deckblatt nur vorne oder vorne und hinten ist.')
+    expect(errors({ ...cover, pages: 4, duplex: true, coverPages: 2 })[0]).toContain('mehr als 4 Seiten')
+    expect(errors({ coverFromMainFile: true, coverPages: 1, pages: 4 })).toContain('Ein Deckblatt ist nicht ausgewählt.')
+  })
+
   it('schlägt das Format anhand der PDF-Seitengröße vor', () => {
     expect(suggestFormat(CATALOG.formats, { widthMm: 297, heightMm: 210 })?.id).toBe('A4')
     expect(suggestFormat(CATALOG.formats, { widthMm: 200, heightMm: 200 })).toBeUndefined()
@@ -161,5 +169,20 @@ describe('Preise', () => {
     expect(amount(p, 'cover_paper')).toBe(1 * 15)
     expect(amount(p, 'binding')).toBe(200)
     expect(p.totalCents).toBe(445)
+  })
+
+  it('Deckblatt aus der Druckdatei: Seiten nicht doppelt berechnen', () => {
+    const cover = { bindingId: 'plastic_comb', coverPaperId: PAPER.card, coverFromMainFile: true }
+    // Doppelseitig: Seiten 1–2 und 19–20 auf Karton, 16 Seiten im Innenteil.
+    const p = price({ ...cover, pages: 20, duplex: true, coverPages: 2 })
+    expect(amount(p, 'print')).toBe(16 * 10)
+    expect(amount(p, 'paper')).toBe(4 * 2)
+    expect(amount(p, 'cover_print')).toBe(4 * 10)
+    expect(amount(p, 'cover_paper')).toBe(1 * 15)
+    expect(p.totalCents).toBe(160 + 8 + 40 + 15 + 200)
+    // Einseitig: nur Seite 1 auf Karton.
+    const single = price({ ...cover, pages: 10, coverPages: 1 })
+    expect(amount(single, 'print')).toBe(9 * 10)
+    expect(amount(single, 'cover_print')).toBe(1 * 10)
   })
 })

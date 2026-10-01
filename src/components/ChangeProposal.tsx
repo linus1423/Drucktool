@@ -188,6 +188,8 @@ export function ProposeChangeForm({
     customHeightMm: format?.kind === 'custom' ? int(draft.customHeight) : null,
     copies: int(draft.copies) ?? 0,
     pages: int(draft.pages) ?? 0,
+    // Ohne Deckblatt-Datei kommt ein Deckblatt aus der Druckdatei (Issue #85).
+    coverFromMainFile: !!draft.spec.coverPaperId && !hasCoverFile,
   }
   const size = format ? formatSize(format, spec) : null
   const binding = catalog.bindings.find((b) => b.id === spec.bindingId)
@@ -322,7 +324,7 @@ export function ProposeChangeForm({
             Randlos
           </label>
         </div>
-        {hasCoverFile && binding?.allowsCover ? (
+        {binding?.allowsCover ? (
           <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Deckblatt" htmlFor="proposal-cover">
               <Select
@@ -339,7 +341,10 @@ export function ProposeChangeForm({
               </Select>
             </Field>
             {spec.coverPaperId ? (
-              <Field label="Seiten im Deckblatt" htmlFor="proposal-cover-pages">
+              <Field
+                label={hasCoverFile ? 'Seiten im Deckblatt' : 'Deckblatt aus der Druckdatei'}
+                htmlFor="proposal-cover-pages"
+              >
                 <Select
                   id="proposal-cover-pages"
                   value={String(spec.coverPages ?? 1)}
