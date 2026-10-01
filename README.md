@@ -61,6 +61,15 @@ Im Profil sieht jeder seine angemeldeten Geräte und kann sie einzeln oder alle 
   mit 403.
 - **Aufräumen:** Der Worker löscht beim Start und dann stündlich abgelaufene Sitzungen, Anmeldelinks,
   Rate-Limit-Zähler und alte Audit-Einträge, dazu die Daten mit Löschfrist (siehe Datenschutz). Die Löschungen sind idempotent, mehrere Worker stören sich nicht.
+- **Server-Härtung (Ansible-Rolle `hardening`):** Firewall `ufw` lässt eingehend nur SSH, HTTP und HTTPS zu. Weil
+  Docker die Firewall für veröffentlichte Ports umgeht, bindet die Compose-Datei die App immer an `127.0.0.1:3000`
+  (ohne Domain erreichbar per `ssh -L 3000:127.0.0.1:3000 deploy@server`); nur `drucktool_expose_app_port: true` gibt
+  Port 3000 ohne HTTPS frei, mit Warnung beim Ausrollen. SSH nur noch mit Schlüssel und ohne Root-Login (das Playbook
+  bricht vorher ab, wenn Ansible selbst als root oder mit Passwort verbindet), `fail2ban` sperrt IPs nach 5
+  Fehlversuchen für eine Stunde, `unattended-upgrades` spielt täglich Sicherheitsupdates ein (Neustart nur mit
+  `hardening_automatic_reboot: true`). Das Playbook bricht ab, solange im Vault Beispielpasswörter stehen. Alles
+  einzeln abschaltbar, siehe `ansible/roles/hardening/defaults/main.yml`, oder ganz mit
+  `drucktool_hardening_enabled: false`. Prüfen nach dem Ausrollen: `nmap -Pn <server>` zeigt nur 22, 80 und 443.
 
 ## Status eines Auftrags
 

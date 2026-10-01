@@ -5,5 +5,8 @@
     # Je Umgebung ein eigener Vault; group_vars/vault.yml bleibt als Rückfall für bestehende Installationen.
     - ["vault/{{ drucktool_environment }}.yml", "group_vars/vault.yml"]
   roles:
+    # Firewall, SSH nur mit Schlüssel, fail2ban, Sicherheitsupdates (abschaltbar mit drucktool_hardening_enabled).
+    - role: hardening
+      when: drucktool_hardening_enabled | default(true)
     - docker
     - drucktool

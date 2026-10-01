@@ -20,6 +20,28 @@
       Bitte group_vars/vault.yml anlegen (siehe vault.example.yml). Das Datenbankpasswort braucht
       mindestens 16 Zeichen und darf keine einfachen Anführungszeichen enthalten.
 
+- name: Beispielpasswörter ablehnen
+  ansible.builtin.assert:
+    that:
+      - drucktool_postgres_password not in drucktool_example_passwords
+      - (drucktool_superadmin_password | default('')) not in drucktool_example_passwords
+      - "'bitte' not in drucktool_postgres_password"
+      - "'bitte' not in (drucktool_superadmin_password | default(''))"
+    fail_msg: >-
+      Im Vault steht noch ein Beispielpasswort aus vault.example.yml. Bitte eigene Passwörter setzen,
+      z. B. mit: openssl rand -hex 24
+    quiet: true
+  no_log: true
+
+- name: Warnen, wenn keine Domain gesetzt ist
+  ansible.builtin.debug:
+    msg: >-
+      WARNUNG: Ohne drucktool_domain gibt es kein HTTPS.
+      {{ 'Port 3000 ist ungeschützt aus dem Internet erreichbar (Docker umgeht die Firewall).'
+      if drucktool_expose_app_port else
+      'Die App ist nur auf dem Server unter 127.0.0.1:3000 erreichbar, z. B. per ssh -L 3000:127.0.0.1:3000.' }}
+  when: drucktool_domain | length == 0
+
 - name: Verzeichnisse anlegen
   ansible.builtin.file:
     path: "{{ item }}"

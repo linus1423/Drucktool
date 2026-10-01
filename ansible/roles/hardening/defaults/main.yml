@@ -1,0 +1,17 @@
+# Grundhärtung des Servers. Alles einzeln abschaltbar, z. B. wenn die FSMB-IT das selbst verwaltet.
+
+# Firewall (ufw): eingehend nur SSH, HTTP und HTTPS.
+# Achtung: Docker umgeht ufw für veröffentlichte Ports. Deshalb bindet die Compose-Datei die App nur an 127.0.0.1.
+hardening_firewall_enabled: true
+hardening_ssh_port: 22
+
+# SSH nur mit Schlüssel, kein Root-Login. Bricht ab, wenn Ansible selbst als root oder mit Passwort verbindet.
+hardening_ssh_enabled: true
+
+# Sperrt IPs nach wiederholten Fehlanmeldungen per SSH.
+hardening_fail2ban_enabled: true
+
+# Sicherheitsupdates automatisch einspielen. Neustart nur, wenn ausdrücklich erlaubt.
+hardening_unattended_upgrades_enabled: true
+hardening_automatic_reboot: false
+hardening_automatic_reboot_time: '04:00'

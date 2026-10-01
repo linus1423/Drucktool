@@ -1,0 +1,5 @@
+// Verwaltet von Ansible (Rolle hardening). Ergänzt 50unattended-upgrades, das nur Sicherheitsupdates der
+// Distribution einspielt. Docker-Pakete werden bewusst nicht automatisch aktualisiert.
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Automatic-Reboot "{{ 'true' if hardening_automatic_reboot else 'false' }}";
+Unattended-Upgrade::Automatic-Reboot-Time "{{ hardening_automatic_reboot_time }}";
