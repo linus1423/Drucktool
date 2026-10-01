@@ -92,7 +92,7 @@ describe.skipIf(!url)('Anfragen (Integration)', () => {
     const created = await placeOrder(noAddress)
     const detail = await getRequestDetail(noAddress, created.id)
     expect(detail.organisationId).toBeNull()
-    expect((await listRequests(noAddress, {})).map((r) => r.id)).toEqual([created.id])
+    expect((await listRequests(noAddress, {})).rows.map((r) => r.id)).toEqual([created.id])
   })
 
   it('zeigt Kunden nur ihre eigenen Anfragen', async () => {
@@ -100,7 +100,7 @@ describe.skipIf(!url)('Anfragen (Integration)', () => {
     await expect(getRequestDetail(colleague, created.id)).rejects.toThrow('Auftrag nicht gefunden')
     await expect(getRequestDetail(otherCustomer, created.id)).rejects.toThrow('Auftrag nicht gefunden')
     await expect(addComment(otherCustomer, { id: created.id, body: 'hallo', internal: false })).rejects.toThrow()
-    const list = await listRequests(otherCustomer, {})
+    const list = (await listRequests(otherCustomer, {})).rows
     expect(list.find((r) => r.id === created.id)).toBeUndefined()
   })
 
@@ -151,13 +151,13 @@ describe.skipIf(!url)('Anfragen (Integration)', () => {
     const forCustomer = await getRequestDetail(customer, id)
     expect(forCustomer.internalStatus).toBeNull()
     expect(forCustomer.events.some((e) => e.type === 'internal_status_changed')).toBe(false)
-    expect((await listRequests(customer, {})).find((r) => r.id === id)?.internalStatus).toBeNull()
+    expect((await listRequests(customer, {})).rows.find((r) => r.id === id)?.internalStatus).toBeNull()
 
     // Mit dem Abschluss verschwindet der Unterstatus.
     await changeStatus(staff, { id, version: 3, to: 'completed' })
     expect((await getRequestDetail(staff, id)).internalStatus).toBeNull()
-    expect((await listRequests(staff, { done: true })).some((r) => r.id === id)).toBe(true)
-    expect((await listRequests(staff, { open: true })).some((r) => r.id === id)).toBe(false)
+    expect((await listRequests(staff, { done: true })).rows.some((r) => r.id === id)).toBe(true)
+    expect((await listRequests(staff, { open: true })).rows.some((r) => r.id === id)).toBe(false)
   })
 
   it('zeigt Kunden keine internen Notizen und keine Zuständigkeit', async () => {

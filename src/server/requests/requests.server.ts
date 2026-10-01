@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { and, asc, desc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, desc, eq, ilike, inArray, isNull, or, sql, type SQL } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { z } from 'zod'
 import { CONFLICT_MESSAGE } from '~/lib/errors'
@@ -77,22 +77,53 @@ async function updateWithVersion(tx: Tx, id: string, expectedVersion: number, va
   return rows[0]!
 }
 
+export const LIST_SORTS = ['number', 'title', 'customer', 'status', 'total', 'created', 'updated'] as const
+export const PAGE_SIZES = [25, 50, 100] as const
+
 export const listFilterSchema = z.object({
   status: z.enum(REQUEST_STATUSES).optional(),
   open: z.boolean().optional(),
   done: z.boolean().optional(),
   assignedToMe: z.boolean().optional(),
   search: z.string().trim().max(200).optional(),
+  // Nur für Mitarbeiter wirksam
+  organisationId: z.uuid().optional(),
+  /** Mitarbeiter-ID oder "none" für nicht zugewiesene Aufträge. */
+  assigneeId: z.union([z.uuid(), z.literal('none')]).optional(),
+  /** Angelegt ab bzw. bis einschließlich (YYYY-MM-DD, deutsche Zeit). */
+  from: z.iso.date().optional(),
+  to: z.iso.date().optional(),
+  sort: z.enum(LIST_SORTS).optional(),
+  dir: z.enum(['asc', 'desc']).optional(),
+  page: z.number().int().min(1).max(100_000).optional(),
+  pageSize: z
+    .number()
+    .int()
+    .refine((n) => (PAGE_SIZES as readonly number[]).includes(n))
+    .optional(),
 })
 
-export async function listRequests(user: Principal, filter: z.infer<typeof listFilterSchema>) {
-  const assignee = alias(users, 'assignee')
-  const creator = alias(users, 'creator')
+export type ListFilter = z.infer<typeof listFilterSchema>
+
+const creatorAlias = alias(users, 'creator')
+const assigneeAlias = alias(users, 'assignee')
+
+function listConditions(user: Principal, filter: ListFilter) {
+  const staff = isStaffRole(user.role)
   const conditions: (SQL | undefined)[] = [visibilityFilter(user)]
   if (filter.status) conditions.push(eq(requests.status, filter.status))
   if (filter.open) conditions.push(inArray(requests.status, OPEN_STATUSES))
   if (filter.done) conditions.push(eq(requests.status, 'completed'))
   if (filter.assignedToMe) conditions.push(eq(requests.assigneeId, user.id))
+  if (staff && filter.organisationId) conditions.push(eq(requests.organisationId, filter.organisationId))
+  if (staff && filter.assigneeId) {
+    conditions.push(filter.assigneeId === 'none' ? isNull(requests.assigneeId) : eq(requests.assigneeId, filter.assigneeId))
+  }
+  // Tagesgrenzen in deutscher Zeit, damit "bis 31.10." den ganzen Tag einschließt.
+  if (filter.from) conditions.push(sql`${requests.createdAt} >= (${filter.from}::date)::timestamp at time zone 'Europe/Berlin'`)
+  if (filter.to) {
+    conditions.push(sql`${requests.createdAt} < (${filter.to}::date + 1)::timestamp at time zone 'Europe/Berlin'`)
+  }
   if (filter.search) {
     const term = `%${filter.search.replace(/[%_\\]/g, '\\$&')}%`
     const asNumber = Number.parseInt(filter.search.replace(/^#/, ''), 10)
@@ -100,36 +131,91 @@ export async function listRequests(user: Principal, filter: z.infer<typeof listF
       or(
         ilike(requests.title, term),
         ilike(organisations.name, term),
-        ilike(creator.name, term),
-        ilike(creator.email, term),
+        ilike(creatorAlias.name, term),
+        staff ? ilike(creatorAlias.email, term) : undefined,
         Number.isFinite(asNumber) ? eq(requests.number, asNumber) : undefined,
       ),
     )
   }
+  return and(...conditions)
+}
 
+function listOrder(filter: ListFilter) {
+  const column = {
+    number: requests.number,
+    title: requests.title,
+    customer: creatorAlias.name,
+    status: requests.status,
+    total: requests.totalCents,
+    created: requests.createdAt,
+    updated: requests.updatedAt,
+  }[filter.sort ?? 'updated']
+  const dir = filter.dir ?? (filter.sort === 'title' || filter.sort === 'customer' ? 'asc' : 'desc')
+  // Die Nummer als zweites Kriterium hält die Reihenfolge über Seiten hinweg stabil.
+  return dir === 'asc'
+    ? [sql`${column} asc nulls last`, asc(requests.number)]
+    : [sql`${column} desc nulls last`, desc(requests.number)]
+}
+
+function listSelection(user: Principal) {
+  const staff = isStaffRole(user.role)
+  return {
+    id: requests.id,
+    number: requests.number,
+    title: requests.title,
+    status: requests.status,
+    internalStatus: staff ? requests.internalStatus : sql<null>`null`,
+    quantity: requests.quantity,
+    totalCents: requests.totalCents,
+    deliveryMethod: requests.deliveryMethod,
+    createdAt: requests.createdAt,
+    updatedAt: requests.updatedAt,
+    organisationName: organisations.name,
+    creatorName: creatorAlias.name,
+    creatorEmail: staff ? creatorAlias.email : sql<null>`null`,
+    assigneeName: staff ? assigneeAlias.name : sql<null>`null`,
+  }
+}
+
+function listRowsQuery(user: Principal) {
   return getDb()
-    .select({
-      id: requests.id,
-      number: requests.number,
-      title: requests.title,
-      status: requests.status,
-      internalStatus: isStaffRole(user.role) ? requests.internalStatus : sql<null>`null`,
-      quantity: requests.quantity,
-      totalCents: requests.totalCents,
-      deliveryMethod: requests.deliveryMethod,
-      createdAt: requests.createdAt,
-      updatedAt: requests.updatedAt,
-      organisationName: organisations.name,
-      creatorName: creator.name,
-      assigneeName: assignee.name,
-    })
+    .select(listSelection(user))
     .from(requests)
     .leftJoin(organisations, eq(organisations.id, requests.organisationId))
-    .innerJoin(creator, eq(creator.id, requests.createdById))
-    .leftJoin(assignee, eq(assignee.id, requests.assigneeId))
-    .where(and(...conditions))
-    .orderBy(desc(requests.updatedAt))
-    .limit(500)
+    .innerJoin(creatorAlias, eq(creatorAlias.id, requests.createdById))
+    .leftJoin(assigneeAlias, eq(assigneeAlias.id, requests.assigneeId))
+    .$dynamic()
+}
+
+/** Eine Seite der Auftragsliste samt Gesamtzahl (Issue #15). */
+export async function listRequests(user: Principal, filter: ListFilter) {
+  const pageSize = filter.pageSize ?? 50
+  const page = filter.page ?? 1
+  const where = listConditions(user, filter)
+  const [rows, [counted]] = await Promise.all([
+    listRowsQuery(user)
+      .where(where)
+      .orderBy(...listOrder(filter))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize),
+    getDb()
+      .select({ count: sql<number>`count(*)::int` })
+      .from(requests)
+      .leftJoin(organisations, eq(organisations.id, requests.organisationId))
+      .innerJoin(creatorAlias, eq(creatorAlias.id, requests.createdById))
+      .where(where),
+  ])
+  return { rows, total: counted?.count ?? 0, page, pageSize }
+}
+
+export const EXPORT_LIMIT = 10_000
+
+/** Alle Treffer der aktuellen Filter für den CSV-Export, höchstens EXPORT_LIMIT. */
+export async function exportRequests(user: Principal, filter: ListFilter) {
+  return listRowsQuery(user)
+    .where(listConditions(user, filter))
+    .orderBy(...listOrder(filter))
+    .limit(EXPORT_LIMIT)
 }
 
 export async function getRequestDetail(user: Principal, id: string) {
