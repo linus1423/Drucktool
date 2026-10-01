@@ -413,10 +413,7 @@ export function termsVersion(terms: string) {
 /** Verbindliches Absenden aus dem Wizard (Lastenheft Schritt 8). */
 export async function createRequest(user: Principal, input: z.infer<typeof createRequestSchema>) {
   return getDb().transaction(async (tx) => {
-    const [me] = await tx
-      .select({ billingAddress: users.billingAddress })
-      .from(users)
-      .where(eq(users.id, user.id))
+    const [me] = await tx.select({ billingAddress: users.billingAddress }).from(users).where(eq(users.id, user.id))
     // Lastenheft 3.1: Die Rechnungsadresse muss vor dem ersten Auftrag hinterlegt sein.
     if (!isStaffRole(user.role) && !me?.billingAddress) {
       throw new Error('Bitte hinterlegen Sie zuerst eine Rechnungsadresse in Ihrem Profil.')

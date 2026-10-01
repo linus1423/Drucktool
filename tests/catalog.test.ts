@@ -132,7 +132,9 @@ describe.skipIf(!url)('Katalog (Integration)', () => {
     }
     expect(calculatePrice(c, spec).ok).toBe(true)
     const rejected = calculatePrice(c, { ...spec, coverColorId: blue.id })
-    expect(rejected.ok ? [] : rejected.errors).toEqual([`Dunkelblau gibt es nicht auf ${c.papers.find((p) => p.id === paperId)!.name} 250 g/m².`])
+    expect(rejected.ok ? [] : rejected.errors).toEqual([
+      `Dunkelblau gibt es nicht auf ${c.papers.find((p) => p.id === paperId)!.name} 250 g/m².`,
+    ])
 
     await catalog.setPaperCoverColor(actor, { paperId, coverColorId: white.id, allowed: false })
     expect((await catalog.getCatalog()).paperCoverColors.some((pc) => pc.paperId === paperId)).toBe(false)

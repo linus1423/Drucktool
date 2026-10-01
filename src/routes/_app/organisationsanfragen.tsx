@@ -117,7 +117,11 @@ function RequestCard({ request: r }: { request: OrganisationRequest }) {
           </Field>
         ) : null}
         {action === 'create' ? (
-          <Field label="Name der neuen Organisation" htmlFor={`name-${r.id}`} hint="Weitere Stammdaten lassen sich danach unter „Organisationen“ ergänzen.">
+          <Field
+            label="Name der neuen Organisation"
+            htmlFor={`name-${r.id}`}
+            hint="Weitere Stammdaten lassen sich danach unter „Organisationen“ ergänzen."
+          >
             <Input id={`name-${r.id}`} value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
         ) : null}
@@ -129,7 +133,9 @@ function RequestCard({ request: r }: { request: OrganisationRequest }) {
         <div className="flex justify-end">
           <Button
             variant={action === 'reject' ? 'danger' : 'primary'}
-            disabled={resolve.isPending || (action === 'assign' && !selectedOrganisationId) || (action === 'create' && !name.trim())}
+            disabled={
+              resolve.isPending || (action === 'assign' && !selectedOrganisationId) || (action === 'create' && !name.trim())
+            }
             onClick={() => resolve.mutate()}
           >
             {action === 'assign' ? 'Zuordnen' : action === 'create' ? 'Anlegen und zuordnen' : 'Ablehnen'}

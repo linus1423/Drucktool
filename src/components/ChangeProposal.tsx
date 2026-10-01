@@ -191,8 +191,7 @@ export function ProposeChangeForm({
     copies: int(draft.copies) ?? 0,
     pages: int(draft.pages) ?? 0,
     // Ohne Deckblatt-Datei kommt ein Deckblatt aus der Druckdatei (Issue #85).
-    coverFromMainFile:
-      draft.spec.coverPaperId && !hasCoverFile ? (draft.spec.coverFromMainFile ?? 'front') : null,
+    coverFromMainFile: draft.spec.coverPaperId && !hasCoverFile ? (draft.spec.coverFromMainFile ?? 'front') : null,
   }
   const size = format ? formatSize(format, spec) : null
   const binding = catalog.bindings.find((b) => b.id === spec.bindingId)

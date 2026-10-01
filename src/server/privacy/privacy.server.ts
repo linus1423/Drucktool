@@ -127,124 +127,125 @@ export async function exportUserData(actor: Principal, userId: string) {
   if (!user) throw new Error('Benutzer nicht gefunden')
   const email = user.email.toLowerCase()
 
-  const [orgs, orgRequests, activeSessions, linkedAccounts, ownRequests, comments, events, files, audit, mails] = await Promise.all([
-    db
-      .select({ id: organisations.id, name: organisations.name, since: organisationMembers.createdAt })
-      .from(organisationMembers)
-      .innerJoin(organisations, eq(organisations.id, organisationMembers.organisationId))
-      .where(eq(organisationMembers.userId, userId))
-      .orderBy(asc(organisations.name)),
-    db
-      .select({
-        name: organisationRequests.name,
-        details: organisationRequests.details,
-        status: organisationRequests.status,
-        note: organisationRequests.note,
-        createdAt: organisationRequests.createdAt,
-        reviewedAt: organisationRequests.reviewedAt,
-      })
-      .from(organisationRequests)
-      .where(eq(organisationRequests.userId, userId))
-      .orderBy(asc(organisationRequests.createdAt)),
-    db
-      .select({
-        createdAt: sessions.createdAt,
-        expiresAt: sessions.expiresAt,
-        ip: sessions.ip,
-        userAgent: sessions.userAgent,
-      })
-      .from(sessions)
-      .where(eq(sessions.userId, userId))
-      .orderBy(asc(sessions.createdAt)),
-    db
-      .select({ issuer: oidcAccounts.issuer, subject: oidcAccounts.subject, createdAt: oidcAccounts.createdAt })
-      .from(oidcAccounts)
-      .where(eq(oidcAccounts.userId, userId)),
-    db
-      .select({
-        number: requests.number,
-        title: requests.title,
-        description: requests.description,
-        status: requests.status,
-        quantity: requests.quantity,
-        desiredDate: requests.desiredDate,
-        order: requests.order,
-        totalCents: requests.totalCents,
-        billingAddress: requests.billingAddress,
-        deliveryMethod: requests.deliveryMethod,
-        deliveryAddress: requests.deliveryAddress,
-        termsAcceptedAt: requests.termsAcceptedAt,
-        termsVersion: requests.termsVersion,
-        createdAt: requests.createdAt,
-        updatedAt: requests.updatedAt,
-      })
-      .from(requests)
-      .where(eq(requests.createdById, userId))
-      .orderBy(asc(requests.number)),
-    db
-      .select({
-        requestNumber: requests.number,
-        body: requestComments.body,
-        internal: requestComments.internal,
-        createdAt: requestComments.createdAt,
-      })
-      .from(requestComments)
-      .innerJoin(requests, eq(requests.id, requestComments.requestId))
-      .where(eq(requestComments.authorId, userId))
-      .orderBy(asc(requestComments.createdAt)),
-    db
-      .select({
-        requestNumber: requests.number,
-        type: requestEvents.type,
-        fromStatus: requestEvents.fromStatus,
-        toStatus: requestEvents.toStatus,
-        createdAt: requestEvents.createdAt,
-      })
-      .from(requestEvents)
-      .innerJoin(requests, eq(requests.id, requestEvents.requestId))
-      .where(eq(requestEvents.actorId, userId))
-      .orderBy(asc(requestEvents.createdAt)),
-    db
-      .select({
-        filename: requestFiles.filename,
-        sizeBytes: requestFiles.sizeBytes,
-        mimeType: requestFiles.mimeType,
-        sha256: requestFiles.sha256,
-        requestNumber: requests.number,
-        createdAt: requestFiles.createdAt,
-      })
-      .from(requestFiles)
-      .leftJoin(requests, eq(requests.id, requestFiles.requestId))
-      .where(eq(requestFiles.ownerId, userId))
-      .orderBy(asc(requestFiles.createdAt)),
-    db
-      .select({
-        action: auditLog.action,
-        data: auditLog.data,
-        ip: auditLog.ip,
-        createdAt: auditLog.createdAt,
-        byThisUser: sql<boolean>`${auditLog.actorId} is not distinct from ${userId}::uuid`,
-      })
-      .from(auditLog)
-      .where(
-        or(
-          eq(auditLog.actorId, userId),
-          and(eq(auditLog.targetType, 'user'), eq(auditLog.targetId, userId)),
-          sql`lower(${auditLog.data}->>'email') = ${email}`,
-        ),
-      )
-      .orderBy(asc(auditLog.createdAt)),
-    db
-      .select({
-        subject: emailOutbox.subject,
-        status: emailOutbox.status,
-        createdAt: emailOutbox.createdAt,
-        sentAt: emailOutbox.sentAt,
-      })
-      .from(emailOutbox)
-      .where(sql`lower(${emailOutbox.to}) = ${email}`)
-      .orderBy(asc(emailOutbox.createdAt)),
-  ])
+  const [orgs, orgRequests, activeSessions, linkedAccounts, ownRequests, comments, events, files, audit, mails] =
+    await Promise.all([
+      db
+        .select({ id: organisations.id, name: organisations.name, since: organisationMembers.createdAt })
+        .from(organisationMembers)
+        .innerJoin(organisations, eq(organisations.id, organisationMembers.organisationId))
+        .where(eq(organisationMembers.userId, userId))
+        .orderBy(asc(organisations.name)),
+      db
+        .select({
+          name: organisationRequests.name,
+          details: organisationRequests.details,
+          status: organisationRequests.status,
+          note: organisationRequests.note,
+          createdAt: organisationRequests.createdAt,
+          reviewedAt: organisationRequests.reviewedAt,
+        })
+        .from(organisationRequests)
+        .where(eq(organisationRequests.userId, userId))
+        .orderBy(asc(organisationRequests.createdAt)),
+      db
+        .select({
+          createdAt: sessions.createdAt,
+          expiresAt: sessions.expiresAt,
+          ip: sessions.ip,
+          userAgent: sessions.userAgent,
+        })
+        .from(sessions)
+        .where(eq(sessions.userId, userId))
+        .orderBy(asc(sessions.createdAt)),
+      db
+        .select({ issuer: oidcAccounts.issuer, subject: oidcAccounts.subject, createdAt: oidcAccounts.createdAt })
+        .from(oidcAccounts)
+        .where(eq(oidcAccounts.userId, userId)),
+      db
+        .select({
+          number: requests.number,
+          title: requests.title,
+          description: requests.description,
+          status: requests.status,
+          quantity: requests.quantity,
+          desiredDate: requests.desiredDate,
+          order: requests.order,
+          totalCents: requests.totalCents,
+          billingAddress: requests.billingAddress,
+          deliveryMethod: requests.deliveryMethod,
+          deliveryAddress: requests.deliveryAddress,
+          termsAcceptedAt: requests.termsAcceptedAt,
+          termsVersion: requests.termsVersion,
+          createdAt: requests.createdAt,
+          updatedAt: requests.updatedAt,
+        })
+        .from(requests)
+        .where(eq(requests.createdById, userId))
+        .orderBy(asc(requests.number)),
+      db
+        .select({
+          requestNumber: requests.number,
+          body: requestComments.body,
+          internal: requestComments.internal,
+          createdAt: requestComments.createdAt,
+        })
+        .from(requestComments)
+        .innerJoin(requests, eq(requests.id, requestComments.requestId))
+        .where(eq(requestComments.authorId, userId))
+        .orderBy(asc(requestComments.createdAt)),
+      db
+        .select({
+          requestNumber: requests.number,
+          type: requestEvents.type,
+          fromStatus: requestEvents.fromStatus,
+          toStatus: requestEvents.toStatus,
+          createdAt: requestEvents.createdAt,
+        })
+        .from(requestEvents)
+        .innerJoin(requests, eq(requests.id, requestEvents.requestId))
+        .where(eq(requestEvents.actorId, userId))
+        .orderBy(asc(requestEvents.createdAt)),
+      db
+        .select({
+          filename: requestFiles.filename,
+          sizeBytes: requestFiles.sizeBytes,
+          mimeType: requestFiles.mimeType,
+          sha256: requestFiles.sha256,
+          requestNumber: requests.number,
+          createdAt: requestFiles.createdAt,
+        })
+        .from(requestFiles)
+        .leftJoin(requests, eq(requests.id, requestFiles.requestId))
+        .where(eq(requestFiles.ownerId, userId))
+        .orderBy(asc(requestFiles.createdAt)),
+      db
+        .select({
+          action: auditLog.action,
+          data: auditLog.data,
+          ip: auditLog.ip,
+          createdAt: auditLog.createdAt,
+          byThisUser: sql<boolean>`${auditLog.actorId} is not distinct from ${userId}::uuid`,
+        })
+        .from(auditLog)
+        .where(
+          or(
+            eq(auditLog.actorId, userId),
+            and(eq(auditLog.targetType, 'user'), eq(auditLog.targetId, userId)),
+            sql`lower(${auditLog.data}->>'email') = ${email}`,
+          ),
+        )
+        .orderBy(asc(auditLog.createdAt)),
+      db
+        .select({
+          subject: emailOutbox.subject,
+          status: emailOutbox.status,
+          createdAt: emailOutbox.createdAt,
+          sentAt: emailOutbox.sentAt,
+        })
+        .from(emailOutbox)
+        .where(sql`lower(${emailOutbox.to}) = ${email}`)
+        .orderBy(asc(emailOutbox.createdAt)),
+    ])
 
   await writeAudit(db, { actorId: actor.id, action: 'user.exported', targetType: 'user', targetId: userId })
 

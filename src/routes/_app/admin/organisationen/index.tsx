@@ -15,7 +15,6 @@ export const Route = createFileRoute('/_app/admin/organisationen/')({
 type Row = Awaited<ReturnType<NonNullable<(typeof organisationsQuery)['queryFn']>>>[number]
 const col = dataColumnHelper<Row>()
 
-
 const columns = [
   col.accessor('name', { header: 'Name', sortFn: 'text', cell: (i) => <span className="font-medium">{i.getValue()}</span> }),
   col.accessor('city', { header: 'Ort', cell: (i) => i.getValue() ?? '–' }),

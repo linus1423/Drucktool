@@ -158,10 +158,7 @@ export async function resolveOrganisationRequest(actor: Principal, input: z.infe
       .where(and(eq(organisationRequests.id, input.id), eq(organisationRequests.status, 'open')))
       .for('update')
     if (!request) throw new Error('Die Anfrage wurde bereits bearbeitet')
-    const [customer] = await tx
-      .select({ name: users.name, email: users.email })
-      .from(users)
-      .where(eq(users.id, request.userId))
+    const [customer] = await tx.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, request.userId))
     if (!customer) throw new Error('Benutzer nicht gefunden')
 
     const reviewed = { reviewedById: actor.id, reviewedAt: new Date() }
@@ -218,7 +215,11 @@ export async function resolveOrganisationRequest(actor: Principal, input: z.infe
       organisationId: organisation.id,
       data: { requested: request.name, created: input.action === 'create' },
     })
-    await notifyOrganisationRequestDecision(tx, customer, { requested: request.name, organisation: organisation.name, note: null })
+    await notifyOrganisationRequestDecision(tx, customer, {
+      requested: request.name,
+      organisation: organisation.name,
+      note: null,
+    })
     return { organisationId: organisation.id }
   })
 }

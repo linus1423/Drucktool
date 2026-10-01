@@ -260,8 +260,8 @@ function RequestListPage() {
             <form
               onSubmit={(e) => {
                 e.preventDefault()
-                const q = new FormData(e.currentTarget).get('q')?.toString() ?? ''
-                void setFilter({ q: q || undefined })
+                const q = new FormData(e.currentTarget).get('q')
+                void setFilter({ q: typeof q === 'string' && q ? q : undefined })
               }}
             >
               <Input

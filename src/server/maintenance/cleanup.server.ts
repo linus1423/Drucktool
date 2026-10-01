@@ -88,10 +88,7 @@ export async function purgeRejectedRegistrations(db: Db, days = rejectedRetentio
       .select({ organisationId: organisationMembers.organisationId })
       .from(organisationMembers)
       .where(inArray(organisationMembers.userId, ids))
-    const deleted = await tx
-      .delete(users)
-      .where(inArray(users.id, ids))
-      .returning({ id: users.id, email: users.email })
+    const deleted = await tx.delete(users).where(inArray(users.id, ids)).returning({ id: users.id, email: users.email })
     const orgIds = [...new Set(memberships.map((m) => m.organisationId))]
     if (orgIds.length) {
       await tx

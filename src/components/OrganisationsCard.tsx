@@ -54,10 +54,13 @@ export function OrganisationsCard({ account }: { account: Pick<Account, 'members
       title="Organisationen"
       actions={
         open ? null : (
-          <Button variant="secondary" onClick={() => {
+          <Button
+            variant="secondary"
+            onClick={() => {
               setOpen(true)
               setSent(false)
-            }}>
+            }}
+          >
             Organisation anfragen
           </Button>
         )
@@ -68,7 +71,11 @@ export function OrganisationsCard({ account }: { account: Pick<Account, 'members
           Eine Organisation ist optional. Gehören Sie einer an, können Sie sie beim Bestellen auswählen.
         </p>
         {error ? <Alert>{errorMessage(error)}</Alert> : null}
-        {sent ? <Alert tone="success">Ihre Anfrage ist eingegangen. Sie erhalten eine E-Mail, sobald die Druckerei sie bearbeitet hat.</Alert> : null}
+        {sent ? (
+          <Alert tone="success">
+            Ihre Anfrage ist eingegangen. Sie erhalten eine E-Mail, sobald die Druckerei sie bearbeitet hat.
+          </Alert>
+        ) : null}
         {account.memberships.length === 0 ? (
           <p className="text-slate-500">Sie gehören keiner Organisation an.</p>
         ) : (
@@ -76,7 +83,9 @@ export function OrganisationsCard({ account }: { account: Pick<Account, 'members
             {account.memberships.map((m) => (
               <li key={m.id} className="flex items-center justify-between gap-2 py-2">
                 <span className="font-medium">{m.name}</span>
-                {m.status !== 'active' ? <Badge className={ORG_STATUS[m.status].className}>{ORG_STATUS[m.status].label}</Badge> : null}
+                {m.status !== 'active' ? (
+                  <Badge className={ORG_STATUS[m.status].className}>{ORG_STATUS[m.status].label}</Badge>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -89,10 +98,18 @@ export function OrganisationsCard({ account }: { account: Pick<Account, 'members
               request.mutate()
             }}
           >
-            <Field label="Name der Organisation" htmlFor="org-request-name" hint="z. B. Lehrstuhl, Institut, Fachschaft oder Firma">
+            <Field
+              label="Name der Organisation"
+              htmlFor="org-request-name"
+              hint="z. B. Lehrstuhl, Institut, Fachschaft oder Firma"
+            >
               <Input id="org-request-name" value={name} maxLength={200} onChange={(e) => setName(e.target.value)} required />
             </Field>
-            <Field label="Weitere Angaben (optional)" htmlFor="org-request-details" hint="z. B. Adresse, Kostenstelle oder Ansprechpartner">
+            <Field
+              label="Weitere Angaben (optional)"
+              htmlFor="org-request-details"
+              hint="z. B. Adresse, Kostenstelle oder Ansprechpartner"
+            >
               <Textarea
                 id="org-request-details"
                 rows={3}

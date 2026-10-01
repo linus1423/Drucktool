@@ -54,7 +54,8 @@ describe.skipIf(!url)('Organisationen und Organisationsanfragen (Issue #68)', ()
       ])
       .returning()
     const created = await createUser(admin, {
-      firstName: '', lastName: 'Mehrfach',
+      firstName: '',
+      lastName: 'Mehrfach',
       email: email('mehrfach'),
       role: 'customer',
       organisationIds: [a!.id, b!.id],
@@ -66,7 +67,14 @@ describe.skipIf(!url)('Organisationen und Organisationsanfragen (Issue #68)', ()
     expect((await getOrganisation(a!.id)).members.map((m) => m.id)).toEqual([created.id])
     expect((await listOrganisations()).find((o) => o.id === b!.id)?.memberCount).toBe(1)
 
-    const base = { id: created.id, firstName: '', lastName: 'Mehrfach', email: email('mehrfach'), status: 'active' as const, password: '' }
+    const base = {
+      id: created.id,
+      firstName: '',
+      lastName: 'Mehrfach',
+      email: email('mehrfach'),
+      status: 'active' as const,
+      password: '',
+    }
     await updateUser(admin, { ...base, role: 'customer', organisationIds: [b!.id] })
     expect(await membershipsOf(created.id)).toEqual([b!.name])
     await updateUser(admin, { ...base, role: 'customer', organisationIds: [] })
@@ -149,8 +157,8 @@ describe.skipIf(!url)('Organisationen und Organisationsanfragen (Issue #68)', ()
       .insert(schema.organisations)
       .values({ name: `Inaktiv ${stamp}`, status: 'disabled' })
       .returning()
-    await expect(
-      orgs.resolveOrganisationRequest(staff, { id, action: 'assign', organisationId: disabled!.id }),
-    ).rejects.toThrow('nicht aktiv')
+    await expect(orgs.resolveOrganisationRequest(staff, { id, action: 'assign', organisationId: disabled!.id })).rejects.toThrow(
+      'nicht aktiv',
+    )
   })
 })

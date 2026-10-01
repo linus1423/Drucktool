@@ -21,18 +21,35 @@ describe.skipIf(!url)('OpenID Connect: Benutzerzuordnung (Integration)', async (
       .insert(schema.users)
       .values({ email: email('Staff'), lastName: 'Staff', role: 'staff', status: 'active' })
       .returning()
-    const result = await resolveOidcUser(ISS, { sub: `s-${stamp}`, email: email('staff'), email_verified: true }, { policy: 'reject' })
+    const result = await resolveOidcUser(
+      ISS,
+      { sub: `s-${stamp}`, email: email('staff'), email_verified: true },
+      { policy: 'reject' },
+    )
     expect(result).toEqual({ kind: 'login', userId: user!.id })
     // Danach zählt die Verknüpfung, auch wenn sich die Adresse beim Anbieter ändert.
-    const again = await resolveOidcUser(ISS, { sub: `s-${stamp}`, email: 'anders@oidc.test', email_verified: true }, { policy: 'reject' })
+    const again = await resolveOidcUser(
+      ISS,
+      { sub: `s-${stamp}`, email: 'anders@oidc.test', email_verified: true },
+      { policy: 'reject' },
+    )
     expect(again).toEqual({ kind: 'login', userId: user!.id })
   })
 
   it('verknüpft nicht über unbestätigte Adressen', async () => {
-    await getDb().insert(schema.users).values({ email: email('opfer'), lastName: 'Opfer', role: 'admin', status: 'active' })
-    const result = await resolveOidcUser(ISS, { sub: `x-${stamp}`, email: email('opfer'), email_verified: false }, { policy: 'staff' })
+    await getDb()
+      .insert(schema.users)
+      .values({ email: email('opfer'), lastName: 'Opfer', role: 'admin', status: 'active' })
+    const result = await resolveOidcUser(
+      ISS,
+      { sub: `x-${stamp}`, email: email('opfer'), email_verified: false },
+      { policy: 'staff' },
+    )
     expect(result.kind).toBe('denied')
-    const links = await getDb().select().from(schema.oidcAccounts).where(eq(schema.oidcAccounts.subject, `x-${stamp}`))
+    const links = await getDb()
+      .select()
+      .from(schema.oidcAccounts)
+      .where(eq(schema.oidcAccounts.subject, `x-${stamp}`))
     expect(links).toHaveLength(0)
   })
 
@@ -52,31 +69,56 @@ describe.skipIf(!url)('OpenID Connect: Benutzerzuordnung (Integration)', async (
       family_name: 'Muster',
     }
     expect((await resolveOidcUser(ISS, claims, { policy: 'staff' })).kind).toBe('login')
-    const [u] = await getDb().select().from(schema.users).where(eq(schema.users.email, email('getrennt')))
+    const [u] = await getDb()
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.email, email('getrennt')))
     expect(u).toMatchObject({ firstName: 'Anna Maria', lastName: 'Muster', name: 'Anna Maria Muster' })
   })
 
   it('legt unbekannte Benutzer je nach Einstellung an', async () => {
-    expect(await resolveOidcUser(ISS, { sub: `r-${stamp}`, email: email('neu1'), email_verified: true }, { policy: 'reject' })).toMatchObject({
+    expect(
+      await resolveOidcUser(ISS, { sub: `r-${stamp}`, email: email('neu1'), email_verified: true }, { policy: 'reject' }),
+    ).toMatchObject({
       kind: 'denied',
     })
 
-    const pending = await resolveOidcUser(ISS, { sub: `p-${stamp}`, email: email('neu2'), email_verified: true, name: 'Neu Zwei' }, { policy: 'pending' })
+    const pending = await resolveOidcUser(
+      ISS,
+      { sub: `p-${stamp}`, email: email('neu2'), email_verified: true, name: 'Neu Zwei' },
+      { policy: 'pending' },
+    )
     expect(pending).toEqual({ kind: 'pending' })
-    const [p] = await getDb().select().from(schema.users).where(eq(schema.users.email, email('neu2')))
+    const [p] = await getDb()
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.email, email('neu2')))
     expect(p).toMatchObject({ role: 'customer', status: 'pending', name: 'Neu Zwei', passwordHash: null })
     // Ohne given_name/family_name wird name am letzten Leerzeichen geteilt.
     expect(p).toMatchObject({ firstName: 'Neu', lastName: 'Zwei' })
 
-    const staff = await resolveOidcUser(ISS, { sub: `st-${stamp}`, email: email('neu3'), email_verified: true }, { policy: 'staff' })
+    const staff = await resolveOidcUser(
+      ISS,
+      { sub: `st-${stamp}`, email: email('neu3'), email_verified: true },
+      { policy: 'staff' },
+    )
     expect(staff.kind).toBe('login')
-    const [s] = await getDb().select().from(schema.users).where(eq(schema.users.email, email('neu3')))
+    const [s] = await getDb()
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.email, email('neu3')))
     expect(s).toMatchObject({ role: 'staff', status: 'active' })
   })
 
   it('lässt deaktivierte Konten nicht herein', async () => {
-    await getDb().insert(schema.users).values({ email: email('weg'), lastName: 'Weg', role: 'staff', status: 'disabled' })
-    const result = await resolveOidcUser(ISS, { sub: `d-${stamp}`, email: email('weg'), email_verified: true }, { policy: 'staff' })
+    await getDb()
+      .insert(schema.users)
+      .values({ email: email('weg'), lastName: 'Weg', role: 'staff', status: 'disabled' })
+    const result = await resolveOidcUser(
+      ISS,
+      { sub: `d-${stamp}`, email: email('weg'), email_verified: true },
+      { policy: 'staff' },
+    )
     expect(result.kind).toBe('denied')
   })
 
@@ -96,7 +138,10 @@ describe.skipIf(!url)('OpenID Connect: Benutzerzuordnung (Integration)', async (
     // Unbekannter Benutzer mit Rolle wird trotz "reject" direkt als Mitarbeiter angelegt.
     const first = await resolveOidcUser(ISS, { ...base, roles: ['Druck.Staff'] }, { policy: 'reject', roles })
     expect(first.kind).toBe('login')
-    const [u] = await getDb().select().from(schema.users).where(eq(schema.users.email, email('mitarbeiter')))
+    const [u] = await getDb()
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.email, email('mitarbeiter')))
     expect(u).toMatchObject({ role: 'staff', status: 'active' })
 
     // Beförderung zum Admin beim nächsten Login.
@@ -105,7 +150,9 @@ describe.skipIf(!url)('OpenID Connect: Benutzerzuordnung (Integration)', async (
     expect(promoted!.role).toBe('admin')
 
     // Rolle entfernt: Anmeldung abgelehnt, laufende Sitzungen beendet.
-    await getDb().insert(schema.sessions).values({ id: `h-${stamp}`, userId: u!.id, expiresAt: new Date(Date.now() + 60_000) })
+    await getDb()
+      .insert(schema.sessions)
+      .values({ id: `h-${stamp}`, userId: u!.id, expiresAt: new Date(Date.now() + 60_000) })
     const denied = await resolveOidcUser(ISS, { ...base, roles: [] }, { policy: 'reject', roles })
     expect(denied.kind).toBe('denied')
     const left = await getDb().select().from(schema.sessions).where(eq(schema.sessions.userId, u!.id))
@@ -118,7 +165,11 @@ describe.skipIf(!url)('OpenID Connect: Benutzerzuordnung (Integration)', async (
       .insert(schema.users)
       .values({ email: email('super'), lastName: 'Super', role: 'superadmin', status: 'active' })
       .returning()
-    const result = await resolveOidcUser(ISS, { sub: `su-${stamp}`, email: email('super'), email_verified: true }, { policy: 'reject', roles })
+    const result = await resolveOidcUser(
+      ISS,
+      { sub: `su-${stamp}`, email: email('super'), email_verified: true },
+      { policy: 'reject', roles },
+    )
     expect(result).toEqual({ kind: 'login', userId: su!.id })
     const [after] = await getDb().select().from(schema.users).where(eq(schema.users.id, su!.id))
     expect(after!.role).toBe('superadmin')

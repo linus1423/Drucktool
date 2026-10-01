@@ -124,9 +124,7 @@ describe.skipIf(!url)('Aufträge aus dem Wizard (Integration)', () => {
     const withSpec = { ...input, spec, expectedTotalCents: priced.price.totalCents }
     await expect(createRequest(customer, withSpec)).rejects.toThrow('Deckblatt hochladen')
     const wrongCount = await testUpload(customer, 'cover', 3)
-    await expect(createRequest(customer, { ...withSpec, coverFileId: wrongCount.id })).rejects.toThrow(
-      'Seitenzahl passt nicht',
-    )
+    await expect(createRequest(customer, { ...withSpec, coverFileId: wrongCount.id })).rejects.toThrow('Seitenzahl passt nicht')
     const goodCover = await testUpload(customer, 'cover', 1)
     const created = await createRequest(customer, { ...withSpec, coverFileId: goodCover.id })
     const detail = await getRequestDetail(customer, created.id)

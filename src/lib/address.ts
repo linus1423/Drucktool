@@ -50,7 +50,9 @@ export const EMPTY_BILLING: BillingAddress = {
 export const EMPTY_DELIVERY: DeliveryAddress = { recipient: '', department: '', building: '', room: '', note: '' }
 
 export function formatBillingAddress(a: StoredBillingAddress): string[] {
-  return [billingName(a), a.organisation, a.street, `${a.zip} ${a.city}`.trim(), a.country].filter((l): l is string => !!l?.trim())
+  return [billingName(a), a.organisation, a.street, `${a.zip} ${a.city}`.trim(), a.country].filter(
+    (l): l is string => !!l?.trim(),
+  )
 }
 
 export function formatDeliveryAddress(a: DeliveryAddress): string[] {

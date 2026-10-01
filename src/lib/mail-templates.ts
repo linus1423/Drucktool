@@ -500,8 +500,8 @@ function blockHtml(b: MailBlock, vars: Record<string, string>, href: string) {
 
 /** Bausteine als HTML mit unveränderten Platzhaltern, als Startpunkt beim Umschalten auf den HTML-Modus. */
 export function blocksToHtml(blocks: MailBlock[]) {
-  const keep = (text: string) => text.replace(PLACEHOLDER, (_, name: string) => `\u0000${name}\u0001`)
-  const restore = (html: string) => html.replace(/\u0000([a-zA-Z]+)\u0001/g, '{{$1}}')
+  const keep = (text: string) => text.replace(PLACEHOLDER, (_, name: string) => `\uE000${name}\uE001`)
+  const restore = (html: string) => html.replace(/\uE000([a-zA-Z]+)\uE001/g, '{{$1}}')
   return blocks
     .map((b) => {
       if (b.kind === 'button') return restore(blockHtml({ ...b, label: keep(b.label) }, {}, keep(b.href)))

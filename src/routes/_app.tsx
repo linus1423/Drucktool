@@ -79,7 +79,7 @@ function AppLayout() {
             <Link to="/profil" className="text-right leading-tight hover:underline">
               <div className="font-medium">{user.name}</div>
               <div className="text-xs text-slate-500">
-                {isStaffRole(user.role) ? ROLE_LABELS[user.role] : (user.organisations.map((o) => o.name).join(', ') || user.email)}
+                {isStaffRole(user.role) ? ROLE_LABELS[user.role] : user.organisations.map((o) => o.name).join(', ') || user.email}
               </div>
             </Link>
             <button type="button" onClick={handleLogout} className={navLink}>

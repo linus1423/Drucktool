@@ -10,7 +10,10 @@ type Principal = import('~/server/requests/requests.server').Principal
 
 async function pendingRegistration(name: string) {
   const db = getDb()
-  const [org] = await db.insert(schema.organisations).values({ name: `${name} GmbH`, status: 'pending' }).returning()
+  const [org] = await db
+    .insert(schema.organisations)
+    .values({ name: `${name} GmbH`, status: 'pending' })
+    .returning()
   const [user] = await db
     .insert(schema.users)
     .values({ email: `${name}-${Date.now()}@test`, lastName: name, role: 'customer', status: 'pending' })
@@ -51,10 +54,7 @@ describe.skipIf(!url)('Freigabe von Registrierungen (Integration)', () => {
     const [existing] = await getDb().insert(schema.organisations).values({ name: 'Bestand AG', status: 'active' }).returning()
     const { org, user } = await pendingRegistration('Ben')
     await approveRegistration(superadmin, { userId: user.id, existingOrganisationId: existing!.id })
-    const members = await getDb()
-      .select()
-      .from(schema.organisationMembers)
-      .where(eq(schema.organisationMembers.userId, user.id))
+    const members = await getDb().select().from(schema.organisationMembers).where(eq(schema.organisationMembers.userId, user.id))
     expect(members.map((m) => m.organisationId)).toEqual([existing!.id])
     const leftover = await getDb().select().from(schema.organisations).where(eq(schema.organisations.id, org.id))
     expect(leftover).toHaveLength(0)

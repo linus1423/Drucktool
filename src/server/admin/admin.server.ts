@@ -20,26 +20,28 @@ const ORG_AUDIT_FIELDS = ['name', 'email', 'phone', 'street', 'zip', 'city', 'co
 // ---------------------------------------------------------------------------
 
 export async function listPendingRegistrations() {
-  return getDb()
-    .select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      createdAt: users.createdAt,
-      organisationId: organisations.id,
-      organisationName: organisations.name,
-      organisationStatus: organisations.status,
-      street: organisations.street,
-      zip: organisations.zip,
-      city: organisations.city,
-      phone: organisations.phone,
-    })
-    .from(users)
-    // Alte Registrierungen bringen eine wartende Organisation mit; neue Konten haben keine.
-    .leftJoin(organisationMembers, eq(organisationMembers.userId, users.id))
-    .leftJoin(organisations, eq(organisations.id, organisationMembers.organisationId))
-    .where(eq(users.status, 'pending'))
-    .orderBy(asc(users.createdAt))
+  return (
+    getDb()
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        createdAt: users.createdAt,
+        organisationId: organisations.id,
+        organisationName: organisations.name,
+        organisationStatus: organisations.status,
+        street: organisations.street,
+        zip: organisations.zip,
+        city: organisations.city,
+        phone: organisations.phone,
+      })
+      .from(users)
+      // Alte Registrierungen bringen eine wartende Organisation mit; neue Konten haben keine.
+      .leftJoin(organisationMembers, eq(organisationMembers.userId, users.id))
+      .leftJoin(organisations, eq(organisations.id, organisationMembers.organisationId))
+      .where(eq(users.status, 'pending'))
+      .orderBy(asc(users.createdAt))
+  )
 }
 
 export const approveSchema = z.object({
@@ -136,10 +138,7 @@ async function memberOrganisationIds(tx: Tx, userId: string) {
 }
 
 async function deleteOrganisationIfUnused(tx: Tx, organisationId: string) {
-  const [org] = await tx
-    .select({ status: organisations.status })
-    .from(organisations)
-    .where(eq(organisations.id, organisationId))
+  const [org] = await tx.select({ status: organisations.status }).from(organisations).where(eq(organisations.id, organisationId))
   if (org?.status !== 'pending') return
   const [members] = await tx
     .select({ n: count() })
