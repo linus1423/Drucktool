@@ -54,6 +54,8 @@ export type OrderCatalog = {
   formatBindings: { formatId: string; bindingId: string }[]
   papers: CatalogPaper[]
   coverColors: CatalogCoverColor[]
+  /** Welche Coverfarben es auf welchem Deckblattpapier gibt. */
+  paperCoverColors: { paperId: string; coverColorId: string }[]
   pricing: Pricing
   texts: CatalogTexts
 }
@@ -332,11 +334,23 @@ export function borderlessChoice(
   }
 }
 
-export function coverColorChoices(catalog: OrderCatalog, binding: CatalogBinding | undefined): Choice<CatalogCoverColor>[] {
+/**
+ * Coverfarben zur Bindung und zum Deckblattpapier. Mit separatem Deckblatt gibt es nur
+ * die Farben, die am Papier gepflegt sind; ohne gilt die Auswahl der Bindung.
+ */
+export function coverColorChoices(
+  catalog: OrderCatalog,
+  binding: CatalogBinding | undefined,
+  coverPaper?: CatalogPaper,
+): Choice<CatalogCoverColor>[] {
   return catalog.coverColors.map((color) => {
     if (!binding?.allowsCover) return { item: color, allowed: false, reason: 'Bei dieser Bindung gibt es keine Coverfarbe.' }
     if (color.transparent && !binding.allowsSplitCover) {
       return { item: color, allowed: false, reason: `Durchsichtig gibt es bei ${binding.label} nicht.` }
+    }
+    if (coverPaper && !catalog.paperCoverColors.some((pc) => pc.paperId === coverPaper.id && pc.coverColorId === color.id)) {
+      const paper = `${coverPaper.name} ${coverPaper.grammage} g/m²`
+      return { item: color, allowed: false, reason: `${color.name} gibt es nicht auf ${paper}.` }
     }
     return { item: color, allowed: true }
   })
@@ -413,7 +427,9 @@ export function resolveOrder(
 
   const colorFor = (id: string | null, label: string) => {
     if (!id) return null
-    const choice = coverColorChoices(catalog, binding).find((c) => c.item.id === id && c.item.available)
+    const choice = coverColorChoices(catalog, binding, coverPaper ?? undefined).find(
+      (c) => c.item.id === id && c.item.available,
+    )
     if (!choice) {
       errors.push(`Die Coverfarbe ${label} ist nicht verfügbar.`)
       return null

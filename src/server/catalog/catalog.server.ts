@@ -15,7 +15,8 @@ import { getDb, schema, type Tx } from '../db/client.server'
 import type { Principal } from '../requests/requests.server'
 import { DEFAULT_DEADLINE_SETTINGS, deadlineSettingsSchema, type DeadlineSettings } from '~/lib/deadlines'
 
-const { formats, bindings, formatBindings, papers, coverColors, settings, catalogChanges, users } = schema
+const { formats, bindings, formatBindings, papers, coverColors, paperCoverColors, settings, catalogChanges, users } =
+  schema
 
 type Db = ReturnType<typeof getDb> | Tx
 
@@ -43,7 +44,7 @@ export async function getDeadlineSettings(db: Db = getDb()): Promise<DeadlineSet
 /** Vollständiger Katalog. Mit onlyAvailable nur, was Kunden gerade wählen dürfen. */
 export async function getCatalog(options: { onlyAvailable?: boolean } = {}, db: Db = getDb()) {
   const only = options.onlyAvailable
-  const [f, b, fb, p, c, pricing, texts] = await Promise.all([
+  const [f, b, fb, p, c, pc, pricing, texts] = await Promise.all([
     db
       .select()
       .from(formats)
@@ -65,10 +66,20 @@ export async function getCatalog(options: { onlyAvailable?: boolean } = {}, db: 
       .from(coverColors)
       .where(only ? eq(coverColors.available, true) : undefined)
       .orderBy(asc(coverColors.sortOrder)),
+    db.select().from(paperCoverColors),
     getPricing(db),
     getTexts(db),
   ])
-  return { formats: f, bindings: b, formatBindings: fb, papers: p, coverColors: c, pricing, texts }
+  return {
+    formats: f,
+    bindings: b,
+    formatBindings: fb,
+    papers: p,
+    coverColors: c,
+    paperCoverColors: pc,
+    pricing,
+    texts,
+  }
 }
 
 export type Catalog = Awaited<ReturnType<typeof getCatalog>>
@@ -153,6 +164,38 @@ export async function savePaper(actor: Principal, input: z.infer<typeof paperSch
     const [created] = await tx.insert(papers).values(values).returning()
     await logChange(tx, actor, 'paper', created!.id, null, created!)
     return { id: created!.id }
+  })
+}
+
+export const paperCoverColorSchema = z.object({ paperId: z.uuid(), coverColorId: z.uuid(), allowed: z.boolean() })
+
+/** Schaltet eine Coverfarbe für ein Deckblattpapier frei oder nimmt sie weg. */
+export async function setPaperCoverColor(actor: Principal, input: z.infer<typeof paperCoverColorSchema>) {
+  await getDb().transaction(async (tx) => {
+    const where = and(
+      eq(paperCoverColors.paperId, input.paperId),
+      eq(paperCoverColors.coverColorId, input.coverColorId),
+    )
+    const [existing] = await tx.select().from(paperCoverColors).where(where)
+    if (input.allowed === !!existing) return
+    if (input.allowed) {
+      const [paper] = await tx.select({ id: papers.id }).from(papers).where(eq(papers.id, input.paperId))
+      if (!paper) throw new Error('Papier nicht gefunden')
+      const [color] = await tx
+        .select({ id: coverColors.id })
+        .from(coverColors)
+        .where(eq(coverColors.id, input.coverColorId))
+      if (!color) throw new Error('Coverfarbe nicht gefunden')
+      await tx.insert(paperCoverColors).values({ paperId: input.paperId, coverColorId: input.coverColorId })
+    } else await tx.delete(paperCoverColors).where(where)
+    await logChange(
+      tx,
+      actor,
+      'paper_cover_color',
+      `${input.paperId}/${input.coverColorId}`,
+      existing ?? null,
+      input.allowed ? { paperId: input.paperId, coverColorId: input.coverColorId } : null,
+    )
   })
 }
 

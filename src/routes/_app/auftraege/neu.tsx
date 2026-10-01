@@ -105,6 +105,11 @@ function toSpec(d: Draft): OrderSpec | null {
   }
 }
 
+/** Das Deckblattpapier, das tatsächlich mitgeschickt wird. */
+function selectedCoverPaper(catalog: OrderCatalog, d: Draft) {
+  return d.coverEnabled ? catalog.papers.find((p) => p.id === d.coverPaperId) : undefined
+}
+
 /** Entfernt Auswahlen, die nach einer Änderung nicht mehr erlaubt sind. */
 function normalize(catalog: OrderCatalog, d: Draft): Draft {
   const next = { ...d }
@@ -121,12 +126,13 @@ function normalize(catalog: OrderCatalog, d: Draft): Draft {
     next.coverColorId = ''
     next.coverBackColorId = ''
   }
-  const colors = coverColorChoices(catalog, binding)
+  if (!paperChoices(catalog, format, size, 'cover').some((c) => c.item.id === next.coverPaperId && c.allowed))
+    next.coverPaperId = ''
+  // Nach dem Deckblattpapier, weil es bestimmt, welche Coverfarben es gibt.
+  const colors = coverColorChoices(catalog, binding, selectedCoverPaper(catalog, next))
   if (!colors.some((c) => c.item.id === next.coverColorId && c.allowed)) next.coverColorId = ''
   if (!binding?.allowsSplitCover || !colors.some((c) => c.item.id === next.coverBackColorId && c.allowed))
     next.coverBackColorId = ''
-  if (!paperChoices(catalog, format, size, 'cover').some((c) => c.item.id === next.coverPaperId && c.allowed))
-    next.coverPaperId = ''
   const paper = catalog.papers.find((p) => p.id === next.paperId)
   if (next.borderless && !borderlessChoice(format, binding, paper, size).allowed) next.borderless = false
   return next
@@ -660,7 +666,8 @@ function PaperStep({ draft, update, catalog }: StepProps) {
     ? formatSize(format, { customWidthMm: int(draft.customWidth), customHeightMm: int(draft.customHeight) })
     : null
   const binding = catalog.bindings.find((b) => b.id === draft.bindingId)
-  const colors = coverColorChoices(catalog, binding)
+  const coverPaper = selectedCoverPaper(catalog, draft)
+  const colors = coverColorChoices(catalog, binding, coverPaper)
   const paperList = (purpose: 'inner' | 'cover', value: string, onSelect: (id: string) => void) => (
     <div role="radiogroup" className="grid gap-2 sm:grid-cols-2">
       {paperChoices(catalog, format, size, purpose)
@@ -721,7 +728,11 @@ function PaperStep({ draft, update, catalog }: StepProps) {
             </>
           ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={binding.allowsSplitCover ? 'Coverfarbe vorne' : 'Coverfarbe'} htmlFor="coverColor">
+            <Field
+              label={binding.allowsSplitCover ? 'Coverfarbe vorne' : 'Coverfarbe'}
+              htmlFor="coverColor"
+              hint={coverPaper ? `Farben, die es auf ${coverPaper.name} ${coverPaper.grammage} g/m² gibt.` : undefined}
+            >
               <Select id="coverColor" value={draft.coverColorId} onChange={(e) => update({ coverColorId: e.target.value })}>
                 <option value="">Standard</option>
                 {colors
