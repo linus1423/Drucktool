@@ -121,6 +121,7 @@ describe.skipIf(!url)('Katalog (Integration)', () => {
       paperId: c.papers.find((p) => p.name === 'Standardpapier')!.id,
       coverPaperId: paperId,
       coverPages: 1,
+      coverFromMainFile: null,
       coverColorId: white.id,
       coverBackColorId: null,
       borderless: false,
