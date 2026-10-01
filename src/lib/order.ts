@@ -227,13 +227,25 @@ function plotPrice(paper: CatalogPaper, formatId: string): number | null {
   return null
 }
 
+/** Papier, das nur auf dem Plotter gedruckt werden kann (weder Innenteil noch Deckblatt am normalen Drucker). */
+export function isPlotterOnly(paper: CatalogPaper): boolean {
+  if (!paper.forPlotter) return false
+  const forPrinter = paper.forInner || paper.forCover
+  return !forPrinter || (paper.priceA3Cents == null && paper.priceSra3Cents == null)
+}
+
+/**
+ * Papierauswahl für Innenteil oder Deckblatt. Reine Plotterpapiere fehlen bei normalen Formaten
+ * ganz, statt ausgegraut zu erscheinen.
+ */
 export function paperChoices(
   catalog: OrderCatalog,
   format: CatalogFormat | undefined,
   size: Size | null,
   purpose: 'inner' | 'cover',
 ): Choice<CatalogPaper>[] {
-  return catalog.papers.map((paper) => {
+  const papers = format && format.kind !== 'plot' ? catalog.papers.filter((p) => !isPlotterOnly(p)) : catalog.papers
+  return papers.map((paper) => {
     if (!format) return { item: paper, allowed: false, reason: 'Bitte zuerst ein Format wählen.' }
     if (format.kind === 'plot') {
       if (purpose === 'cover') return { item: paper, allowed: false, reason: 'Plots haben kein Deckblatt.' }
@@ -241,7 +253,9 @@ export function paperChoices(
       if (plotPrice(paper, format.id) == null) return { item: paper, allowed: false, reason: `Nicht in ${format.label}.` }
       return { item: paper, allowed: true }
     }
-    if (purpose === 'inner' && !paper.forInner) return { item: paper, allowed: false, reason: 'Nur für Deckblätter.' }
+    if (purpose === 'inner' && !paper.forInner) {
+      return { item: paper, allowed: false, reason: paper.forCover ? 'Nur für Deckblätter.' : 'Nicht für den Innenteil.' }
+    }
     if (purpose === 'cover' && !paper.forCover) return { item: paper, allowed: false, reason: 'Nicht für Deckblätter geeignet.' }
     if (paper.priceA3Cents == null && paper.priceSra3Cents == null) {
       return { item: paper, allowed: false, reason: 'Nicht für den normalen Drucker.' }
@@ -307,6 +321,11 @@ export type ResolvedOrder = {
   coverBackColor: CatalogCoverColor | null
 }
 
+/** Grund für Papiere, die paperChoices gar nicht erst anbietet (nur reine Plotterpapiere). */
+function plotterOnlyReason(paper: CatalogPaper): string {
+  return isPlotterOnly(paper) ? 'Nur für den Plotter.' : 'nicht wählbar'
+}
+
 /** Prüft eine Bestellung gegen den Katalog. Liefert Fehler in Kundensprache. */
 export function resolveOrder(
   catalog: OrderCatalog,
@@ -336,7 +355,7 @@ export function resolveOrder(
   const paper = catalog.papers.find((p) => p.id === spec.paperId && p.available)
   if (!paper) return fail('Das gewählte Papier ist nicht verfügbar.')
   const paperOk = paperChoices(catalog, format, size, 'inner').find((c) => c.item.id === paper.id)
-  if (!paperOk?.allowed) errors.push(`${paper.name}: ${paperOk?.reason ?? 'nicht wählbar'}`)
+  if (!paperOk?.allowed) errors.push(`${paper.name}: ${paperOk?.reason ?? plotterOnlyReason(paper)}`)
 
   let coverPaper: CatalogPaper | null = null
   if (spec.coverPaperId) {
@@ -345,7 +364,7 @@ export function resolveOrder(
     if (!coverPaper) errors.push('Das Deckblattpapier ist nicht verfügbar.')
     else {
       const ok = paperChoices(catalog, format, size, 'cover').find((c) => c.item.id === coverPaper!.id)
-      if (!ok?.allowed) errors.push(`${coverPaper.name}: ${ok?.reason ?? 'nicht als Deckblatt wählbar'}`)
+      if (!ok?.allowed) errors.push(`${coverPaper.name}: ${ok?.reason ?? plotterOnlyReason(coverPaper)}`)
     }
     if (!spec.coverPages) errors.push('Bitte die Datei für das Deckblatt hochladen.')
   }
