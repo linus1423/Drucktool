@@ -2,6 +2,7 @@
 // Katalogwerte, mit denen gerechnet wurde. Spätere Katalogänderungen ändern daran nichts.
 import type { Pricing } from './catalog'
 import {
+  bookletBlankPages,
   DELIVERY_LABELS,
   type CatalogBinding,
   type CatalogCoverColor,
@@ -53,6 +54,8 @@ export function describeOrder(s: Omit<OrderSnapshot, 'pricing' | 'price'>): [lab
   ])
   rows.push(['Bindung', s.binding.label])
   rows.push(['Seiten', `${spec.pages} ${spec.pages === 1 ? 'Seite' : 'Seiten'}, ${spec.duplex ? 'doppelseitig' : 'einseitig'}`])
+  const blank = bookletBlankPages(spec)
+  if (blank) rows.push(['Leerseiten', `${blank} am Ende der Datei ergänzen`])
   rows.push(['Papier', paperLabel(s.paper)])
   if (s.coverPaper) {
     // Ohne eigene Datei muss die Druckerei wissen, welche Seiten aufs Deckblatt kommen.
