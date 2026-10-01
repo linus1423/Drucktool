@@ -10,6 +10,8 @@ import {
   listPendingRegistrationsFn,
   listUsersFn,
 } from '~/server/admin/admin.functions'
+import { listAuditLogFn } from '~/server/audit/audit.functions'
+import type { AuditFilter } from '~/server/audit/audit.server'
 import type { RequestStatus } from './status'
 
 export type RequestListFilter = {
@@ -86,3 +88,9 @@ export const catalogChangesQuery = queryOptions({
 })
 
 export const accountQuery = queryOptions({ queryKey: ['account'], queryFn: () => getMyAccountFn() })
+
+export const auditLogQuery = (filter: AuditFilter) =>
+  queryOptions({
+    queryKey: ['admin', 'audit', filter],
+    queryFn: () => listAuditLogFn({ data: filter }),
+  })

@@ -23,6 +23,7 @@ import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppAdminBenutzerRouteImport } from './routes/_app/admin/benutzer'
 import { Route as AppAdminFreigabenRouteImport } from './routes/_app/admin/freigaben'
 import { Route as AppAdminKatalogRouteImport } from './routes/_app/admin/katalog'
+import { Route as AppAdminProtokollRouteImport } from './routes/_app/admin/protokoll'
 import { Route as AppAuftraegeIndexRouteImport } from './routes/_app/auftraege/index'
 import { Route as AppAuftraegeRequestIdRouteImport } from './routes/_app/auftraege/$requestId'
 import { Route as AppAuftraegeNeuRouteImport } from './routes/_app/auftraege/neu'
@@ -104,6 +105,11 @@ const AppAdminKatalogRoute = AppAdminKatalogRouteImport.update({
   path: '/katalog',
   getParentRoute: () => AppAdminRouteRoute,
 } as any)
+const AppAdminProtokollRoute = AppAdminProtokollRouteImport.update({
+  id: '/protokoll',
+  path: '/protokoll',
+  getParentRoute: () => AppAdminRouteRoute,
+} as any)
 const AppAuftraegeIndexRoute = AppAuftraegeIndexRouteImport.update({
   id: '/auftraege/',
   path: '/auftraege/',
@@ -177,6 +183,7 @@ export interface FileRoutesByFullPath {
   '/admin/benutzer': typeof AppAdminBenutzerRoute
   '/admin/freigaben': typeof AppAdminFreigabenRoute
   '/admin/katalog': typeof AppAdminKatalogRoute
+  '/admin/protokoll': typeof AppAdminProtokollRoute
   '/auftraege/$requestId': typeof AppAuftraegeRequestIdRoute
   '/auftraege/neu': typeof AppAuftraegeNeuRoute
   '/api/auftraege/export': typeof ApiAuftraegeExportRoute
@@ -203,6 +210,7 @@ export interface FileRoutesByTo {
   '/admin/benutzer': typeof AppAdminBenutzerRoute
   '/admin/freigaben': typeof AppAdminFreigabenRoute
   '/admin/katalog': typeof AppAdminKatalogRoute
+  '/admin/protokoll': typeof AppAdminProtokollRoute
   '/auftraege/$requestId': typeof AppAuftraegeRequestIdRoute
   '/auftraege/neu': typeof AppAuftraegeNeuRoute
   '/api/auftraege/export': typeof ApiAuftraegeExportRoute
@@ -231,6 +239,7 @@ export interface FileRoutesById {
   '/_app/admin/benutzer': typeof AppAdminBenutzerRoute
   '/_app/admin/freigaben': typeof AppAdminFreigabenRoute
   '/_app/admin/katalog': typeof AppAdminKatalogRoute
+  '/_app/admin/protokoll': typeof AppAdminProtokollRoute
   '/_app/auftraege/$requestId': typeof AppAuftraegeRequestIdRoute
   '/_app/auftraege/neu': typeof AppAuftraegeNeuRoute
   '/api/auftraege/export': typeof ApiAuftraegeExportRoute
@@ -259,6 +268,7 @@ export interface FileRouteTypes {
     | '/admin/benutzer'
     | '/admin/freigaben'
     | '/admin/katalog'
+    | '/admin/protokoll'
     | '/auftraege/$requestId'
     | '/auftraege/neu'
     | '/api/auftraege/export'
@@ -285,6 +295,7 @@ export interface FileRouteTypes {
     | '/admin/benutzer'
     | '/admin/freigaben'
     | '/admin/katalog'
+    | '/admin/protokoll'
     | '/auftraege/$requestId'
     | '/auftraege/neu'
     | '/api/auftraege/export'
@@ -312,6 +323,7 @@ export interface FileRouteTypes {
     | '/_app/admin/benutzer'
     | '/_app/admin/freigaben'
     | '/_app/admin/katalog'
+    | '/_app/admin/protokoll'
     | '/_app/auftraege/$requestId'
     | '/_app/auftraege/neu'
     | '/api/auftraege/export'
@@ -441,6 +453,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminKatalogRouteImport
       parentRoute: typeof AppAdminRouteRoute
     }
+    '/_app/admin/protokoll': {
+      id: '/_app/admin/protokoll'
+      path: '/protokoll'
+      fullPath: '/admin/protokoll'
+      preLoaderRoute: typeof AppAdminProtokollRouteImport
+      parentRoute: typeof AppAdminRouteRoute
+    }
     '/_app/auftraege/': {
       id: '/_app/auftraege/'
       path: '/auftraege'
@@ -525,6 +544,7 @@ interface AppAdminRouteRouteChildren {
   AppAdminBenutzerRoute: typeof AppAdminBenutzerRoute
   AppAdminFreigabenRoute: typeof AppAdminFreigabenRoute
   AppAdminKatalogRoute: typeof AppAdminKatalogRoute
+  AppAdminProtokollRoute: typeof AppAdminProtokollRoute
   AppAdminOrganisationenOrganisationIdRoute: typeof AppAdminOrganisationenOrganisationIdRoute
   AppAdminOrganisationenNeuRoute: typeof AppAdminOrganisationenNeuRoute
   AppAdminOrganisationenIndexRoute: typeof AppAdminOrganisationenIndexRoute
@@ -534,6 +554,7 @@ const AppAdminRouteRouteChildren: AppAdminRouteRouteChildren = {
   AppAdminBenutzerRoute: AppAdminBenutzerRoute,
   AppAdminFreigabenRoute: AppAdminFreigabenRoute,
   AppAdminKatalogRoute: AppAdminKatalogRoute,
+  AppAdminProtokollRoute: AppAdminProtokollRoute,
   AppAdminOrganisationenOrganisationIdRoute:
     AppAdminOrganisationenOrganisationIdRoute,
   AppAdminOrganisationenNeuRoute: AppAdminOrganisationenNeuRoute,
