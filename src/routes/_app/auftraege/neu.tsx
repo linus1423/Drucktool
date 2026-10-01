@@ -468,7 +468,7 @@ function ChoiceCard({
   return (
     <div
       className={cx(
-        'rounded-lg p-3 text-left text-sm ring-1 transition',
+        'rounded-lg p-3 text-left text-sm ring-1 transition-shadow',
         selected
           ? 'bg-slate-900 text-white ring-slate-900'
           : disabled
