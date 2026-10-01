@@ -32,6 +32,18 @@ bearbeiten sie über einen Status-Workflow bis zur Auslieferung.
 
 Im Profil sieht jeder seine angemeldeten Geräte und kann sie einzeln oder alle anderen abmelden.
 
+## Sicherheit
+
+- **Rate-Limits** stehen in PostgreSQL (Tabelle `rate_limits`) und gelten damit über Neustarts und mehrere Instanzen
+  hinweg. Pro IP: 10 Passwort-Logins pro Minute, 10 Anmeldelinks pro 10 Minuten (3 pro Adresse). Gespeichert wird nur
+  ein Hash von IP bzw. E-Mail-Adresse.
+- **Kontosperre:** Nach 5 falschen Passwörtern innerhalb von 15 Minuten wird die Anmeldung für diese E-Mail-Adresse
+  gesperrt, unabhängig von der IP: erst 1 Minute, bei jedem weiteren Fehlversuch doppelt so lange, höchstens eine
+  Stunde. Eine erfolgreiche Anmeldung setzt den Zähler zurück. Unbekannte Adressen werden genauso gezählt, damit die
+  Sperre nichts über vorhandene Konten verrät.
+- **Aufräumen:** Der Worker löscht beim Start und dann stündlich abgelaufene Sitzungen, Anmeldelinks und
+  Rate-Limit-Zähler. Die Löschungen sind idempotent, mehrere Worker stören sich nicht.
+
 ## Status eines Auftrags
 
 ```
@@ -127,7 +139,8 @@ Wer eine Änderung selbst auslöst, bekommt keine Mail. Im Profil lassen sich Be
 
 Die Mails werden in derselben Transaktion wie die Änderung in die Tabelle `email_outbox` geschrieben und von einem
 eigenen Worker-Prozess verschickt (`pnpm mail:worker`, im Container `worker`). Scheitert der Versand, versucht der
-Worker es mit wachsendem Abstand bis zu acht Mal erneut. Ohne `SMTP_URL` werden Mails nur ins Log geschrieben.
+Worker es mit wachsendem Abstand bis zu acht Mal erneut. Ohne `SMTP_URL` werden Mails nur ins Log geschrieben. Derselbe
+Worker räumt stündlich abgelaufene Daten auf (siehe Sicherheit).
 
 ## Anmeldung über OpenID Connect
 

@@ -103,6 +103,22 @@ export const loginTokens = pgTable(
   (t) => [index('login_tokens_email_idx').on(t.email)],
 )
 
+/**
+ * Zähler für Rate-Limits und Kontosperren. Liegt in PostgreSQL, damit Limits Neustarts
+ * überstehen und für alle App-Instanzen gelten. Der Schlüssel enthält nur einen Hash
+ * von IP-Adresse bzw. E-Mail-Adresse. Abgelaufene Einträge räumt der Worker auf.
+ */
+export const rateLimits = pgTable(
+  'rate_limits',
+  {
+    key: text('key').primaryKey(),
+    hits: integer('hits').notNull().default(0),
+    windowEndsAt: timestamp('window_ends_at', { withTimezone: true }).notNull(),
+    blockedUntil: timestamp('blocked_until', { withTimezone: true }),
+  },
+  (t) => [index('rate_limits_window_idx').on(t.windowEndsAt)],
+)
+
 /** Verknüpfung eines Benutzers mit einem Konto beim OpenID-Connect-Anbieter. */
 export const oidcAccounts = pgTable(
   'oidc_accounts',

@@ -16,7 +16,7 @@ export const Route = createFileRoute('/api/dateien/')({
         const user = await getSessionUser()
         if (!user) return json({ error: 'Nicht angemeldet' }, 401)
         try {
-          assertRateLimit('upload', 60, 60 * 60 * 1000, user.id)
+          await assertRateLimit('upload', 60, 60 * 60 * 1000, user.id)
         } catch (e) {
           return json({ error: (e as Error).message }, 429)
         }
