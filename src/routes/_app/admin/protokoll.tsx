@@ -167,7 +167,7 @@ function label(key: string, value: unknown, orgName: OrgName) {
     return USER_STATUS_LABELS[value as UserStatus] ?? ORG_STATUS[value as keyof typeof ORG_STATUS]?.label ?? value
   }
   if (key === 'organisationId' && typeof value === 'string') return orgName(value)
-  return String(value)
+  return typeof value === 'object' ? JSON.stringify(value) : String(value as string | number | boolean)
 }
 
 function describeChanges(before: Record<string, unknown> | null, after: Record<string, unknown> | null, orgName: OrgName) {

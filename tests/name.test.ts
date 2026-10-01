@@ -25,11 +25,23 @@ describe('displayName', () => {
 
 describe('Rechnungsadresse', () => {
   it('zeigt Vor- und Nachnamen in der ersten Zeile', () => {
-    expect(formatBillingAddress(BILLING)).toEqual(['Erika Muster', 'Lehrstuhl für Drucktechnik', 'Boltzmannstraße 15', '85748 Garching'])
+    expect(formatBillingAddress(BILLING)).toEqual([
+      'Erika Muster',
+      'Lehrstuhl für Drucktechnik',
+      'Boltzmannstraße 15',
+      '85748 Garching',
+    ])
   })
 
   it('zeigt eingefrorene Kopien älterer Aufträge mit gemeinsamem Namensfeld weiter an', () => {
-    const legacy: LegacyBillingAddress = { name: 'Dr. Erika Muster', organisation: '', street: 'Weg 1', zip: '1', city: 'Ort', country: '' }
+    const legacy: LegacyBillingAddress = {
+      name: 'Dr. Erika Muster',
+      organisation: '',
+      street: 'Weg 1',
+      zip: '1',
+      city: 'Ort',
+      country: '',
+    }
     expect(billingName(legacy)).toBe('Dr. Erika Muster')
     expect(formatBillingAddress(legacy)).toEqual(['Dr. Erika Muster', 'Weg 1', '1 Ort'])
   })

@@ -10,7 +10,10 @@ type Principal = import('~/server/requests/requests.server').Principal
 
 async function pendingRegistration(name: string) {
   const db = getDb()
-  const [org] = await db.insert(schema.organisations).values({ name: `${name} GmbH`, status: 'pending' }).returning()
+  const [org] = await db
+    .insert(schema.organisations)
+    .values({ name: `${name} GmbH`, status: 'pending' })
+    .returning()
   const [user] = await db
     .insert(schema.users)
     .values({ email: `${name}-${Date.now()}@test`, lastName: name, role: 'customer', status: 'pending', organisationId: org!.id })

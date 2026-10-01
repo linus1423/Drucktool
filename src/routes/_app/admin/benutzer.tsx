@@ -139,7 +139,12 @@ function UserForm({ editing, actorRole, onDone }: { editing: Editing; actorRole:
         <form.Field name="lastName">
           {(field) => (
             <Field label="Nachname" htmlFor="user-last-name" error={fieldError(field.state.meta.errors)}>
-              <Input id="user-last-name" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} required />
+              <Input
+                id="user-last-name"
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
+                required
+              />
             </Field>
           )}
         </form.Field>
@@ -195,7 +200,11 @@ function UserForm({ editing, actorRole, onDone }: { editing: Editing; actorRole:
           <form.Field name="status">
             {(field) => (
               <Field label="Status" htmlFor="user-status">
-                <Select id="user-status" value={field.state.value} onChange={(e) => field.handleChange(e.target.value as UserStatus)}>
+                <Select
+                  id="user-status"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value as UserStatus)}
+                >
                   {USER_STATUSES.map((s) => (
                     <option key={s} value={s}>
                       {USER_STATUS_LABELS[s]}
