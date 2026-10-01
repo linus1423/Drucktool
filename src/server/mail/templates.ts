@@ -106,6 +106,17 @@ export function changeAnsweredMail(r: RequestRef & { actorName: string; accepted
   return compose(r.accepted ? 'change_accepted' : 'change_rejected', requestVars(r))
 }
 
+/** Bestätigung an den Kunden, wenn die Druckerei seine Antwort eingetragen hat (Issue #113). */
+export function changeRecordedMail(
+  r: RequestRef & OrderRef & { actorName: string; accepted: boolean; note: string },
+): MailContent {
+  return compose(r.accepted ? 'change_recorded_accepted' : 'change_recorded_rejected', {
+    ...requestVars(r),
+    vermerk: r.note,
+    zusammenfassung: orderSummary(r),
+  })
+}
+
 export function promisedDateMail(r: RequestRef & { actorName: string; date: string | null }): MailContent {
   return r.date
     ? compose('promised_date_set', { ...requestVars(r), termin: formatDate(r.date) })
