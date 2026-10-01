@@ -34,10 +34,11 @@ describe.skipIf(!url)('Anfragen (Integration)', () => {
     const [s, c, o, k, n] = await db
       .insert(schema.users)
       .values([
-        { email: `staff${stamp}@test`, name: 'Mitarbeiterin', role: 'staff', status: 'active' },
+        { email: `staff${stamp}@test`, lastName: 'Mitarbeiterin', role: 'staff', status: 'active' },
         {
           email: `a${stamp}@test`,
-          name: 'Kunde A',
+          firstName: 'Kunde',
+          lastName: 'A',
           role: 'customer',
           status: 'active',
           organisationId: orgA!.id,
@@ -45,7 +46,8 @@ describe.skipIf(!url)('Anfragen (Integration)', () => {
         },
         {
           email: `b${stamp}@test`,
-          name: 'Kunde B',
+          firstName: 'Kunde',
+          lastName: 'B',
           role: 'customer',
           status: 'active',
           organisationId: orgB!.id,
@@ -53,13 +55,14 @@ describe.skipIf(!url)('Anfragen (Integration)', () => {
         },
         {
           email: `k${stamp}@test`,
-          name: 'Kollege A',
+          firstName: 'Kollege',
+          lastName: 'A',
           role: 'customer',
           status: 'active',
           organisationId: orgA!.id,
           billingAddress: BILLING,
         },
-        { email: `n${stamp}@test`, name: 'Ohne Adresse', role: 'customer', status: 'active' },
+        { email: `n${stamp}@test`, firstName: 'Ohne', lastName: 'Adresse', role: 'customer', status: 'active' },
       ])
       .returning()
     staff = { id: s!.id, role: 'staff', organisationId: null }

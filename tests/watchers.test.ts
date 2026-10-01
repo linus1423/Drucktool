@@ -49,10 +49,10 @@ describe.skipIf(!url)('Beobachter (Integration)', async () => {
     const rows = await getDb()
       .insert(schema.users)
       .values([
-        { email: mail('k'), name: `Kunde ${tag}`, role: 'customer', status: 'active', billingAddress: BILLING },
-        { email: mail('anna'), name: `Anna ${tag}`, role: 'staff', status: 'active' },
-        { email: mail('bernd'), name: `Bernd ${tag}`, role: 'staff', status: 'active' },
-        { email: mail('other'), name: `Kim ${tag}`, role: 'customer', status: 'active', billingAddress: BILLING },
+        { email: mail('k'), lastName: `Kunde ${tag}`, role: 'customer', status: 'active', billingAddress: BILLING },
+        { email: mail('anna'), lastName: `Anna ${tag}`, role: 'staff', status: 'active' },
+        { email: mail('bernd'), lastName: `Bernd ${tag}`, role: 'staff', status: 'active' },
+        { email: mail('other'), lastName: `Kim ${tag}`, role: 'customer', status: 'active', billingAddress: BILLING },
       ])
       .returning()
     customer = { id: rows[0]!.id, role: 'customer', organisationId: null }
