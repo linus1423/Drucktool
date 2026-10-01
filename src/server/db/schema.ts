@@ -18,7 +18,7 @@ import {
 import { INTERNAL_STATUSES, REQUEST_STATUSES } from '../../lib/status'
 import { USER_ROLES, USER_STATUSES } from '../../lib/roles'
 import type { JsonObject } from '../../lib/json'
-import type { BillingAddress, DeliveryAddress } from '../../lib/address'
+import type { BillingAddress, DeliveryAddress, StoredBillingAddress } from '../../lib/address'
 import { DELIVERY_METHODS } from '../../lib/order'
 import type { OrderSnapshot } from '../../lib/snapshot'
 import type { ChangeProposal } from '../../lib/proposal'
@@ -54,7 +54,12 @@ export const users = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     email: text('email').notNull(),
-    name: text('name').notNull(),
+    firstName: text('first_name').notNull().default(''),
+    lastName: text('last_name').notNull().default(''),
+    /** Anzeigename „Vorname Nachname“, von der Datenbank berechnet (siehe displayName in lib/name.ts). */
+    name: text('name')
+      .notNull()
+      .generatedAlwaysAs(sql`btrim(first_name || ' ' || last_name)`),
     passwordHash: text('password_hash'),
     role: userRole('role').notNull().default('customer'),
     status: userStatus('status').notNull().default('pending'),
@@ -162,7 +167,8 @@ export const requests = pgTable(
     order: jsonb('order').$type<OrderSnapshot>(),
     totalCents: integer('total_cents'),
     // Kopie der Rechnungsadresse beim Absenden; spätere Profiländerungen wirken nicht zurück.
-    billingAddress: jsonb('billing_address').$type<BillingAddress>(),
+    // Kopie zum Zeitpunkt des Absendens; ältere Aufträge haben noch ein gemeinsames Namensfeld.
+    billingAddress: jsonb('billing_address').$type<StoredBillingAddress>(),
     deliveryMethod: deliveryMethod('delivery_method').notNull().default('pickup'),
     deliveryAddress: jsonb('delivery_address').$type<DeliveryAddress>(),
     // Zustimmung zu den Auftragsbedingungen beim verbindlichen Absenden (Lastenheft Schritt 8).
@@ -231,6 +237,21 @@ export const requestWatchers = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.requestId, t.userId] }), index('request_watchers_user_idx').on(t.userId)],
+)
+
+/** Wann ein Benutzer einen Auftrag zuletzt angesehen hat (Ungelesen-Markierung, Issue #18). */
+export const requestReads = pgTable(
+  'request_reads',
+  {
+    requestId: uuid('request_id')
+      .notNull()
+      .references(() => requests.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    readAt: timestamp('read_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.requestId, t.userId] })],
 )
 
 export const requestEventType = pgEnum('request_event_type', [
@@ -416,6 +437,20 @@ export const coverColors = pgTable('cover_colors', {
   available: boolean('available').notNull().default(true),
   sortOrder: integer('sort_order').notNull().default(0),
 })
+
+/** Coverfarben, die es auf einem Deckblattpapier gibt (z. B. 250 g/m² nur Weiß). */
+export const paperCoverColors = pgTable(
+  'paper_cover_colors',
+  {
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => papers.id, { onDelete: 'cascade' }),
+    coverColorId: uuid('cover_color_id')
+      .notNull()
+      .references(() => coverColors.id, { onDelete: 'cascade' }),
+  },
+  (t) => [uniqueIndex('paper_cover_colors_unique').on(t.paperId, t.coverColorId)],
+)
 
 /** Übrige Preise und Texte als Schlüssel/Wert, z. B. Druckpreise pro Image und Mindestpreis. */
 export const settings = pgTable('settings', {

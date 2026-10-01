@@ -1,7 +1,7 @@
 import { and, asc, count, eq, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { USER_ROLES, USER_STATUSES, type UserRole } from '~/lib/roles'
-import { emailSchema, organisationSchema, passwordSchema } from '~/lib/validation'
+import { emailSchema, organisationSchema, passwordSchema, personNameFields } from '~/lib/validation'
 import { getDb, schema, type Tx } from '../db/client.server'
 import { hashPassword } from '../auth/password.server'
 import { notifyRegistrationDecision } from '../mail/notifications.server'
@@ -11,7 +11,7 @@ import type { Principal } from '../requests/requests.server'
 const { users, organisations, requests, sessions } = schema
 
 // Felder, die im Audit-Log festgehalten werden (keine Passwörter oder Hashes).
-const USER_AUDIT_FIELDS = ['name', 'email', 'role', 'status', 'organisationId'] as const
+const USER_AUDIT_FIELDS = ['firstName', 'lastName', 'email', 'role', 'status', 'organisationId'] as const
 const ORG_AUDIT_FIELDS = ['name', 'email', 'phone', 'street', 'zip', 'city', 'country', 'vatId', 'status'] as const
 
 // ---------------------------------------------------------------------------
@@ -249,6 +249,8 @@ export async function listUsers() {
     .select({
       id: users.id,
       name: users.name,
+      firstName: users.firstName,
+      lastName: users.lastName,
       email: users.email,
       role: users.role,
       status: users.status,
@@ -271,7 +273,7 @@ function assertMayManageRole(actor: Principal, role: UserRole) {
 }
 
 const userFields = {
-  name: z.string().trim().min(1, 'Name ist erforderlich').max(200),
+  ...personNameFields,
   email: emailSchema,
   role: z.enum(USER_ROLES),
   organisationId: z.uuid().nullable(),
@@ -293,7 +295,8 @@ export async function createUser(actor: Principal, input: z.infer<typeof createU
     const [row] = await tx
       .insert(users)
       .values({
-        name: input.name,
+        firstName: input.firstName,
+        lastName: input.lastName,
         email: input.email,
         role: input.role,
         organisationId,
@@ -357,7 +360,8 @@ export async function updateUser(actor: Principal, input: z.infer<typeof updateU
     const [updated] = await tx
       .update(users)
       .set({
-        name: input.name,
+        firstName: input.firstName,
+        lastName: input.lastName,
         email: input.email,
         role: input.role,
         status: input.status,

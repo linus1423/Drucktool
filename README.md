@@ -95,7 +95,12 @@ Admins pflegen unter „Katalog und Preise“ alles, was Kunden im Bestellformul
 - **Bindungspreise**: Preis pro Exemplar oder pro Blatt (Laminieren), einmalige Kosten pro Auftrag (Leimbindung),
   ob ein Deckblatt, eine Coverfarbe oder ein Zuschnitt dazugehört.
 - **Papiere**: Grammatur, Preis pro A3- bzw. SRA3-Bogen oder pro Plot (A0 bis A2), wofür das Papier taugt.
-- **Coverfarben** und **Preise und Texte** (Druck pro Image, Mindestpreis, Hauspost, allgemeine Hilfetexte).
+- **Coverfarben**: die Farben selbst und welche Farbe es auf welchem Deckblattpapier gibt (z. B. 250 g/m² nur
+  Weiß, 160 g/m² auch Blau, Rot und Durchsichtig). Wählt ein Kunde ein separates Deckblatt, zeigt der Wizard nur
+  diese Farben und verwirft eine nicht mehr passende Farbe; der Server prüft dasselbe beim Absenden. Ohne separates
+  Deckblatt gelten alle Farben, die die Bindung erlaubt. Die Migration `0014_cover_colors_per_paper.sql` gibt jedem
+  bestehenden Deckblattpapier zunächst alle Farben, damit sich für Kunden nichts ändert.
+- **Preise und Texte** (Druck pro Image, Mindestpreis, Hauspost, allgemeine Hilfetexte).
 
 Jede Änderung landet mit altem und neuem Stand in `catalog_changes` und ist unter „Änderungen“ sichtbar.
 Die Startwerte kommen aus der Migration `0005_catalog.sql`. Die Druckpreise pro Image und der Mindestpreis sind
@@ -114,8 +119,10 @@ vorschlägt. Das Lastenheft sieht den Upload erst nach den Optionen vor.
 **Preisberechnung** (`src/lib/pricing.ts`): Die Seiten werden auf den kleinsten passenden Druckbogen ausgeschossen
 (A4, A3 oder SRA3). Klicks = Bögen × Seiten, A4-Bögen zum A4-Preis, A3 und SRA3 zum A3-Preis. Papier zählt pro A3-
 bzw. SRA3-Bogen (zwei A4-Bögen = ein A3-Bogen). Randlos druckt auf SRA3 mit 3 mm Beschnitt. Plots kosten einen festen
-Preis pro Seite. Dazu kommen Bindung (pro Exemplar oder pro Blatt), einmalige Kosten, Deckblatt (jede Deckblattseite
-ein einseitiger Bogen), dann der Mindestpreis und die Lieferung. Kunden sehen nur Druck- und Lieferkosten.
+Preis pro Seite. Dazu kommen Bindung (pro Exemplar oder pro Blatt), einmalige Kosten, Deckblatt (immer ein beidseitig
+bedrucktes Blatt pro Exemplar, egal wie viele Seiten die Deckblatt-Datei hat; ohne eigene Datei aus der Druckdatei
+die ersten zwei Seiten, bei vorne und hinten zusätzlich die letzten zwei als zweites Blatt), dann der Mindestpreis
+und die Lieferung. Kunden sehen nur Druck- und Lieferkosten.
 
 Beim Absenden rechnet der Server neu. Weicht der Preis von der Vorschau ab, weil sich der Katalog geändert hat,
 wird der Auftrag nicht angelegt und der Kunde sieht den neuen Preis. Angelegte Aufträge speichern Auswahl, Preis und
@@ -167,6 +174,10 @@ Auftrag an- und abschalten; Mitarbeiter können so auch fremde Aufträge verfolg
 Mitarbeiter erwähnen sich in Nachrichten und internen Notizen mit `@Name` (Auswahl unter dem Eingabefeld); Erwähnte
 beobachten den Auftrag danach. Kunden können niemanden erwähnen. Die Ansicht „Für mich“ in der Auftragsliste zeigt alle
 beobachteten Aufträge.
+
+Aufträge mit neuer Aktivität anderer seit dem letzten Öffnen (Nachrichten, Statuswechsel) sind in der Liste fett mit
+blauem Punkt markiert, die Ansicht „Ungelesen“ zeigt nur diese. Im Auftrag sind neue Nachrichten und Verlaufseinträge
+hervorgehoben. Interne Einträge zählen für Kunden nicht, eigene Aktionen nie. Alles vor der Einführung gilt als gelesen.
 
 Die Mails werden in derselben Transaktion wie die Änderung in die Tabelle `email_outbox` geschrieben und von einem
 eigenen Worker-Prozess verschickt (`pnpm mail:worker`, im Container `worker`). Scheitert der Versand, versucht der
@@ -226,6 +237,7 @@ cp .env.example .env
 pnpm install
 pnpm db:migrate   # Schema anlegen
 pnpm db:seed      # ersten Superadmin aus SUPERADMIN_EMAIL/SUPERADMIN_PASSWORD anlegen
+                  # mit SEED_EXAMPLE_CATALOG=true auch Beispiel-Coverfarben je Papier (250 g/m² nur Weiß)
 pnpm dev          # http://localhost:3000
 pnpm mail:worker  # optional, in einem zweiten Terminal: verschickt E-Mails
 ```

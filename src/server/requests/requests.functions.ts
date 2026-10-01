@@ -28,6 +28,8 @@ import {
   updateRequest,
   updateRequestSchema,
   setWatchingRequest,
+  markRequestRead,
+  markReadSchema,
   watchSchema,
 } from './requests.server'
 
@@ -91,3 +93,7 @@ export const prepareReorderFn = createServerFn({ method: 'POST' })
 export const setWatchingFn = createServerFn({ method: 'POST' })
   .validator(watchSchema)
   .handler(async ({ data }) => setWatchingRequest(await requireUser(), data))
+
+export const markReadFn = createServerFn({ method: 'POST' })
+  .validator(markReadSchema)
+  .handler(async ({ data }) => markRequestRead(await requireUser(), data))
