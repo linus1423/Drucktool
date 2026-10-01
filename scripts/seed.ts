@@ -58,7 +58,7 @@ async function seedExampleCoverColors() {
   const byName = (name: string) => colors.find((c) => c.name === name)
   const white = byName('Weiß')
   if (!white) {
-    console.log('Coverfarbe „Weiß“ fehlt, Beispiel-Coverfarben übersprungen')
+    logger.info('Coverfarbe „Weiß“ fehlt, Beispiel-Coverfarben übersprungen')
     return
   }
   const colored = ['Weiß', 'Dunkelblau', 'Dunkelrot', 'Durchsichtig'].flatMap((n) => byName(n) ?? [])
@@ -102,7 +102,7 @@ async function seedExampleCoverColors() {
     thin.map((p) => p.id),
     colored.map((c) => c.id),
   )
-  console.log(`Beispiel-Coverfarben gesetzt: 250 g/m² nur Weiß, 160 g/m² ${colored.map((c) => c.name).join(', ')}`)
+  logger.info(`Beispiel-Coverfarben gesetzt: 250 g/m² nur Weiß, 160 g/m² ${colored.map((c) => c.name).join(', ')}`)
 }
 
 if (process.env.SEED_EXAMPLE_CATALOG === 'true') await seedExampleCoverColors()

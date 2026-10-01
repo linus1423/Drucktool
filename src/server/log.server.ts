@@ -22,7 +22,7 @@ function minLevel(): number {
   return LEVELS[level ?? 'info'] ?? LEVELS.info
 }
 
-function useJson(): boolean {
+function jsonOutput(): boolean {
   const format = process.env.LOG_FORMAT
   if (format) return format === 'json'
   return process.env.NODE_ENV === 'production'
@@ -70,7 +70,7 @@ function write(level: Level, msg: string, fields?: Fields) {
   if (level === 'error' && fields?.err !== undefined) reportError(fields.err, { ...ctx, message: msg })
   const entry = { time: new Date().toISOString(), level, msg, ...ctx, ...(clean(fields ?? {}) as Fields) }
   const stream = level === 'error' || level === 'warn' ? process.stderr : process.stdout
-  if (useJson()) {
+  if (jsonOutput()) {
     stream.write(`${JSON.stringify(entry)}\n`)
     return
   }

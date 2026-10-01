@@ -111,17 +111,20 @@ describe('Fehler-Tracking', () => {
 
   it('meldet Fehler aus dem Log, sobald SENTRY_DSN gesetzt ist', async () => {
     vi.stubEnv('SENTRY_DSN', 'https://k@sentry.example.com/3')
-    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }))
+    const fetchMock = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(
+      async () => new Response(null, { status: 200 }),
+    )
     vi.stubGlobal('fetch', fetchMock)
     captureJsonLog(() => {
       logger.error('ohne Fehlerobjekt')
       requestContext.run({ requestId: 'r9' }, () => logger.error('Kaputt', { err: new TypeError('x is undefined') }))
     })
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    const [url, init] = fetchMock.mock.calls[0]!
+    const body = typeof init.body === 'string' ? init.body : ''
     expect(url).toBe('https://sentry.example.com/api/3/envelope/')
-    expect(String(init.body)).toContain('"request_id":"r9"')
-    expect(String(init.body)).toContain('x is undefined')
+    expect(body).toContain('"request_id":"r9"')
+    expect(body).toContain('x is undefined')
     vi.unstubAllGlobals()
   })
 })
