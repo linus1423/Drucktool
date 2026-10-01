@@ -81,6 +81,11 @@ Abgelehnt / Storniert
 Die Übersicht zeigt Mitarbeitern standardmäßig die Warteschlange aller offenen Aufträge, daneben die fertigen.
 Die erlaubten Übergänge je Rolle stehen in `src/lib/status.ts`.
 
+Unter „Als Board“ (`/auftraege/board`) sehen Mitarbeiter die offenen Aufträge in Spalten nach Status, dazu die in den
+letzten 14 Tagen fertig gewordenen. Karten lassen sich in eine erlaubte Spalte ziehen oder per Tastatur über das Menü
+„Status …“ an der Karte verschieben. Eine Rückfrage fragt dabei nach dem Text an den Kunden. Ablehnen und Stornieren
+gehen weiter über die Detailseite. Hat jemand den Auftrag inzwischen geändert, lädt das Board neu und meldet das.
+
 ## Übersicht
 
 Nach dem Anmelden landet man auf der Übersicht (`/uebersicht`). Mitarbeiter sehen dort die offenen Aufträge je Status
