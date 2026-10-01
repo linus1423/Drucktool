@@ -237,6 +237,8 @@ Weitere Befehle:
 
 ```sh
 pnpm typecheck
+pnpm lint                                             # oxlint mit Typinformationen
+pnpm format                                           # Prettier; pnpm format:check nur prüfen
 pnpm test                                             # Unit-Tests
 TEST_DATABASE_URL=postgres://…/drucktool_test pnpm test  # inkl. Integrationstests (Datenbank wird geleert!)
 pnpm db:generate --name <name>                        # Migration aus Schemaänderung erzeugen
@@ -257,7 +259,13 @@ und verschickt die E-Mails. Druckdateien liegen im Volume `uploads`.
 
 `.github/workflows/ci.yml` läuft bei jedem Pull Request und jedem Push auf `main`:
 
-- **Typecheck, Tests, Migrationen**: `pnpm typecheck`, `pnpm test` (mit Datenbank), `pnpm build`. Danach prüft
+- **Lint und Formatierung**: `pnpm lint` und `pnpm format:check`. Fehler lassen die CI scheitern, Warnungen nicht.
+  Gelintet wird mit [oxlint](https://oxc.rs) statt ESLint, weil typescript-eslint TypeScript 7 noch nicht unterstützt;
+  oxlint prüft über `oxlint-tsgolint` auch typbasierte Regeln wie vergessene `await` (`no-floating-promises`). Die
+  Regeln stehen in `.oxlintrc.json`, der Stil in `.prettierrc.json`. Der einmalige Formatierungs-Commit steht in
+  `.git-blame-ignore-revs` (`git config blame.ignoreRevsFile .git-blame-ignore-revs`).
+- **Typecheck, Tests, Migrationen**: `pnpm typecheck`, `pnpm test:coverage` (mit Datenbank, Abdeckung im Log),
+  `pnpm build`. Danach prüft
   `drizzle-kit`, dass `src/server/db/schema.ts` keine Änderungen ohne Migration enthält, und die neuen Migrationen
   werden auf eine Datenbank mit dem Schema des vorherigen Stands (Basis des PRs) eingespielt.
 - **Ansible prüfen**: `ansible-lint` und `ansible-playbook --syntax-check`.

@@ -781,8 +781,8 @@ function formatValue(key: string, v: unknown) {
   if (v === null || v === undefined || v === '') return '–'
   if (typeof v === 'number' && /Cents$/.test(key)) return formatMoney(v)
   if (typeof v === 'boolean') return v ? 'ja' : 'nein'
-  if (key === 'priceUnit') return BINDING_UNIT_LABELS[v as keyof typeof BINDING_UNIT_LABELS] ?? String(v)
-  const text = String(v)
+  if (key === 'priceUnit' && typeof v === 'string') return BINDING_UNIT_LABELS[v as keyof typeof BINDING_UNIT_LABELS] ?? v
+  const text = typeof v === 'object' ? JSON.stringify(v) : String(v as string | number | bigint)
   return text.length > 60 ? `„${text.slice(0, 57)}…“` : typeof v === 'string' ? `„${text}“` : text
 }
 
@@ -810,8 +810,10 @@ function subject(
     }
     case 'settings':
       return SETTING_LABELS[c.entityId] ?? c.entityId
-    default:
-      return String((c.after ?? c.before)?.name ?? c.entityId)
+    default: {
+      const name = (c.after ?? c.before)?.name
+      return typeof name === 'string' ? name : c.entityId
+    }
   }
 }
 
