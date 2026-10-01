@@ -423,8 +423,14 @@ export async function createRequest(user: Principal, input: z.infer<typeof creat
     if (spec.delivery === 'house_post' && !input.deliveryAddress) {
       throw new Error('Bitte die Lieferadresse für die Hauspost angeben.')
     }
-    if (!!spec.coverPaperId !== !!input.coverFileId) {
-      throw new Error(spec.coverPaperId ? 'Bitte die Datei für das Deckblatt hochladen.' : 'Ein Deckblatt ist nicht ausgewählt.')
+    // Die Deckblatt-Datei ist freiwillig (Issue #85): ohne sie kommt das Deckblatt aus der Druckdatei.
+    if (input.coverFileId && !spec.coverPaperId) throw new Error('Ein Deckblatt ist nicht ausgewählt.')
+    if (spec.coverPaperId && spec.coverFromMainFile === !!input.coverFileId) {
+      throw new Error(
+        input.coverFileId
+          ? 'Mit eigener Deckblatt-Datei wird das Deckblatt nicht aus der Druckdatei gedruckt.'
+          : 'Bitte die Datei für das Deckblatt hochladen oder das Deckblatt aus der Druckdatei wählen.',
+      )
     }
 
     let reorderOf: { id: string; number: number } | null = null
@@ -624,8 +630,14 @@ export async function proposeChange(user: Principal, input: z.infer<typeof propo
     if (spec.delivery === 'house_post' && !input.deliveryAddress)
       throw new Error('Bitte die Lieferadresse für die Hauspost angeben.')
     const files = await listRequestFiles(input.id)
-    if (spec.coverPaperId && !files.some((f) => f.role === 'cover')) {
-      throw new Error('Zu diesem Auftrag gibt es keine Deckblatt-Datei. Ein Deckblatt kann nur mit Datei gewählt werden.')
+    // Ohne Deckblatt-Datei kann das Deckblatt nur aus der Druckdatei kommen (Issue #85).
+    const hasCoverFile = files.some((f) => f.role === 'cover')
+    if (spec.coverPaperId && spec.coverFromMainFile === hasCoverFile) {
+      throw new Error(
+        hasCoverFile
+          ? 'Zu diesem Auftrag gibt es eine Deckblatt-Datei, das Deckblatt kommt nicht aus der Druckdatei.'
+          : 'Zu diesem Auftrag gibt es keine Deckblatt-Datei. Das Deckblatt kann nur aus der Druckdatei kommen.',
+      )
     }
 
     const catalog = await getCatalog({ onlyAvailable: true }, tx)

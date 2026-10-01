@@ -457,6 +457,20 @@ export const coverColors = pgTable('cover_colors', {
   sortOrder: integer('sort_order').notNull().default(0),
 })
 
+/** Coverfarben, die es auf einem Deckblattpapier gibt (z. B. 250 g/m² nur Weiß). */
+export const paperCoverColors = pgTable(
+  'paper_cover_colors',
+  {
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => papers.id, { onDelete: 'cascade' }),
+    coverColorId: uuid('cover_color_id')
+      .notNull()
+      .references(() => coverColors.id, { onDelete: 'cascade' }),
+  },
+  (t) => [uniqueIndex('paper_cover_colors_unique').on(t.paperId, t.coverColorId)],
+)
+
 /** Übrige Preise und Texte als Schlüssel/Wert, z. B. Druckpreise pro Image und Mindestpreis. */
 export const settings = pgTable('settings', {
   key: text('key').primaryKey(),

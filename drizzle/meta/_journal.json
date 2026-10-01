@@ -94,6 +94,13 @@
       "breakpoints": true
     },
     {
+      "idx": 14,
+      "version": "7",
+      "when": 1790884202998,
+      "tag": "0014_cover_colors_per_paper",
+      "breakpoints": true
+    },
+    {
       "idx": 16,
       "version": "7",
       "when": 1790884274715,

@@ -1,6 +1,6 @@
 // Preisberechnung (Lastenheft Schritt 7, Issue #45). Alle Beträge in Cent.
 // Dieselbe Funktion rechnet die Vorschau im Browser und den verbindlichen Preis auf dem Server.
-import { impose, resolveOrder, type Imposition, type OrderCatalog, type OrderSpec, type ResolvedOrder } from './order'
+import { coverPagesFromMainFile, impose, resolveOrder, type Imposition, type OrderCatalog, type OrderSpec, type ResolvedOrder } from './order'
 
 export type PriceGroup = 'print' | 'delivery'
 
@@ -74,7 +74,11 @@ export function calculatePrice(
     if ('error' in imp) return { ok: false, errors: [imp.error] }
     inner = imp
     const sides = spec.duplex ? 2 : 1
-    const piecesPerCopy = spec.duplex ? Math.ceil(spec.pages / 2) : spec.pages
+    // Kommt das Deckblatt aus der Druckdatei, werden diese Seiten nur auf dem Deckblatt
+    // gedruckt und berechnet, nicht zusätzlich im Innenteil (Issue #85).
+    const fromMain = order.coverPaper ? coverPagesFromMainFile(spec) : null
+    const innerPages = spec.pages - (fromMain?.taken ?? 0)
+    const piecesPerCopy = spec.duplex ? Math.ceil(innerPages / 2) : innerPages
     const run = sheetsFor(piecesPerCopy * spec.copies, imp, sides)
     const click = imp.sheet === 'A4' ? pricing.printA4Cents : pricing.printA3Cents
     add({
@@ -96,12 +100,14 @@ export function calculatePrice(
       if ('error' in coverImp) return { ok: false, errors: [`Deckblatt: ${coverImp.error}`] }
       cover = coverImp
       // Jede Seite der Deckblatt-Datei ist ein einseitig bedrucktes Blatt (vorne, ggf. hinten).
+      // Aus der Druckdatei wird das Deckblatt wie der Innenteil ein- oder doppelseitig bedruckt.
       coverPiecesPerCopy = spec.coverPages
-      const coverRun = sheetsFor(coverPiecesPerCopy * spec.copies, coverImp, 1)
+      const coverSides = fromMain ? sides : 1
+      const coverRun = sheetsFor(coverPiecesPerCopy * spec.copies, coverImp, coverSides)
       const coverClick = coverImp.sheet === 'A4' ? pricing.printA4Cents : pricing.printA3Cents
       add({
         key: 'cover_print',
-        label: `Deckblatt Farbdruck ${SHEET_LABEL[coverImp.sheet]}`,
+        label: `Deckblatt Farbdruck ${SHEET_LABEL[coverImp.sheet]}${coverSides === 2 ? ', doppelseitig' : ''}`,
         detail: `${times(coverRun.clicks, coverClick)} (${coverRun.sheets} Bögen, ${coverImp.ups} pro Bogen)`,
         amountCents: coverRun.clicks * coverClick,
       })

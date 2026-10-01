@@ -41,6 +41,7 @@ export async function orderInput(
     paperId: paper.id,
     coverPaperId: null,
     coverPages: null,
+    coverFromMainFile: false,
     coverColorId: null,
     coverBackColorId: null,
     borderless: false,
