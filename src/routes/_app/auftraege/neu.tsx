@@ -468,7 +468,7 @@ function ChoiceCard({
   return (
     <div
       className={cx(
-        'rounded-lg p-3 text-left text-sm ring-1 transition',
+        'rounded-lg p-3 text-left text-sm ring-1 transition-shadow',
         selected
           ? 'bg-slate-900 text-white ring-slate-900'
           : disabled
@@ -957,26 +957,28 @@ function PricePreview({
       </dl>
       <div className="mt-4 border-t border-slate-100 pt-3 text-sm">
         {priced?.ok ? (
-          <dl className="space-y-1">
-            <div className="flex justify-between">
-              <dt>Druckkosten</dt>
-              <dd>{formatMoney(priced.price.printCents)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt>Lieferkosten</dt>
-              <dd>{formatMoney(priced.price.deliveryCents)}</dd>
-            </div>
-            <div className="flex justify-between text-base font-semibold" data-testid="price-total">
-              <dt>Gesamt</dt>
-              <dd>{formatMoney(priced.price.totalCents)}</dd>
-            </div>
-            {warning ? <p className="text-xs text-amber-700">{warning}</p> : null}
+          <>
+            <dl className="space-y-1">
+              <div className="flex justify-between">
+                <dt>Druckkosten</dt>
+                <dd>{formatMoney(priced.price.printCents)}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt>Lieferkosten</dt>
+                <dd>{formatMoney(priced.price.deliveryCents)}</dd>
+              </div>
+              <div className="flex justify-between text-base font-semibold" data-testid="price-total">
+                <dt>Gesamt</dt>
+                <dd>{formatMoney(priced.price.totalCents)}</dd>
+              </div>
+            </dl>
+            {warning ? <p className="mt-1 text-xs text-amber-700">{warning}</p> : null}
             {priced.price.lines.some((l) => l.key === 'minimum') ? (
-              <p className="text-xs text-slate-500">
+              <p className="mt-1 text-xs text-slate-500">
                 Enthält den Mindestpreis von {formatMoney(catalog.pricing.minimumOrderCents)}.
               </p>
             ) : null}
-          </dl>
+          </>
         ) : priced && !priced.ok ? (
           <ul className="list-disc space-y-1 pl-4 text-rose-700">
             {priced.errors.map((e) => (

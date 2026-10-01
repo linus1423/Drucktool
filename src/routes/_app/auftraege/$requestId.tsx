@@ -105,7 +105,7 @@ function RequestDetailPage() {
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">
-            <span className="mr-2 font-mono text-slate-400">{formatRequestNumber(request.number)}</span>
+            <span className="mr-2 font-mono text-slate-500">{formatRequestNumber(request.number)}</span>
             {request.title}
           </h1>
           <StatusBadge status={request.status} />
@@ -874,7 +874,7 @@ function History({ request, isNew }: { request: Detail; isNew: (e: Entry) => boo
             <div>
               <span className="font-medium">{e.actorName ?? 'System'}</span> {describeEvent(e)}
             </div>
-            <div className="text-xs text-slate-500">{formatDateTime(e.createdAt)}</div>
+            <div className="text-xs text-slate-600">{formatDateTime(e.createdAt)}</div>
           </li>
         ))}
       </ol>
@@ -935,19 +935,23 @@ function PriceCard({ request, staff }: { request: Detail; staff: boolean }) {
   return (
     <Card title="Preis">
       <dl className="space-y-1 text-sm">
-        {staff && price.lines.length ? (
-          <div className="mb-3 space-y-2 border-b border-slate-100 pb-3">
-            {price.lines.map((line) => (
-              <div key={line.key}>
-                <div className="flex justify-between gap-2">
-                  <dt>{line.label}</dt>
-                  <dd className="whitespace-nowrap">{formatMoney(line.amountCents)}</dd>
-                </div>
-                <div className="text-xs text-slate-500">{line.detail}</div>
+        {staff
+          ? price.lines.map((line, i) => (
+              <div
+                key={line.key}
+                className={cx(
+                  'flex justify-between gap-2',
+                  i === price.lines.length - 1 && 'mb-3 border-b border-slate-100 pb-3',
+                )}
+              >
+                <dt>
+                  {line.label}
+                  <span className="block text-xs text-slate-600">{line.detail}</span>
+                </dt>
+                <dd className="whitespace-nowrap">{formatMoney(line.amountCents)}</dd>
               </div>
-            ))}
-          </div>
-        ) : null}
+            ))
+          : null}
         <div className="flex justify-between">
           <dt>Druckkosten</dt>
           <dd>{formatMoney(price.printCents)}</dd>

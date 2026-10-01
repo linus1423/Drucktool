@@ -309,6 +309,11 @@ und verschickt die E-Mails. Druckdateien liegen im Volume `uploads`.
   `pnpm build`. Danach prüft
   `drizzle-kit`, dass `src/server/db/schema.ts` keine Änderungen ohne Migration enthält, und die neuen Migrationen
   werden auf eine Datenbank mit dem Schema des vorherigen Stands (Basis des PRs) eingespielt.
+- **E2E und Barrierefreiheit**: startet den gebauten Server und spielt in `e2e/` die Kernabläufe auf 375 px Breite
+  durch (Auftrag anlegen, Nachricht schreiben, Änderung vorschlagen und annehmen). Jede Seite wird mit axe nach
+  WCAG 2.1 AA geprüft, schwere Befunde und waagerechtes Scrollen lassen den Test scheitern. Lokal: `pnpm build`,
+  Datenbank migrieren und Superadmin anlegen, dann `pnpm test:e2e` (Port 3100, änderbar mit `E2E_PORT`; mit
+  `E2E_BASE_URL` gegen einen laufenden Server).
 - **Ansible prüfen**: `ansible-lint` und `ansible-playbook --syntax-check`.
 - **Docker-Smoke-Test**: baut das Image, startet es mit `docker compose`, wartet auf `/api/health` und meldet sich in
   einem echten Browser (Playwright) mit dem Superadmin an. Lokal: `docker compose build && scripts/smoke/smoke-test.sh`
