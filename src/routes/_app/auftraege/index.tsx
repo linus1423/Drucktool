@@ -18,7 +18,7 @@ const date = z.iso.date().optional().catch(undefined)
 // Filter, Sortierung und Seite stehen in der URL, damit Links und „Zurück“ funktionieren (Issue #15).
 const searchSchema = z.object({
   status: z.enum(REQUEST_STATUSES).optional().catch(undefined),
-  ansicht: z.enum(['offen', 'fertig', 'alle', 'meine', 'ueberfaellig']).optional().catch(undefined),
+  ansicht: z.enum(['offen', 'fertig', 'alle', 'meine', 'fuer_mich', 'ueberfaellig']).optional().catch(undefined),
   q: z.string().optional().catch(undefined),
   org: z.uuid().optional().catch(undefined),
   zustaendig: z
@@ -66,6 +66,7 @@ function toFilter(search: Search) {
     done: view === 'fertig' && !search.status ? true : undefined,
     assignedToMe: view === 'meine' ? true : undefined,
     overdue: view === 'ueberfaellig' ? true : undefined,
+    watching: view === 'fuer_mich' ? true : undefined,
     search: search.q || undefined,
     organisationId: search.org,
     assigneeId: search.zustaendig,
@@ -274,6 +275,7 @@ function RequestListPage() {
               <option value="fertig">Fertige Aufträge</option>
               <option value="alle">Alle Aufträge</option>
               {staff ? <option value="meine">Mir zugewiesen</option> : null}
+              {staff ? <option value="fuer_mich">Für mich (beobachtet)</option> : null}
               <option value="ueberfaellig">Überfällig</option>
             </Select>
             <Select
