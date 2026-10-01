@@ -57,8 +57,8 @@ describe.skipIf(!url)('Anmeldung per E-Mail-Link (Integration)', async () => {
     await getDb()
       .insert(schema.users)
       .values([
-        { email: email('wartet'), name: 'Wartet', role: 'customer', status: 'pending' },
-        { email: email('gesperrt'), name: 'Gesperrt', role: 'customer', status: 'disabled' },
+        { email: email('wartet'), lastName: 'Wartet', role: 'customer', status: 'pending' },
+        { email: email('gesperrt'), lastName: 'Gesperrt', role: 'customer', status: 'disabled' },
       ])
     const token = await issueLoginLink(email('wartet'), null)
     await redeemLoginLink(token!)

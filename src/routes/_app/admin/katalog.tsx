@@ -16,6 +16,7 @@ import {
   saveTextsFn,
   saveDeadlineSettingsFn,
   setFormatBindingFn,
+  setPaperCoverColorFn,
   updateBindingFn,
   updateFormatFn,
 } from '~/server/catalog/catalog.functions'
@@ -487,21 +488,81 @@ function PaperCard({ paper, formats, onDone }: { paper: PaperInput; formats: Cat
 function CoverTab({ catalog }: { catalog: Catalog }) {
   const [adding, setAdding] = useState(false)
   return (
-    <Card
-      title="Coverfarben für Deckblatt und Rückseite"
-      actions={!adding ? <Button onClick={() => setAdding(true)}>Farbe hinzufügen</Button> : null}
-    >
-      <ul className="divide-y divide-slate-100">
-        {adding ? (
-          <CoverRow
-            color={{ name: '', hex: '#ffffff', transparent: false, available: true, sortOrder: 100 }}
-            onDone={() => setAdding(false)}
-          />
-        ) : null}
-        {catalog.coverColors.map((c) => (
-          <CoverRow key={c.id} color={c} />
-        ))}
-      </ul>
+    <div className="space-y-6">
+      <Card
+        title="Coverfarben für Deckblatt und Rückseite"
+        actions={!adding ? <Button onClick={() => setAdding(true)}>Farbe hinzufügen</Button> : null}
+      >
+        <ul className="divide-y divide-slate-100">
+          {adding ? (
+            <CoverRow
+              color={{ name: '', hex: '#ffffff', transparent: false, available: true, sortOrder: 100 }}
+              onDone={() => setAdding(false)}
+            />
+          ) : null}
+          {catalog.coverColors.map((c) => (
+            <CoverRow key={c.id} color={c} />
+          ))}
+        </ul>
+      </Card>
+      <PaperColorsCard catalog={catalog} />
+    </div>
+  )
+}
+
+/** Welche Coverfarben es auf welchem Deckblattpapier gibt. */
+function PaperColorsCard({ catalog }: { catalog: Catalog }) {
+  const toggle = useSave(setPaperCoverColorFn)
+  const allowed = new Set(catalog.paperCoverColors.map((pc) => `${pc.paperId}/${pc.coverColorId}`))
+  const coverPapers = catalog.papers.filter((p) => p.forCover)
+
+  return (
+    <Card title="Farben je Deckblattpapier">
+      <p className="mb-3 text-sm text-slate-600">
+        Kunden sehen bei einem separaten Deckblatt nur die Farben, die es auf dem gewählten Papier gibt. Ohne separates
+        Deckblatt gelten alle verfügbaren Farben der Bindung.
+      </p>
+      {toggle.error ? <Alert>{errorMessage(toggle.error)}</Alert> : null}
+      {coverPapers.length === 0 ? (
+        <p className="text-sm text-slate-500">Kein Papier ist als Deckblatt geeignet.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr>
+                <th className="px-2 py-2 text-left font-medium text-slate-500">Papier</th>
+                {catalog.coverColors.map((c) => (
+                  <th key={c.id} className="px-2 py-2 text-center text-xs font-medium text-slate-500">
+                    {c.name}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {coverPapers.map((p) => (
+                <tr key={p.id}>
+                  <td className="px-2 py-2 font-medium whitespace-nowrap">
+                    {p.name} {p.grammage} g/m²
+                  </td>
+                  {catalog.coverColors.map((c) => (
+                    <td key={c.id} className="px-2 py-2 text-center">
+                      <input
+                        type="checkbox"
+                        aria-label={`${c.name} auf ${p.name} ${p.grammage} g/m²`}
+                        checked={allowed.has(`${p.id}/${c.id}`)}
+                        disabled={toggle.isPending}
+                        onChange={(e) =>
+                          toggle.mutate({ data: { paperId: p.id, coverColorId: c.id, allowed: e.target.checked } })
+                        }
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </Card>
   )
 }
@@ -670,6 +731,7 @@ const ENTITY_LABELS: Record<string, string> = {
   format: 'Format',
   binding: 'Bindung',
   format_binding: 'Kombination',
+  paper_cover_color: 'Coverfarbe am Papier',
   paper: 'Papier',
   cover_color: 'Coverfarbe',
   settings: 'Einstellung',
@@ -740,6 +802,12 @@ function subject(
       const [f, b] = c.entityId.split('/')
       return `${formatLabel(f ?? '')} mit ${bindingLabel(b ?? '')}`
     }
+    case 'paper_cover_color': {
+      const [p, col] = c.entityId.split('/')
+      const paper = catalog.papers.find((x) => x.id === p)
+      const color = catalog.coverColors.find((x) => x.id === col)?.name ?? col
+      return `${color} auf ${paper ? `${paper.name} ${paper.grammage} g/m²` : p}`
+    }
     case 'settings':
       return SETTING_LABELS[c.entityId] ?? c.entityId
     default:
@@ -748,7 +816,7 @@ function subject(
 }
 
 function describeDiff(entity: string, before: Record<string, unknown> | null, after: Record<string, unknown> | null) {
-  if (entity === 'format_binding') return after ? 'erlaubt' : 'nicht mehr erlaubt'
+  if (entity === 'format_binding' || entity === 'paper_cover_color') return after ? 'erlaubt' : 'nicht mehr erlaubt'
   if (!before) return 'angelegt'
   if (!after) return 'entfernt'
   const changed = Object.keys(after).filter((k) => k !== 'updatedAt' && JSON.stringify(before[k]) !== JSON.stringify(after[k]))

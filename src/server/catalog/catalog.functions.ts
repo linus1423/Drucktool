@@ -13,6 +13,8 @@ import {
   savePricing,
   saveTexts,
   setFormatBinding,
+  setPaperCoverColor,
+  paperCoverColorSchema,
   updateBinding,
   updateFormat,
 } from './catalog.server'
@@ -57,6 +59,10 @@ export const savePaperFn = createServerFn({ method: 'POST' })
 export const saveCoverColorFn = createServerFn({ method: 'POST' })
   .validator(coverColorSchema)
   .handler(async ({ data }) => saveCoverColor(await requireAdmin(), data))
+
+export const setPaperCoverColorFn = createServerFn({ method: 'POST' })
+  .validator(paperCoverColorSchema)
+  .handler(async ({ data }) => setPaperCoverColor(await requireAdmin(), data))
 
 export const savePricingFn = createServerFn({ method: 'POST' })
   .validator(pricingSchema)
