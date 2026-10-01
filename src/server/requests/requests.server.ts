@@ -15,7 +15,7 @@ import {
   type RequestStatus,
 } from '~/lib/status'
 import { deliveryAddressSchema } from '~/lib/address'
-import { MAX_COVER_PAGES, orderSpecSchema } from '~/lib/order'
+import { orderSpecSchema } from '~/lib/order'
 import { calculatePrice } from '~/lib/pricing'
 import { buildSnapshot } from '~/lib/snapshot'
 import { applyPriceOverride, type ChangeProposal } from '~/lib/proposal'
@@ -421,7 +421,7 @@ export async function createRequest(user: Principal, input: z.infer<typeof creat
     }
     // Die Deckblatt-Datei ist freiwillig (Issue #85): ohne sie kommt das Deckblatt aus der Druckdatei.
     if (input.coverFileId && !spec.coverPaperId) throw new Error('Ein Deckblatt ist nicht ausgewählt.')
-    if (spec.coverPaperId && spec.coverFromMainFile === !!input.coverFileId) {
+    if (spec.coverPaperId && !!spec.coverFromMainFile === !!input.coverFileId) {
       throw new Error(
         input.coverFileId
           ? 'Mit eigener Deckblatt-Datei wird das Deckblatt nicht aus der Druckdatei gedruckt.'
@@ -469,11 +469,7 @@ export async function createRequest(user: Principal, input: z.infer<typeof creat
       throw new Error(`Die Seitenzahl passt nicht zur Datei (${files.main.pageCount} Seiten).`)
     }
     if (files.cover?.pageCount != null && files.cover.pageCount !== spec.coverPages) {
-      throw new Error(
-        files.cover.pageCount > MAX_COVER_PAGES
-          ? `Die Deckblatt-Datei darf höchstens ${MAX_COVER_PAGES} Seiten haben (vorne und hinten).`
-          : `Die Seitenzahl passt nicht zur Deckblatt-Datei (${files.cover.pageCount} Seiten).`,
-      )
+      throw new Error(`Die Seitenzahl passt nicht zur Deckblatt-Datei (${files.cover.pageCount} Seiten).`)
     }
 
     await tx.insert(requestEvents).values({
@@ -628,7 +624,7 @@ export async function proposeChange(user: Principal, input: z.infer<typeof propo
     const files = await listRequestFiles(input.id)
     // Ohne Deckblatt-Datei kann das Deckblatt nur aus der Druckdatei kommen (Issue #85).
     const hasCoverFile = files.some((f) => f.role === 'cover')
-    if (spec.coverPaperId && spec.coverFromMainFile === hasCoverFile) {
+    if (spec.coverPaperId && !!spec.coverFromMainFile === hasCoverFile) {
       throw new Error(
         hasCoverFile
           ? 'Zu diesem Auftrag gibt es eine Deckblatt-Datei, das Deckblatt kommt nicht aus der Druckdatei.'
