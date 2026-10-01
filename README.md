@@ -47,6 +47,14 @@ Im Profil sieht jeder seine angemeldeten Geräte und kann sie einzeln oder alle 
   Log, nur ob ein Passwort gesetzt wurde. Superadmins sehen das Protokoll unter **Protokoll** (`/admin/protokoll`) mit
   Filter nach Benutzer, Organisation, Aktion und Zeitraum. Einträge werden nach `AUDIT_LOG_RETENTION_DAYS` Tagen
   gelöscht (Standard 365, 0 = nie).
+- **Security-Header** setzt die App selbst (Middleware in `src/start.ts`), damit sie auch ohne Caddy gelten:
+  Content-Security-Policy mit Nonce pro Antwort für die Inline-Skripte von TanStack Start (`script-src 'self'
+  'nonce-…'`, `frame-ancestors 'none'`, `object-src 'none'`), `X-Content-Type-Options`, `Referrer-Policy`,
+  `X-Frame-Options`, `Permissions-Policy` und Cross-Origin-Header. `Strict-Transport-Security` nur mit HTTPS (gleiche
+  Regel wie `COOKIE_SECURE`). Im Vite-Dev-Server entfällt die CSP.
+- **CSRF:** Schreibende Anfragen (POST-Server-Funktionen, Upload) brauchen `Sec-Fetch-Site: same-origin` bzw. bei
+  älteren Browsern einen Origin/Referer der App (`APP_URL` oder die Adresse der Anfrage), sonst antwortet die App
+  mit 403.
 - **Aufräumen:** Der Worker löscht beim Start und dann stündlich abgelaufene Sitzungen, Anmeldelinks,
   Rate-Limit-Zähler und alte Audit-Einträge. Die Löschungen sind idempotent, mehrere Worker stören sich nicht.
 
