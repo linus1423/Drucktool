@@ -878,3 +878,49 @@ export async function setWatchingRequest(user: Principal, input: z.infer<typeof 
     return { watching: (await watcherIds(tx, request)).has(user.id) }
   })
 }
+
+/** Spalten des Boards (Issue #16): offene Status plus kürzlich fertige Aufträge. */
+export const BOARD_DONE_DAYS = 14
+const BOARD_LIMIT = 500
+
+export const boardFilterSchema = z.object({
+  mine: z.boolean().optional(),
+  search: z.string().trim().max(200).optional(),
+})
+
+/** Aufträge für das Board der Mitarbeiter, gruppiert wird im Client. */
+export async function listBoard(user: Principal, filter: z.infer<typeof boardFilterSchema>) {
+  if (!isStaffRole(user.role)) throw new Error('Keine Berechtigung')
+  const base = listConditions(user, { assignedToMe: filter.mine, search: filter.search })
+  const rows = await getDb()
+    .select({
+      ...listSelection(user),
+      version: requests.version,
+      assigneeId: requests.assigneeId,
+      hasProposal: sql<boolean>`${requests.proposal} is not null`,
+    })
+    .from(requests)
+    .leftJoin(organisations, eq(organisations.id, requests.organisationId))
+    .innerJoin(creatorAlias, eq(creatorAlias.id, requests.createdById))
+    .leftJoin(assigneeAlias, eq(assigneeAlias.id, requests.assigneeId))
+    .where(
+      and(
+        base,
+        or(
+          inArray(requests.status, OPEN_STATUSES),
+          and(
+            eq(requests.status, 'completed'),
+            sql`${requests.statusChangedAt} > now() - make_interval(days => ${BOARD_DONE_DAYS})`,
+          ),
+        ),
+      ),
+    )
+    .orderBy(asc(requests.promisedDate), asc(requests.number))
+    .limit(BOARD_LIMIT)
+  const deadlines = await getDeadlineSettings()
+  const now = new Date()
+  return {
+    rows: rows.map((r) => ({ ...r, attention: attentionFor(r, deadlines, now) })),
+    truncated: rows.length === BOARD_LIMIT,
+  }
+}

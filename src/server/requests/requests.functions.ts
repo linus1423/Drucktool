@@ -28,6 +28,8 @@ import {
   updateRequest,
   updateRequestSchema,
   setWatchingRequest,
+  boardFilterSchema,
+  listBoard,
   watchSchema,
 } from './requests.server'
 
@@ -91,3 +93,7 @@ export const prepareReorderFn = createServerFn({ method: 'POST' })
 export const setWatchingFn = createServerFn({ method: 'POST' })
   .validator(watchSchema)
   .handler(async ({ data }) => setWatchingRequest(await requireUser(), data))
+
+export const listBoardFn = createServerFn({ method: 'GET' })
+  .validator(boardFilterSchema)
+  .handler(async ({ data }) => listBoard(await requireStaff(), data))
