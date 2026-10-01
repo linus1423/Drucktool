@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { formatBillingAddress, formatDeliveryAddress } from '~/lib/address'
-import { formatBytes } from '~/components/FileUpload'
+import { formatBytes, uploadFile, type UploadedFile } from '~/components/FileUpload'
 import { AttentionBadge } from '~/components/AttentionBadge'
 import { ProposalCard, ProposeChangeForm } from '~/components/ChangeProposal'
 import { RequestFields, useRequestForm } from '~/components/RequestFields'
@@ -505,14 +505,32 @@ function Comments({ request, staff }: { request: Detail; staff: boolean }) {
   const refresh = useRefresh(request.id)
   const [body, setBody] = useState('')
   const [internal, setInternal] = useState(false)
+  const [attachments, setAttachments] = useState<UploadedFile[]>([])
+  const [uploading, setUploading] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const mutation = useMutation({
-    mutationFn: () => addCommentFn({ data: { id: request.id, body, internal } }),
+    mutationFn: () => addCommentFn({ data: { id: request.id, body, internal, attachmentIds: attachments.map((a) => a.id) } }),
     onSuccess: async () => {
       setBody('')
       setInternal(false)
+      setAttachments([])
       await refresh()
     },
   })
+  const addFiles = async (files: FileList | null) => {
+    setUploadError(null)
+    for (const file of Array.from(files ?? [])) {
+      setUploading(file.name)
+      try {
+        const uploaded = await uploadFile(file, 'attachment', () => {})
+        setAttachments((list) => [...list, uploaded])
+      } catch (e) {
+        setUploadError(`${file.name}: ${(e as Error).message}`)
+      }
+    }
+    setUploading(null)
+  }
+  const canSend = (body.trim().length > 0 || attachments.length > 0) && !uploading
 
   return (
     <Card title="Kommunikation">
@@ -539,7 +557,21 @@ function Comments({ request, staff }: { request: Detail; staff: boolean }) {
                   {c.internal ? <Badge className="bg-amber-200 text-amber-900">Intern</Badge> : null}
                   <span>{formatDateTime(c.createdAt)}</span>
                 </div>
-                <p className="whitespace-pre-wrap">{c.body}</p>
+                {c.body ? <p className="whitespace-pre-wrap">{c.body}</p> : null}
+                {c.attachments.length ? (
+                  <ul className="mt-2 flex flex-wrap gap-2">
+                    {c.attachments.map((a) => (
+                      <li key={a.id}>
+                        <a
+                          href={`/api/dateien/${a.id}`}
+                          className="inline-flex items-center gap-1 rounded bg-white px-2 py-1 text-xs ring-1 ring-slate-200 hover:bg-slate-100"
+                        >
+                          📎 {a.filename} <span className="text-slate-500">{formatBytes(a.sizeBytes)}</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -548,7 +580,7 @@ function Comments({ request, staff }: { request: Detail; staff: boolean }) {
           className="space-y-2"
           onSubmit={(e) => {
             e.preventDefault()
-            if (body.trim()) mutation.mutate()
+            if (canSend) mutation.mutate()
           }}
         >
           {mutation.error ? <Alert>{errorMessage(mutation.error)}</Alert> : null}
@@ -559,7 +591,38 @@ function Comments({ request, staff }: { request: Detail; staff: boolean }) {
             onChange={(e) => setBody(e.target.value)}
             placeholder={staff ? 'Nachricht an den Kunden oder interne Notiz …' : 'Nachricht an die Druckerei …'}
           />
-          <div className="flex items-center justify-between gap-2">
+          {attachments.length || uploading ? (
+            <ul className="flex flex-wrap gap-2 text-xs">
+              {attachments.map((a) => (
+                <li key={a.id} className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1">
+                  📎 {a.filename}
+                  <button
+                    type="button"
+                    aria-label={`${a.filename} entfernen`}
+                    className="ml-1 text-slate-500 hover:text-slate-900"
+                    onClick={() => setAttachments((list) => list.filter((x) => x.id !== a.id))}
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+              {uploading ? <li className="px-2 py-1 text-slate-500">{uploading} wird hochgeladen …</li> : null}
+            </ul>
+          ) : null}
+          {uploadError ? <p className="text-sm text-rose-600">{uploadError}</p> : null}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label className="cursor-pointer text-sm text-slate-700 underline">
+              Datei anhängen
+              <input
+                type="file"
+                multiple
+                className="sr-only"
+                onChange={(e) => {
+                  void addFiles(e.target.files)
+                  e.target.value = ''
+                }}
+              />
+            </label>
             {staff ? (
               <label className="flex items-center gap-2 text-sm text-slate-700">
                 <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} />
@@ -568,7 +631,7 @@ function Comments({ request, staff }: { request: Detail; staff: boolean }) {
             ) : (
               <span />
             )}
-            <Button type="submit" disabled={mutation.isPending || !body.trim()}>
+            <Button type="submit" disabled={mutation.isPending || !canSend}>
               Senden
             </Button>
           </div>

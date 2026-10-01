@@ -92,6 +92,9 @@ das Ergebnis der PDF-Prüfung. Auch verschlüsselte oder nicht lesbare PDFs werd
 dann einen Hinweis. Hochgeladene Dateien, die nach 24 Stunden zu keinem Auftrag gehören, werden gelöscht.
 Herunterladen dürfen Mitarbeiter und der Kunde, dem der Auftrag gehört.
 
+An Nachrichten lassen sich bis zu zehn Dateien anhängen (z. B. korrigierte Druckdaten, Logos, Fotos). Sie liegen in
+derselben Ablage. Anhänge interner Notizen sehen nur Mitarbeiter.
+
 ## Änderungen durch die Druckerei
 
 Mitarbeiter können Optionen und Preis eines Auftrags nicht direkt ändern, sondern schlagen über „Änderung
@@ -221,6 +224,7 @@ Ist das Paket in der GitHub Container Registry privat, `drucktool_registry_usern
 | `MAIL_FROM`                               | Absender, z. B. `Druckerei Muster <auftraege@example.com>`             |
 | `UPLOAD_DIR`                              | Ablage für Druckdateien, Standard `data/uploads` (im Image `/app/uploads`) |
 | `UPLOAD_MAX_MB`                           | Größte erlaubte Druckdatei in MB, Standard 500                         |
+| `ATTACHMENT_MAX_MB`, `ATTACHMENT_TYPES`   | Anhänge an Nachrichten: Größe in MB (Standard 25), erlaubte Endungen (kommagetrennt) |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | OpenID Connect, siehe oben                                 |
 | `OIDC_DISPLAY_NAME`, `OIDC_NEW_USERS`, `OIDC_TRUST_EMAIL` | Beschriftung und Verhalten der OIDC-Anmeldung          |
 | `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_ROLES`, `OIDC_STAFF_ROLES`, `OIDC_ENFORCE_FOR_STAFF` | Rollen vom Anbieter, siehe oben |

@@ -10,7 +10,7 @@ export function formatBytes(bytes: number) {
 }
 
 /** Lädt eine Datei als Rohdaten hoch; XHR statt fetch, damit der Fortschritt sichtbar ist. */
-function upload(file: File, role: 'main' | 'cover', onProgress: (p: number) => void) {
+export function uploadFile(file: File, role: 'main' | 'cover' | 'attachment', onProgress: (p: number) => void) {
   return new Promise<UploadedFile>((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('POST', `/api/dateien?rolle=${role}&name=${encodeURIComponent(file.name)}`)
@@ -52,7 +52,7 @@ export function FileUpload({
     setError(null)
     setProgress(0)
     try {
-      onChange(await upload(file, role, setProgress))
+      onChange(await uploadFile(file, role, setProgress))
     } catch (e) {
       setError((e as Error).message)
     } finally {

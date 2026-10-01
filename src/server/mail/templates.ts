@@ -162,13 +162,17 @@ export function promisedDateMail(r: RequestRef & { actorName: string; date: stri
   return compose(`Termin für ${requestLabel(r)}`, [{ kind: 'p', text }, requestButton(r)])
 }
 
-export function commentMail(r: RequestRef & { actorName: string; body: string; internal: boolean }): MailContent {
+export function commentMail(
+  r: RequestRef & { actorName: string; body: string; internal: boolean; attachmentNames?: string[] },
+): MailContent {
+  const files = r.attachmentNames ?? []
   return compose(`${r.internal ? 'Interne Notiz' : 'Neue Nachricht'} zu ${requestLabel(r)}`, [
     {
       kind: 'p',
       text: `${r.actorName} hat ${r.internal ? 'eine interne Notiz' : 'eine Nachricht'} zu ${requestLabel(r)} geschrieben:`,
     },
-    { kind: 'quote', text: r.body },
+    ...(r.body ? [{ kind: 'quote', text: r.body } as Block] : []),
+    ...(files.length ? [{ kind: 'p', text: `Anhänge: ${files.join(', ')}` } as Block] : []),
     requestButton(r),
   ])
 }

@@ -21,7 +21,14 @@ import { buildSnapshot } from '~/lib/snapshot'
 import { applyPriceOverride, type ChangeProposal } from '~/lib/proposal'
 import { getCatalog, getDeadlineSettings } from '../catalog/catalog.server'
 import { attentionFor, berlinToday } from '~/lib/deadlines'
-import { claimFiles, copyAsUpload, listRequestFiles } from '../files/files.server'
+import {
+  MAX_ATTACHMENTS,
+  claimAttachments,
+  claimFiles,
+  copyAsUpload,
+  listCommentAttachments,
+  listRequestFiles,
+} from '../files/files.server'
 import { getDb, schema, type Tx } from '../db/client.server'
 import {
   notifyAssigned,
@@ -294,6 +301,7 @@ export async function getRequestDetail(user: Principal, id: string) {
     .orderBy(asc(requestEvents.createdAt))
 
   const r = found.request
+  const attachments = await listCommentAttachments(comments.map((c) => c.id))
   const [files, deadlines, [reorderOf]] = await Promise.all([
     listRequestFiles(id),
     getDeadlineSettings(),
@@ -329,7 +337,7 @@ export async function getRequestDetail(user: Principal, id: string) {
     reorderOf: reorderOf ?? null,
     attention: attentionFor({ ...r, internalDueDate }, deadlines),
     confirmedByName: found.confirmedByName,
-    comments,
+    comments: comments.map((c) => ({ ...c, attachments: attachments.get(c.id) ?? [] })),
     events,
     // Solange ein Vorschlag offen ist, bleiben nur Stornieren und Ablehnen; der Rest läuft über den Vorschlag.
     transitions: allowedTransitions(r.status, actorOf(user)).filter((t) => !r.proposal || t === 'cancelled' || t === 'rejected'),
@@ -795,11 +803,14 @@ export async function assignRequest(user: Principal, input: z.infer<typeof assig
   })
 }
 
-export const addCommentSchema = z.object({
-  id: z.uuid(),
-  body: z.string().trim().min(1, 'Bitte einen Kommentar eingeben').max(10_000),
-  internal: z.boolean().default(false),
-})
+export const addCommentSchema = z
+  .object({
+    id: z.uuid(),
+    body: z.string().trim().max(10_000),
+    internal: z.boolean().default(false),
+    attachmentIds: z.array(z.uuid()).max(MAX_ATTACHMENTS, `Höchstens ${MAX_ATTACHMENTS} Anhänge pro Nachricht`).optional(),
+  })
+  .refine((c) => c.body.length > 0 || !!c.attachmentIds?.length, { message: 'Bitte einen Kommentar eingeben', path: ['body'] })
 
 export async function addComment(user: Principal, input: z.infer<typeof addCommentSchema>) {
   const internal = isStaffRole(user.role) ? input.internal : false
@@ -810,8 +821,14 @@ export async function addComment(user: Principal, input: z.infer<typeof addComme
       .insert(requestComments)
       .values({ requestId: input.id, authorId: user.id, body: input.body, internal })
       .returning({ id: requestComments.id })
+    const attachments = await claimAttachments(tx, user, input.id, comment!.id, input.attachmentIds ?? [])
     await tx.update(requests).set({ updatedAt: new Date() }).where(eq(requests.id, input.id))
-    await notifyComment(tx, user, { requestId: input.id, body: input.body, internal })
+    await notifyComment(tx, user, {
+      requestId: input.id,
+      body: input.body,
+      internal,
+      attachmentNames: attachments.map((a) => a.filename),
+    })
     return comment!
   })
 }

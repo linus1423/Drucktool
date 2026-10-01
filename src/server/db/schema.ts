@@ -225,7 +225,7 @@ export const requestEvents = pgTable(
   (t) => [index('request_events_request_idx').on(t.requestId)],
 )
 
-export const fileRole = pgEnum('file_role', ['main', 'cover'])
+export const fileRole = pgEnum('file_role', ['main', 'cover', 'attachment'])
 export const pdfStatus = pgEnum('pdf_status', ['ok', 'encrypted', 'unreadable', 'not_pdf'])
 
 /**
@@ -240,6 +240,8 @@ export const requestFiles = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'restrict' }),
     requestId: uuid('request_id').references(() => requests.id, { onDelete: 'cascade' }),
+    // Anhang an einer Nachricht (Issue #8); interne Notizen vererben ihre Sichtbarkeit.
+    commentId: uuid('comment_id').references(() => requestComments.id, { onDelete: 'cascade' }),
     role: fileRole('role').notNull(),
     filename: text('filename').notNull(),
     sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull(),
@@ -254,7 +256,11 @@ export const requestFiles = pgTable(
     mixedPageSizes: boolean('mixed_page_sizes').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('request_files_request_idx').on(t.requestId), index('request_files_owner_idx').on(t.ownerId)],
+  (t) => [
+    index('request_files_request_idx').on(t.requestId),
+    index('request_files_owner_idx').on(t.ownerId),
+    index('request_files_comment_idx').on(t.commentId),
+  ],
 )
 
 export const emailStatus = pgEnum('email_status', ['pending', 'sent', 'failed'])

@@ -178,7 +178,11 @@ export async function notifyPromisedDate(tx: Tx, actor: Actor, input: { requestI
   )
 }
 
-export async function notifyComment(tx: Tx, actor: Actor, input: { requestId: string; body: string; internal: boolean }) {
+export async function notifyComment(
+  tx: Tx,
+  actor: Actor,
+  input: { requestId: string; body: string; internal: boolean; attachmentNames?: string[] },
+) {
   const request = await loadRequest(tx, input.requestId)
   const content = commentMail({ ...request, ...input, actorName: await actorName(tx, actor.id) })
   let recipients: string[]
