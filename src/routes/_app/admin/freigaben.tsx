@@ -53,8 +53,7 @@ function RegistrationCard({ registration: r }: { registration: Registration }) {
     ])
 
   const approve = useMutation({
-    mutationFn: () =>
-      approveRegistrationFn({ data: { userId: r.id, existingOrganisationId: existingOrganisationId || null } }),
+    mutationFn: () => approveRegistrationFn({ data: { userId: r.id, existingOrganisationId: existingOrganisationId || null } }),
     onSuccess: refresh,
   })
   const reject = useMutation({
@@ -73,7 +72,9 @@ function RegistrationCard({ registration: r }: { registration: Registration }) {
           <dt className="text-slate-500">Firma</dt>
           <dd className="col-span-2">{r.organisationName ?? 'Keine Angabe (Anmeldung über Single Sign-on)'}</dd>
           <dt className="text-slate-500">Adresse</dt>
-          <dd className="col-span-2">{[r.street, [r.zip, r.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '–'}</dd>
+          <dd className="col-span-2">
+            {[r.street, [r.zip, r.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '–'}
+          </dd>
           <dt className="text-slate-500">Telefon</dt>
           <dd className="col-span-2">{r.phone || '–'}</dd>
           <dt className="text-slate-500">Registriert</dt>
@@ -96,13 +97,15 @@ function RegistrationCard({ registration: r }: { registration: Registration }) {
           </Select>
         </Field>
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" className="text-rose-700" disabled={reject.isPending || approve.isPending} onClick={() => reject.mutate()}>
+          <Button
+            variant="secondary"
+            className="text-rose-700"
+            disabled={reject.isPending || approve.isPending}
+            onClick={() => reject.mutate()}
+          >
             Ablehnen
           </Button>
-          <Button
-            disabled={approve.isPending || reject.isPending}
-            onClick={() => approve.mutate()}
-          >
+          <Button disabled={approve.isPending || reject.isPending} onClick={() => approve.mutate()}>
             Freigeben
           </Button>
         </div>

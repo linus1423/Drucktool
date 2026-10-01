@@ -78,10 +78,7 @@ export const users = pgTable(
     anonymizedAt: timestamp('anonymized_at', { withTimezone: true }),
     ...timestamps,
   },
-  (t) => [
-    uniqueIndex('users_email_unique').on(sql`lower(${t.email})`),
-    index('users_organisation_idx').on(t.organisationId),
-  ],
+  (t) => [uniqueIndex('users_email_unique').on(sql`lower(${t.email})`), index('users_organisation_idx').on(t.organisationId)],
 )
 
 export const sessions = pgTable(
@@ -142,7 +139,10 @@ export const oidcAccounts = pgTable(
     subject: text('subject').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('oidc_accounts_issuer_subject_unique').on(t.issuer, t.subject), index('oidc_accounts_user_idx').on(t.userId)],
+  (t) => [
+    uniqueIndex('oidc_accounts_issuer_subject_unique').on(t.issuer, t.subject),
+    index('oidc_accounts_user_idx').on(t.userId),
+  ],
 )
 
 export const requests = pgTable(
@@ -224,7 +224,10 @@ export const requestComments = pgTable(
     // Interne Notizen sind nur für Mitarbeiter sichtbar.
     internal: boolean('internal').notNull().default(false),
     // Per @Name erwähnte Mitarbeiter (Issue #13).
-    mentionedIds: uuid('mentioned_ids').array().notNull().default(sql`'{}'::uuid[]`),
+    mentionedIds: uuid('mentioned_ids')
+      .array()
+      .notNull()
+      .default(sql`'{}'::uuid[]`),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('request_comments_request_idx').on(t.requestId)],

@@ -16,11 +16,7 @@ const password = process.env.SUPERADMIN_PASSWORD
 const client = postgres(url, { max: 1, onnotice: () => {} })
 const db = drizzle(client, { schema })
 
-const existing = await db
-  .select({ id: schema.users.id })
-  .from(schema.users)
-  .where(eq(schema.users.role, 'superadmin'))
-  .limit(1)
+const existing = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.role, 'superadmin')).limit(1)
 
 if (existing.length > 0) {
   console.log('Superadmin existiert bereits, nichts zu tun')

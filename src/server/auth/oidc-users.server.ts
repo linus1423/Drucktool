@@ -14,10 +14,7 @@ export type OidcClaims = {
   [claim: string]: unknown
 }
 
-export type OidcResolution =
-  | { kind: 'login'; userId: string }
-  | { kind: 'pending' }
-  | { kind: 'denied'; message: string }
+export type OidcResolution = { kind: 'login'; userId: string } | { kind: 'pending' } | { kind: 'denied'; message: string }
 
 export type ResolveOptions = {
   policy: NewUserPolicy
@@ -75,7 +72,12 @@ async function decide(userId: string, claims: OidcClaims, options: ResolveOption
     if (mapped && mapped !== row.role) {
       await db
         .update(users)
-        .set({ role: mapped, organisationId: null, status: row.status === 'pending' ? 'active' : row.status, updatedAt: new Date() })
+        .set({
+          role: mapped,
+          organisationId: null,
+          status: row.status === 'pending' ? 'active' : row.status,
+          updatedAt: new Date(),
+        })
         .where(eq(users.id, userId))
       await db.delete(sessions).where(eq(sessions.userId, userId))
       row.role = mapped
@@ -126,7 +128,8 @@ export async function resolveOidcUser(issuer: string, claims: OidcClaims, option
   if (!mapped && options.policy === 'reject') {
     return {
       kind: 'denied',
-      message: 'Für diese E-Mail-Adresse gibt es noch kein Konto. Bitte registrieren Sie sich oder wenden Sie sich an die Druckerei.',
+      message:
+        'Für diese E-Mail-Adresse gibt es noch kein Konto. Bitte registrieren Sie sich oder wenden Sie sich an die Druckerei.',
     }
   }
 
@@ -142,7 +145,11 @@ export async function resolveOidcUser(issuer: string, claims: OidcClaims, option
     if (!user) return null
     await tx.insert(oidcAccounts).values({ userId: user.id, issuer, subject: claims.sub })
     if (status === 'pending') {
-      await notifyRegistrationReceived(tx, { name: displayName(personName), email, organisationName: 'ohne Organisation (Anmeldung über OIDC)' })
+      await notifyRegistrationReceived(tx, {
+        name: displayName(personName),
+        email,
+        organisationName: 'ohne Organisation (Anmeldung über OIDC)',
+      })
     }
     return user
   })
