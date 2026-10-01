@@ -10,7 +10,14 @@ COPY . .
 RUN pnpm build
 
 FROM node:22-alpine AS runtime
+# Setzt die CI (git describe bzw. Commit); sichtbar unter /api/health und für Admins in der Fußzeile.
+ARG APP_VERSION=dev
+ARG GIT_COMMIT=unknown
+LABEL org.opencontainers.image.version=$APP_VERSION \
+      org.opencontainers.image.revision=$GIT_COMMIT
 ENV NODE_ENV=production \
+    APP_VERSION=$APP_VERSION \
+    GIT_COMMIT=$GIT_COMMIT \
     PORT=3000 \
     HOST=0.0.0.0 \
     MIGRATIONS_DIR=/app/drizzle \

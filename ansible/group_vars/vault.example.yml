@@ -1,5 +1,6 @@
-# Kopieren nach group_vars/vault.yml und verschlüsseln:
-#   ansible-vault encrypt group_vars/vault.yml
+# Je Umgebung kopieren und verschlüsseln (eigene Passwörter je Umgebung!):
+#   cp group_vars/vault.example.yml vault/production.yml && ansible-vault encrypt vault/production.yml
+#   cp group_vars/vault.example.yml vault/staging.yml    && ansible-vault encrypt vault/staging.yml
 # z. B. mit: openssl rand -hex 24
 drucktool_postgres_password: 'bitte-ein-langes-zufaelliges-passwort'
 drucktool_superadmin_password: 'bitte-aendern-mindestens-12-zeichen'
@@ -11,3 +12,10 @@ drucktool_registry_password: ''
 drucktool_smtp_url: ''
 # Client-Secret für OpenID Connect (nur nötig, wenn drucktool_oidc_issuer gesetzt ist).
 drucktool_oidc_client_secret: ''
+# Offsite-Backup mit restic (nur nötig, wenn drucktool_offsite_backup_enabled: true; mind. 16 Zeichen). Das Passwort
+# verschlüsselt die Backups; ohne es sind sie wertlos. Deshalb zusätzlich außerhalb des Servers aufbewahren.
+drucktool_restic_password: ''
+# Zugangsdaten für das Ziel, z. B. für S3:
+drucktool_restic_env: {}
+#   AWS_ACCESS_KEY_ID: '…'
+#   AWS_SECRET_ACCESS_KEY: '…'

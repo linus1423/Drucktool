@@ -1,0 +1,187 @@
+#!/bin/bash
+# Verwaltet von Ansible. Spielt ein Backup der Datenbank (und auf Wunsch der Druckdateien) wieder ein.
+# Anleitung: README, Abschnitt "Backup und Wiederherstellung".
+set -euo pipefail
+
+dir="{{ drucktool_dir }}"
+backup_dir="{{ drucktool_backup_dir }}"
+offsite={{ 'true' if drucktool_offsite_backup_enabled else 'false' }}
+test_ping_url="{{ drucktool_restore_test_healthcheck_url }}"
+compose=(docker compose --project-directory "$dir")
+
+hilfe() {
+  cat <<'EOF'
+Aufruf:
+  drucktool-restore --liste                      vorhandene Backups anzeigen
+  drucktool-restore <datei.sql.gz> [optionen]    Datenbank aus dieser Datei wiederherstellen
+  drucktool-restore --neuestes [optionen]        neuestes lokales Backup einspielen
+  drucktool-restore --offsite [snapshot] [opt.]  Backup außer Haus holen (Standard: neuester Snapshot) und einspielen
+  drucktool-restore --test                       neuestes Backup in eine Wegwerf-Datenbank einspielen und prüfen
+
+Optionen:
+  --mit-dateien     auch die Druckdateien wiederherstellen (aus dem lokalen Spiegel bzw. dem Snapshot)
+  --anonymisieren   danach personenbezogene Daten entfernen (für das Testsystem)
+  --ja              ohne Rückfrage
+EOF
+}
+
+restic_env() {
+  set -a
+  # shellcheck disable=SC1091
+  . /etc/drucktool/restic.env
+  set +a
+}
+
+neuestes_lokal() {
+  find "$backup_dir" -maxdepth 1 -name 'drucktool-*.sql.gz' | sort | tail -n 1
+}
+
+# Holt einen Snapshot in ein temporäres Verzeichnis und gibt dessen Pfad aus.
+offsite_holen() {
+  local snapshot=$1 tmp
+  restic_env
+  tmp=$(mktemp -d /var/tmp/drucktool-restore.XXXXXX)
+  restic restore "$snapshot" --host drucktool --tag drucktool --target "$tmp" >&2
+  echo "$tmp"
+}
+
+psql_admin() {
+  "${compose[@]}" exec -T db psql -U drucktool -d postgres -v ON_ERROR_STOP=1 -q "$@"
+}
+
+einspielen() {
+  local datei=$1 db=$2
+  psql_admin -c "DROP DATABASE IF EXISTS $db WITH (FORCE)" -c "CREATE DATABASE $db OWNER drucktool"
+  gunzip -c "$datei" | "${compose[@]}" exec -T db psql -U drucktool -d "$db" -v ON_ERROR_STOP=1 -q >/dev/null
+}
+
+anonymisieren() {
+  echo 'Entferne personenbezogene Daten …'
+  "${compose[@]}" exec -T db psql -U drucktool -d drucktool -v ON_ERROR_STOP=1 -q <<'SQL'
+BEGIN;
+-- Zugänge, Tokens, Mails und Protokolle enthalten Adressen, IPs und Geräte; sie werden komplett gelöscht.
+DELETE FROM sessions;
+DELETE FROM login_tokens;
+DELETE FROM oidc_accounts;
+DELETE FROM rate_limits;
+DELETE FROM email_outbox;
+DELETE FROM audit_log;
+-- Superadmins bleiben als Zugang erhalten, alle anderen Konten werden zu Testkonten ohne Passwort.
+UPDATE users SET
+  email = 'nutzer-' || id || '@example.invalid',
+  first_name = 'Test',
+  last_name = 'Nutzer ' || left(id::text, 8),
+  password_hash = NULL,
+  billing_address = NULL,
+  delivery_address = NULL
+WHERE role <> 'superadmin';
+UPDATE organisations SET email = NULL, phone = NULL, street = NULL, vat_id = NULL;
+UPDATE requests SET billing_address = NULL, delivery_address = NULL, description = '';
+UPDATE request_comments SET body = '(anonymisiert)';
+COMMIT;
+SQL
+}
+
+mit_dateien=false
+anonym=false
+ja=false
+modus=''
+quelle=''
+snapshot=latest
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h | --help) hilfe; exit 0 ;;
+    --liste) modus=liste ;;
+    --test) modus='test' ;;
+    --neuestes) modus=lokal; quelle=$(neuestes_lokal) ;;
+    --offsite)
+      modus=offsite
+      if [ $# -gt 1 ] && [[ $2 != --* ]]; then snapshot=$2; shift; fi
+      ;;
+    --mit-dateien) mit_dateien=true ;;
+    --anonymisieren) anonym=true ;;
+    --ja) ja=true ;;
+    -*) echo "Unbekannte Option: $1" >&2; hilfe; exit 2 ;;
+    *) modus=lokal; quelle=$1 ;;
+  esac
+  shift
+done
+
+case "$modus" in
+  liste)
+    echo "Lokale Backups in $backup_dir:"
+    find "$backup_dir" -maxdepth 1 -name 'drucktool-*.sql.gz' -printf '  %f  %s Bytes\n' | sort
+    if $offsite; then
+      echo 'Backups außer Haus:'
+      restic_env
+      restic snapshots --host drucktool --tag drucktool
+    fi
+    exit 0
+    ;;
+
+  test)
+    # Restore-Test: das neueste Backup (außer Haus, falls eingerichtet) in eine Wegwerf-Datenbank einspielen.
+    tmp=''
+    if $offsite; then
+      restic_env
+      tmp=$(offsite_holen latest)
+      datei=$(find "$tmp" -name 'drucktool-*.sql.gz' | sort | tail -n 1)
+      restic check --read-data-subset=5% >/dev/null
+    else
+      datei=$(neuestes_lokal)
+    fi
+    [ -n "$datei" ] || { echo 'Kein Backup gefunden' >&2; exit 1; }
+    einspielen "$datei" drucktool_restore_test
+    benutzer=$("${compose[@]}" exec -T db psql -U drucktool -d drucktool_restore_test -tAc 'SELECT count(*) FROM users')
+    migrationen=$("${compose[@]}" exec -T db psql -U drucktool -d drucktool_restore_test -tAc 'SELECT count(*) FROM drizzle.__drizzle_migrations')
+    psql_admin -c 'DROP DATABASE drucktool_restore_test WITH (FORCE)'
+    [ -n "$tmp" ] && rm -rf "$tmp"
+    if [ "${benutzer:-0}" -lt 1 ] || [ "${migrationen:-0}" -lt 1 ]; then
+      echo "Restore-Test fehlgeschlagen: $benutzer Benutzer, $migrationen Migrationen in $(basename "$datei")" >&2
+      [ -n "$test_ping_url" ] && curl -fsS -m 10 -o /dev/null "$test_ping_url/fail" || true
+      exit 1
+    fi
+    echo "$(date -Is) Restore-Test erfolgreich: $(basename "$datei") mit $benutzer Benutzern und $migrationen Migrationen"
+    if [ -n "$test_ping_url" ]; then curl -fsS -m 10 -o /dev/null "$test_ping_url" || true; fi
+    exit 0
+    ;;
+
+  lokal | offsite) ;;
+  *) hilfe; exit 2 ;;
+esac
+
+tmp=''
+if [ "$modus" = offsite ]; then
+  $offsite || { echo 'Das Offsite-Backup ist nicht eingerichtet (drucktool_offsite_backup_enabled).' >&2; exit 1; }
+  tmp=$(offsite_holen "$snapshot")
+  quelle=$(find "$tmp" -name 'drucktool-*.sql.gz' | sort | tail -n 1)
+  dateien_quelle=$(find "$tmp" -type d -path "*${dir}/uploads" | head -n 1)
+else
+  dateien_quelle="$backup_dir/uploads"
+fi
+[ -n "$quelle" ] && [ -f "$quelle" ] || { echo "Backup nicht gefunden: ${quelle:-?}" >&2; exit 1; }
+
+echo "Backup:       $quelle"
+echo "Druckdateien: $($mit_dateien && echo "werden aus $dateien_quelle wiederhergestellt" || echo 'bleiben unverändert')"
+echo 'Die aktuelle Datenbank wird ersetzt. Vorher wird sie noch einmal gesichert.'
+if ! $ja; then
+  read -r -p 'Fortfahren? Bitte "ja" eingeben: ' antwort
+  [ "$antwort" = ja ] || { echo 'Abgebrochen.'; exit 1; }
+fi
+
+"${compose[@]}" up -d db
+until "${compose[@]}" exec -T db pg_isready -U drucktool -d postgres >/dev/null 2>&1; do sleep 1; done
+# Sicherheitskopie des aktuellen Stands (schlägt auf einem frischen Server ohne Daten nicht fehl).
+/usr/local/bin/drucktool-backup vor-restore || echo 'Hinweis: aktueller Stand konnte nicht gesichert werden.'
+
+"${compose[@]}" stop app worker || true
+einspielen "$quelle" drucktool
+if $mit_dateien; then
+  rsync -a --delete "$dateien_quelle/" "$dir/uploads/"
+  chown -R 1000:1000 "$dir/uploads"
+fi
+if $anonym; then anonymisieren; fi
+[ -n "$tmp" ] && rm -rf "$tmp"
+
+"${compose[@]}" up -d
+echo 'Wiederhergestellt. Die Anwendung startet neu und spielt fehlende Migrationen ein.'

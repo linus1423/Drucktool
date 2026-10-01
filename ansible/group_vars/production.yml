@@ -1,0 +1,11 @@
+# Produktion, z. B. druck.fsmb.de. Gilt für die Gruppe "production" im Inventory. Geheimnisse in vault/production.yml.
+drucktool_environment: production
+
+# Feste Version (Git-Tag des Releases), z. B. v1.2.0. Am besten hier eintragen und committen, dann ist nachvollziehbar,
+# wann welche Version live ging. Einmalig (z. B. für einen Rollback) geht auch:
+#   ansible-playbook playbook.yml -l production -e drucktool_image_tag=v1.1.0
+# Ohne feste Version (leer oder "latest") bricht das Playbook ab.
+drucktool_image_tag: ''
+
+drucktool_domain: ''
+drucktool_acme_email: ''

@@ -1,0 +1,59 @@
+#!/bin/bash
+# Verwaltet von Ansible. Sichert Datenbank und Druckdateien und löscht alte Datenbank-Backups.
+{% if drucktool_offsite_backup_enabled %}
+# Zusätzlich verschlüsselte Kopie außer Haus mit restic ({{ drucktool_restic_repository }}).
+{% endif %}
+#
+# Aufruf: drucktool-backup [anlass]   z. B. "vor-update"; ohne Angabe das tägliche Backup
+set -euo pipefail
+
+anlass="${1:-}"
+dir="{{ drucktool_dir }}"
+backup_dir="{{ drucktool_backup_dir }}"
+ping_url="{{ drucktool_backup_healthcheck_url }}"
+
+ping() {
+  # Nur das tägliche Backup meldet sich beim Überwachungsdienst.
+  if [ -n "$ping_url" ] && [ -z "$anlass" ]; then
+    curl -fsS -m 10 --retry 3 -o /dev/null "${ping_url}$1" || true
+  fi
+}
+fertig() {
+  status=$?
+  if [ "$status" -eq 0 ]; then ping ''; else ping /fail; echo "Backup fehlgeschlagen (Status $status)" >&2; fi
+}
+ping /start
+trap fertig EXIT
+
+name="drucktool-$(date +%Y%m%d-%H%M%S)${anlass:+-$anlass}.sql.gz"
+target="$backup_dir/$name"
+# Erst in eine temporäre Datei, damit ein abgebrochener Dump nie wie ein gültiges Backup aussieht.
+docker compose --project-directory "$dir" exec -T db pg_dump -U drucktool drucktool | gzip --rsyncable > "$target.tmp"
+chmod 600 "$target.tmp"
+mv "$target.tmp" "$target"
+echo "$(date -Is) Datenbank gesichert: $target"
+
+find "$backup_dir" -maxdepth 1 -name 'drucktool-*.sql.gz' -mtime +{{ drucktool_backup_keep_days }} -delete
+# Druckdateien werden nur beim täglichen Backup gespiegelt; gelöschte Dateien verschwinden auch aus der Sicherung.
+# Vor einem Restore auf einem frischen Server würde der leere Ordner sonst den Spiegel löschen, der gleich eingespielt
+# werden soll.
+if [ -z "$anlass" ]; then
+  rsync -a --delete "$dir/uploads/" "$backup_dir/uploads/"
+fi
+
+{% if drucktool_offsite_backup_enabled %}
+# Nur das tägliche Backup geht außer Haus. Backups vor Updates oder Restores bleiben lokal, sonst könnte z. B. der
+# leere Stand vor einer Wiederherstellung auf einem frischen Server den letzten guten Stand des Tages verdrängen.
+if [ -z "$anlass" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . /etc/drucktool/restic.env
+  set +a
+  restic backup --quiet --host drucktool --tag drucktool "$target" "$dir/uploads"
+  restic forget --quiet --host drucktool --tag drucktool --group-by host --prune \
+    --keep-daily {{ drucktool_restic_keep_daily }} \
+    --keep-weekly {{ drucktool_restic_keep_weekly }} \
+    --keep-monthly {{ drucktool_restic_keep_monthly }}
+  echo "$(date -Is) Kopie außer Haus gespeichert"
+fi
+{% endif %}

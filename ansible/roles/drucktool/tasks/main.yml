@@ -1,3 +1,15 @@
+- name: Einstellungen der Umgebung prüfen
+  ansible.builtin.assert:
+    that:
+      - drucktool_environment in ['production', 'staging']
+      - drucktool_environment != 'production' or drucktool_image_tag not in ['', 'latest']
+      - drucktool_environment != 'staging' or drucktool_smtp_url == '' or drucktool_mail_redirect_to != ''
+      - not drucktool_offsite_backup_enabled or (drucktool_restic_repository != '' and drucktool_restic_password | length >= 16)
+    fail_msg: >-
+      Produktion braucht eine feste Version (z. B. -e drucktool_image_tag=v1.2.0, nicht "latest").
+      Staging mit SMTP braucht drucktool_mail_redirect_to, damit keine echten Kunden angeschrieben werden.
+      Für das Offsite-Backup drucktool_restic_repository und drucktool_restic_password (mind. 16 Zeichen) setzen.
+
 - name: Pflichtvariablen prüfen
   ansible.builtin.assert:
     that:
@@ -18,6 +30,7 @@
   loop:
     - "{{ drucktool_dir }}"
     - "{{ drucktool_backup_dir }}"
+    - /etc/drucktool
 
 - name: Ablage für Druckdateien anlegen
   ansible.builtin.file:
@@ -28,9 +41,9 @@
     group: '1000'
     mode: '0750'
 
-- name: Rsync für das Backup der Druckdateien installieren
-  ansible.builtin.package:
-    name: rsync
+- name: Werkzeuge für Backups installieren
+  ansible.builtin.apt:
+    name: "{{ ['rsync', 'curl'] + (['restic'] if drucktool_offsite_backup_enabled else []) }}"
     state: present
 
 - name: Umgebungsdatei schreiben
@@ -55,6 +68,24 @@
   when: drucktool_domain | length > 0
   notify: Drucktool neu starten
 
+- name: Zugangsdaten für das Offsite-Backup schreiben
+  ansible.builtin.template:
+    src: restic.env.j2
+    dest: /etc/drucktool/restic.env
+    mode: '0600'
+  when: drucktool_offsite_backup_enabled
+  no_log: true
+
+- name: Betriebsskripte installieren
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/usr/local/bin/{{ item }}"
+    mode: '0750'
+  loop:
+    - drucktool-backup
+    - drucktool-restore
+    - drucktool-update
+
 - name: An der Registry anmelden
   community.docker.docker_login:
     registry_url: ghcr.io
@@ -63,10 +94,20 @@
   when: drucktool_registry_username | length > 0
   no_log: true
 
+- name: Images holen
+  community.docker.docker_compose_v2_pull:
+    project_src: "{{ drucktool_dir }}"
+
+# Die App spielt beim Start Migrationen ein. Läuft schon eine andere Version, wird vorher gesichert.
+- name: Datenbank vor dem Update sichern
+  ansible.builtin.command: /usr/local/bin/drucktool-update --backup-falls-noetig
+  register: drucktool_pre_update
+  changed_when: "'Backup' in drucktool_pre_update.stdout"
+
 - name: Anwendung starten bzw. aktualisieren
   community.docker.docker_compose_v2:
     project_src: "{{ drucktool_dir }}"
-    pull: always
+    pull: missing
     state: present
     remove_orphans: true
   register: drucktool_compose
@@ -80,15 +121,52 @@
   delay: 2
   until: drucktool_health.status == 200
 
-- name: Backup-Skript installieren
-  ansible.builtin.template:
-    src: backup.sh.j2
-    dest: /usr/local/bin/drucktool-backup
-    mode: '0750'
+- name: Laufende Version anzeigen
+  ansible.builtin.debug:
+    msg: "Drucktool {{ drucktool_health.json.version | default('?') }} ({{ drucktool_environment }}) läuft."
 
-- name: Tägliches Datenbank-Backup einrichten
+- name: Offsite-Repository anlegen, falls es noch nicht existiert
+  ansible.builtin.shell: |
+    set -a; . /etc/drucktool/restic.env; set +a
+    restic cat config >/dev/null 2>&1 && echo vorhanden || restic init
+  args:
+    executable: /bin/bash
+  register: drucktool_restic_init
+  changed_when: "'vorhanden' not in drucktool_restic_init.stdout"
+  when: drucktool_offsite_backup_enabled
+
+- name: Tägliches Backup einrichten
   ansible.builtin.cron:
     name: drucktool-backup
     minute: '15'
     hour: '2'
-    job: /usr/local/bin/drucktool-backup
+    job: /usr/local/bin/drucktool-backup >> /var/log/drucktool-backup.log 2>&1
+
+- name: Monatlichen Restore-Test einrichten
+  ansible.builtin.cron:
+    name: drucktool-restore-test
+    minute: '45'
+    hour: '3'
+    day: '1'
+    job: /usr/local/bin/drucktool-restore --test >> /var/log/drucktool-backup.log 2>&1
+    state: "{{ 'present' if drucktool_restore_test_enabled else 'absent' }}"
+
+- name: Automatische Updates einrichten
+  ansible.builtin.cron:
+    name: drucktool-update
+    minute: "{{ drucktool_auto_update_minute }}"
+    job: /usr/local/bin/drucktool-update >> /var/log/drucktool-update.log 2>&1
+    state: "{{ 'present' if drucktool_auto_update else 'absent' }}"
+
+- name: Logdateien der Betriebsskripte rotieren
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/drucktool
+    mode: '0644'
+    content: |
+      /var/log/drucktool-backup.log /var/log/drucktool-update.log {
+        monthly
+        rotate 6
+        compress
+        missingok
+        notifempty
+      }

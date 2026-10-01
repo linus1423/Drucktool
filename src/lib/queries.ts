@@ -12,6 +12,7 @@ import {
 } from '~/server/admin/admin.functions'
 import { getDashboardFn } from '~/server/requests/dashboard.functions'
 import { listAuditLogFn } from '~/server/audit/audit.functions'
+import { getAppInfoFn } from '~/server/app-info.functions'
 import { listMailTemplatesFn } from '~/server/mail/mail-templates.functions'
 import type { AuditFilter } from '~/server/audit/audit.server'
 import type { RequestStatus } from './status'
@@ -32,6 +33,12 @@ export const currentUserQuery = queryOptions({
 export const siteLinksQuery = queryOptions({
   queryKey: ['site-links'],
   queryFn: () => getSiteLinksFn(),
+  staleTime: Infinity,
+})
+
+export const appInfoQuery = queryOptions({
+  queryKey: ['app-info'],
+  queryFn: () => getAppInfoFn(),
   staleTime: Infinity,
 })
 

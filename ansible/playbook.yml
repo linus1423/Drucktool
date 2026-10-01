@@ -2,7 +2,8 @@
   hosts: all
   become: true
   vars_files:
-    - group_vars/vault.yml
+    # Je Umgebung ein eigener Vault; group_vars/vault.yml bleibt als Rückfall für bestehende Installationen.
+    - ["vault/{{ drucktool_environment }}.yml", "group_vars/vault.yml"]
   roles:
     - docker
     - drucktool

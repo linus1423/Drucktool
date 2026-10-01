@@ -87,6 +87,19 @@ function AppLayout() {
         <Outlet />
       </main>
       <LegalLinks className="pb-8" />
+      {isAdminRole(user.role) ? <VersionInfo /> : null}
     </div>
+  )
+}
+
+/** Laufende Version für Admins, z. B. für Fehlermeldungen und Rollbacks. */
+function VersionInfo() {
+  const { appInfo } = Route.useRouteContext()
+  return (
+    <p className="pb-6 text-center text-xs text-slate-400">
+      Version {appInfo.version}
+      {appInfo.commit ? ` (${appInfo.commit})` : null}
+      {appInfo.environment !== 'production' ? ` · ${appInfo.environment === 'staging' ? 'Testsystem' : 'Entwicklung'}` : null}
+    </p>
   )
 }
