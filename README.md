@@ -170,6 +170,10 @@ Mitarbeiter erwähnen sich in Nachrichten und internen Notizen mit `@Name` (Ausw
 beobachten den Auftrag danach. Kunden können niemanden erwähnen. Die Ansicht „Für mich“ in der Auftragsliste zeigt alle
 beobachteten Aufträge.
 
+Aufträge mit neuer Aktivität anderer seit dem letzten Öffnen (Nachrichten, Statuswechsel) sind in der Liste fett mit
+blauem Punkt markiert, die Ansicht „Ungelesen“ zeigt nur diese. Im Auftrag sind neue Nachrichten und Verlaufseinträge
+hervorgehoben. Interne Einträge zählen für Kunden nicht, eigene Aktionen nie. Alles vor der Einführung gilt als gelesen.
+
 Die Mails werden in derselben Transaktion wie die Änderung in die Tabelle `email_outbox` geschrieben und von einem
 eigenen Worker-Prozess verschickt (`pnpm mail:worker`, im Container `worker`). Scheitert der Versand, versucht der
 Worker es mit wachsendem Abstand bis zu acht Mal erneut. Ohne `SMTP_URL` werden Mails nur ins Log geschrieben. Derselbe

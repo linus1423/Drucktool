@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { formatBillingAddress, formatDeliveryAddress } from '~/lib/address'
@@ -30,6 +30,7 @@ import {
   changeStatusFn,
   setDatesFn,
   setInternalStatusFn,
+  markReadFn,
   setWatchingFn,
   updateRequestFn,
 } from '~/server/requests/requests.functions'
@@ -64,6 +65,25 @@ function useRefresh(id: string) {
   }
 }
 
+type Entry = { createdAt: Date | string; mine: boolean }
+
+/**
+ * Ungelesen-Markierung (Issue #18): Merkt sich beim Öffnen, bis wann der Auftrag gelesen war, hebt neuere
+ * Einträge anderer hervor und meldet dem Server, dass der Auftrag jetzt gesehen ist.
+ */
+function useUnreadMarker(request: Detail) {
+  const queryClient = useQueryClient()
+  const [seen, setSeen] = useState({ id: request.id, at: request.readAt })
+  if (seen.id !== request.id) setSeen({ id: request.id, at: request.readAt })
+  useEffect(() => {
+    void markReadFn({ data: { id: request.id, at: request.loadedAt } })
+      .then(() => queryClient.invalidateQueries({ queryKey: ['requests', 'list'] }))
+      .catch(() => {})
+  }, [request.id, request.loadedAt, queryClient])
+  const since = seen.id === request.id ? seen.at : request.readAt
+  return (e: Entry) => !!since && !e.mine && new Date(e.createdAt) > new Date(since)
+}
+
 function RequestDetailPage() {
   const { requestId } = Route.useParams()
   const { user } = Route.useRouteContext()
@@ -73,6 +93,7 @@ function RequestDetailPage() {
   const [proposing, setProposing] = useState(false)
   const refresh = useRefresh(requestId)
   const canPropose = staff && !!request.order && !TERMINAL_STATUSES.has(request.status)
+  const isNew = useUnreadMarker(request)
 
   return (
     <div className="space-y-6">
@@ -211,7 +232,7 @@ function RequestDetailPage() {
           )}
 
           <Files request={request} staff={staff} />
-          <Comments request={request} staff={staff} />
+          <Comments request={request} staff={staff} isNew={isNew} />
         </div>
 
         <div className="space-y-6">
@@ -220,7 +241,7 @@ function RequestDetailPage() {
           {staff && hasInternalStatus(request.status) ? <InternalStatusCard request={request} /> : null}
           {staff && !TERMINAL_STATUSES.has(request.status) ? <DatesCard request={request} /> : null}
           {staff ? <Assignment request={request} /> : null}
-          <History request={request} />
+          <History request={request} isNew={isNew} />
         </div>
       </div>
     </div>
@@ -573,7 +594,7 @@ function MentionPicker({ onPick }: { onPick: (name: string) => void }) {
   )
 }
 
-function Comments({ request, staff }: { request: Detail; staff: boolean }) {
+function Comments({ request, staff, isNew }: { request: Detail; staff: boolean; isNew: (e: Entry) => boolean }) {
   const refresh = useRefresh(request.id)
   const [body, setBody] = useState('')
   const [internal, setInternal] = useState(false)
@@ -616,6 +637,7 @@ function Comments({ request, staff }: { request: Detail; staff: boolean }) {
                 key={c.id}
                 className={cx(
                   'rounded-md p-3 text-sm ring-1',
+                  isNew(c) && 'ring-2 ring-sky-400',
                   c.internal
                     ? 'bg-amber-50 ring-amber-200'
                     : c.authorIsStaff
@@ -628,6 +650,7 @@ function Comments({ request, staff }: { request: Detail; staff: boolean }) {
                   {c.authorIsStaff ? <Badge>Druckerei</Badge> : null}
                   {c.internal ? <Badge className="bg-amber-200 text-amber-900">Intern</Badge> : null}
                   <span>{formatDateTime(c.createdAt)}</span>
+                  {isNew(c) ? <Badge className="bg-sky-100 text-sky-900">Neu</Badge> : null}
                 </div>
                 {c.body ? (
                   <p className="whitespace-pre-wrap">
@@ -756,12 +779,12 @@ function describeEvent(e: Detail['events'][number]) {
   }
 }
 
-function History({ request }: { request: Detail }) {
+function History({ request, isNew }: { request: Detail; isNew: (e: Entry) => boolean }) {
   return (
     <Card title="Verlauf">
       <ol className="space-y-3 text-sm">
         {request.events.map((e) => (
-          <li key={e.id} className="border-l-2 border-slate-200 pl-3">
+          <li key={e.id} className={cx('border-l-2 pl-3', isNew(e) ? 'border-sky-500 bg-sky-50' : 'border-slate-200')}>
             <div>
               <span className="font-medium">{e.actorName ?? 'System'}</span> {describeEvent(e)}
             </div>

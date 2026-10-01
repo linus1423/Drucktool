@@ -31,6 +31,7 @@ import {
 } from '../files/files.server'
 import { getDb, schema, type Tx } from '../db/client.server'
 import { isActiveMember } from '../organisations/organisations.server'
+import { markRead, markReadSchema, readAtFor, unreadExpression } from './reads.server'
 import { addWatchers, clearMute, listWatchers, resolveMentions, setWatching, watchedBy, watcherIds } from './watchers.server'
 import {
   notifyAssigned,
@@ -107,6 +108,8 @@ export const listFilterSchema = z.object({
   overdue: z.boolean().optional(),
   /** Aufträge, die der Benutzer beobachtet (Ansicht "Für mich", Issue #13). */
   watching: z.boolean().optional(),
+  /** Aufträge mit Aktivität anderer seit dem letzten Öffnen (Issue #18). */
+  unread: z.boolean().optional(),
   sort: z.enum(LIST_SORTS).optional(),
   dir: z.enum(['asc', 'desc']).optional(),
   page: z.number().int().min(1).max(100_000).optional(),
@@ -130,6 +133,7 @@ function listConditions(user: Principal, filter: ListFilter) {
   if (filter.done) conditions.push(eq(requests.status, 'completed'))
   if (filter.assignedToMe) conditions.push(eq(requests.assigneeId, user.id))
   if (filter.watching) conditions.push(watchedBy(user.id, requests))
+  if (filter.unread) conditions.push(unreadExpression(user))
   if (staff && filter.organisationId) conditions.push(eq(requests.organisationId, filter.organisationId))
   if (staff && filter.assigneeId) {
     conditions.push(filter.assigneeId === 'none' ? isNull(requests.assigneeId) : eq(requests.assigneeId, filter.assigneeId))
@@ -199,6 +203,7 @@ function listSelection(user: Principal) {
     creatorName: creatorAlias.name,
     creatorEmail: staff ? creatorAlias.email : sql<null>`null`,
     assigneeName: staff ? assigneeAlias.name : sql<null>`null`,
+    unread: unreadExpression(user),
   }
 }
 
@@ -284,6 +289,7 @@ export async function getRequestDetail(user: Principal, id: string) {
       createdAt: requestComments.createdAt,
       authorName: users.name,
       authorIsStaff: sql<boolean>`${users.role} <> 'customer'`,
+      mine: sql<boolean>`${requestComments.authorId} = ${user.id}`,
     })
     .from(requestComments)
     .innerJoin(users, eq(users.id, requestComments.authorId))
@@ -299,6 +305,7 @@ export async function getRequestDetail(user: Principal, id: string) {
       data: requestEvents.data,
       createdAt: requestEvents.createdAt,
       actorName: users.name,
+      mine: sql<boolean>`${requestEvents.actorId} is not distinct from ${user.id}`,
     })
     .from(requestEvents)
     .leftJoin(users, eq(users.id, requestEvents.actorId))
@@ -358,6 +365,9 @@ export async function getRequestDetail(user: Principal, id: string) {
       mentions: mentionedIds.flatMap((m) => (mentionNames.has(m) ? [{ id: m, name: mentionNames.get(m)! }] : [])),
     })),
     watching: watchers.some((w) => w.id === user.id),
+    // Bis hierhin hat der Benutzer den Auftrag gesehen; neuere Einträge anderer werden hervorgehoben (Issue #18).
+    readAt: await readAtFor(user.id, id),
+    loadedAt: new Date(),
     // Wer sonst noch beobachtet, ist eine interne Information.
     watchers: isStaff ? watchers : [],
     events,
@@ -889,4 +899,11 @@ export async function setWatchingRequest(user: Principal, input: z.infer<typeof 
     await setWatching(tx, input.id, user.id, input.watching)
     return { watching: (await watcherIds(tx, request)).has(user.id) }
   })
+}
+
+export { markReadSchema }
+
+/** Merkt sich, dass der Benutzer den Auftrag gesehen hat (Issue #18). */
+export async function markRequestRead(user: Principal, input: z.infer<typeof markReadSchema>) {
+  return markRead(user, input, (id) => getDb().transaction((tx) => loadForUpdate(tx, user, id)))
 }

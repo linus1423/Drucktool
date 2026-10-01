@@ -278,6 +278,21 @@ export const requestWatchers = pgTable(
   (t) => [primaryKey({ columns: [t.requestId, t.userId] }), index('request_watchers_user_idx').on(t.userId)],
 )
 
+/** Wann ein Benutzer einen Auftrag zuletzt angesehen hat (Ungelesen-Markierung, Issue #18). */
+export const requestReads = pgTable(
+  'request_reads',
+  {
+    requestId: uuid('request_id')
+      .notNull()
+      .references(() => requests.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    readAt: timestamp('read_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.requestId, t.userId] })],
+)
+
 export const requestEventType = pgEnum('request_event_type', [
   'created',
   'updated',
