@@ -147,7 +147,12 @@ export const requests = pgTable(
   'requests',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    number: integer('number').generatedAlwaysAsIdentity({ startWith: 1001 }).notNull().unique(),
+    // Auftragsnummer im Format JJMMxxxx, fortlaufend je Monat (Issue #90). Vergibt die Datenbank über
+    // next_request_number(), damit auch gleichzeitige Aufträge keine Nummer doppelt bekommen.
+    number: integer('number')
+      .notNull()
+      .unique()
+      .default(sql`next_request_number()`),
     // Organisationen sind optional; sichtbar ist ein Auftrag für seinen Ersteller.
     organisationId: uuid('organisation_id').references(() => organisations.id, { onDelete: 'restrict' }),
     createdById: uuid('created_by_id')
@@ -451,6 +456,12 @@ export const paperCoverColors = pgTable(
   },
   (t) => [uniqueIndex('paper_cover_colors_unique').on(t.paperId, t.coverColorId)],
 )
+
+/** Zähler für die Auftragsnummern je Monat (JJMM), siehe next_request_number() in Migration 0016. */
+export const requestNumberCounters = pgTable('request_number_counters', {
+  month: integer('month').primaryKey(),
+  last: integer('last').notNull(),
+})
 
 /** Übrige Preise und Texte als Schlüssel/Wert, z. B. Druckpreise pro Image und Mindestpreis. */
 export const settings = pgTable('settings', {
