@@ -59,6 +59,9 @@ function AppLayout() {
                 <Link to="/admin/katalog" className={navLink} activeProps={navActive}>
                   Katalog und Preise
                 </Link>
+                <Link to="/admin/emails" className={navLink} activeProps={navActive}>
+                  E-Mails
+                </Link>
               </>
             ) : null}
             {user.role === 'superadmin' ? (

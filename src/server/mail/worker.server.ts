@@ -1,6 +1,7 @@
 import { and, asc, eq, lte, sql } from 'drizzle-orm'
 import { schema, type getDb } from '../db/client.server'
 import type { MailTransport } from './transport.server'
+import { getMailLayout } from './mail-templates.server'
 type Db = ReturnType<typeof getDb>
 
 export const MAX_ATTEMPTS = 8
@@ -25,9 +26,17 @@ export async function processOutbox(db: Db, transport: MailTransport, batchSize 
       .limit(batchSize)
       .for('update', { skipLocked: true })
 
+    const layout = due.length ? await getMailLayout(tx) : null
     for (const mail of due) {
       try {
-        await transport.send({ to: mail.to, subject: mail.subject, text: mail.text, html: mail.html })
+        await transport.send({
+          to: mail.to,
+          subject: mail.subject,
+          text: mail.text,
+          html: mail.html,
+          senderName: layout?.senderName,
+          replyTo: layout?.replyTo,
+        })
         await tx
           .update(schema.emailOutbox)
           .set({ status: 'sent', sentAt: new Date(), attempts: sql`${schema.emailOutbox.attempts} + 1`, lastError: null })
