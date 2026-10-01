@@ -92,6 +92,14 @@ das Ergebnis der PDF-Prüfung. Auch verschlüsselte oder nicht lesbare PDFs werd
 dann einen Hinweis. Hochgeladene Dateien, die nach 24 Stunden zu keinem Auftrag gehören, werden gelöscht.
 Herunterladen dürfen Mitarbeiter und der Kunde, dem der Auftrag gehört.
 
+## Änderungen durch die Druckerei
+
+Mitarbeiter können Optionen und Preis eines Auftrags nicht direkt ändern, sondern schlagen über „Änderung
+vorschlagen“ einen neuen Stand vor, optional mit manuell gesetztem Preis und immer mit Begründung. Der Auftrag geht
+auf „Rückfrage“, der Kunde bekommt eine E-Mail und sieht Vorher und Nachher. Erst wenn er zustimmt, gilt der neue
+Stand samt Preis, und der Auftrag kehrt in seinen vorherigen Status zurück. Lehnt er ab, bleibt alles, wie es war.
+Solange ein Vorschlag offen ist, kann der Auftrag nur storniert oder abgelehnt werden. Alle Schritte stehen im Verlauf.
+
 ## Schutz vor gleichzeitigen Änderungen
 
 Jede Anfrage hat eine `version`. Änderungen (Status, Bearbeiten, Zuweisung) schicken die Version mit, die der
@@ -219,5 +227,4 @@ Ist das Paket in der GitHub Container Registry privat, `drucktool_registry_usern
 
 ## Nächste Schritte
 
-- Änderungen durch die Druckerei, denen der Kunde zustimmt (#50)
 - Weitere offene Punkte stehen als Issues im Repository.

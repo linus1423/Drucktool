@@ -8,6 +8,7 @@ import {
   INTERNAL_STATUSES,
   OPEN_STATUSES,
   REQUEST_STATUSES,
+  TERMINAL_STATUSES,
   allowedTransitions,
   canTransition,
   hasInternalStatus,
@@ -17,10 +18,18 @@ import { deliveryAddressSchema } from '~/lib/address'
 import { MAX_COVER_PAGES, orderSpecSchema } from '~/lib/order'
 import { calculatePrice } from '~/lib/pricing'
 import { buildSnapshot } from '~/lib/snapshot'
+import { applyPriceOverride, type ChangeProposal } from '~/lib/proposal'
 import { getCatalog } from '../catalog/catalog.server'
 import { claimFiles, listRequestFiles } from '../files/files.server'
 import { getDb, schema, type Tx } from '../db/client.server'
-import { notifyAssigned, notifyComment, notifyRequestCreated, notifyStatusChanged } from '../mail/notifications.server'
+import {
+  notifyAssigned,
+  notifyChangeAnswered,
+  notifyChangeProposed,
+  notifyComment,
+  notifyRequestCreated,
+  notifyStatusChanged,
+} from '../mail/notifications.server'
 
 /** Minimale Sicht auf den handelnden Benutzer, unabhängig von der HTTP-Session. */
 export type Principal = {
@@ -183,6 +192,14 @@ export async function getRequestDetail(user: Principal, id: string) {
     ...r,
     // Kunden sehen nur Druck- und Lieferkosten, nicht den internen Rechenweg (Lastenheft Schritt 7).
     order: r.order && !isStaff ? { ...r.order, price: { ...r.order.price, lines: [] }, pricing: null } : r.order,
+    proposal:
+      r.proposal && !isStaff
+        ? {
+            ...r.proposal,
+            proposedById: null,
+            order: { ...r.proposal.order, price: { ...r.proposal.order.price, lines: [] }, pricing: null },
+          }
+        : r.proposal,
     files,
     organisationName: found.organisationName,
     creatorName: found.creatorName,
@@ -194,7 +211,9 @@ export async function getRequestDetail(user: Principal, id: string) {
     confirmedByName: found.confirmedByName,
     comments,
     events,
-    transitions: allowedTransitions(r.status, actorOf(user)),
+    // Solange ein Vorschlag offen ist, bleiben nur Stornieren und Ablehnen; der Rest läuft über den Vorschlag.
+    transitions: allowedTransitions(r.status, actorOf(user)).filter((t) => !r.proposal || t === 'cancelled' || t === 'rejected'),
+    canAnswerProposal: !!r.proposal && r.createdById === user.id,
     canEdit: canEditRequest(user, r.status),
   }
 }
@@ -341,8 +360,19 @@ export async function changeStatus(user: Principal, input: z.infer<typeof change
       throw new Error('Dieser Statuswechsel ist nicht erlaubt')
     }
     if (input.to === 'on_hold' && !input.note) throw new Error('Bitte die Rückfrage an den Kunden formulieren')
+    // Ein offener Änderungsvorschlag wird angenommen, abgelehnt oder zurückgezogen, nicht übergangen.
+    // Stornieren und Ablehnen bleiben möglich und verwerfen den Vorschlag.
+    const endsOrder = input.to === 'cancelled' || input.to === 'rejected'
+    if (current.proposal && !endsOrder) {
+      throw new Error(
+        actorOf(user) === 'staff'
+          ? 'Es gibt einen offenen Änderungsvorschlag. Bitte ihn zuerst zurückziehen oder die Antwort des Kunden abwarten.'
+          : 'Bitte nehmen Sie den Änderungsvorschlag an oder lehnen Sie ihn ab.',
+      )
+    }
 
     const values: Partial<typeof requests.$inferInsert> = { status: input.to }
+    if (endsOrder) values.proposal = null
     // Der interne Unterstatus gilt nur, solange der Auftrag bestätigt ist.
     if (!hasInternalStatus(input.to)) values.internalStatus = null
     if (input.to === 'confirmed' && !current.confirmedAt) {
@@ -363,6 +393,126 @@ export async function changeStatus(user: Principal, input: z.infer<typeof change
     }
     await notifyStatusChanged(tx, user, { requestId: input.id, from: current.status, to: input.to, note: input.note })
     return { version: updated.version, status: updated.status }
+  })
+}
+
+export const proposeChangeSchema = z.object({
+  id: z.uuid(),
+  version: z.number().int().positive(),
+  spec: orderSpecSchema,
+  deliveryAddress: deliveryAddressSchema.nullable(),
+  /** Manuell gesetzter Gesamtpreis; null übernimmt den berechneten Preis. */
+  priceOverrideCents: z.number().int().min(0).max(100_000_000).nullable(),
+  /** Der berechnete Preis, den der Mitarbeiter gesehen hat. */
+  expectedTotalCents: z.number().int().min(0),
+  reason: z.string().trim().min(1, 'Bitte die Änderung für den Kunden begründen').max(5000),
+})
+
+/**
+ * Mitarbeiter schlagen neue Optionen oder einen neuen Preis vor (Issue #50). Der Auftrag geht auf
+ * „Rückfrage“; wirksam wird die Änderung erst mit der Zustimmung des Kunden.
+ */
+export async function proposeChange(user: Principal, input: z.infer<typeof proposeChangeSchema>) {
+  if (!isStaffRole(user.role)) throw new Error('Keine Berechtigung')
+  return getDb().transaction(async (tx) => {
+    const current = await loadForUpdate(tx, user, input.id)
+    if (current.version !== input.version) throw new Error(CONFLICT_MESSAGE)
+    if (TERMINAL_STATUSES.has(current.status))
+      throw new Error('Der Auftrag ist abgeschlossen und kann nicht mehr geändert werden')
+    if (!current.order) throw new Error('Aufträge aus der Zeit vor dem Bestell-Wizard können nicht so geändert werden')
+
+    const { spec } = input
+    if (spec.delivery === 'house_post' && !input.deliveryAddress)
+      throw new Error('Bitte die Lieferadresse für die Hauspost angeben.')
+    const files = await listRequestFiles(input.id)
+    if (spec.coverPaperId && !files.some((f) => f.role === 'cover')) {
+      throw new Error('Zu diesem Auftrag gibt es keine Deckblatt-Datei. Ein Deckblatt kann nur mit Datei gewählt werden.')
+    }
+
+    const catalog = await getCatalog({ onlyAvailable: true }, tx)
+    const priced = calculatePrice(catalog, spec)
+    if (!priced.ok) throw new Error(priced.errors.join(' '))
+    if (priced.price.totalCents !== input.expectedTotalCents) throw new Error(PRICE_CHANGED_MESSAGE)
+    const price = applyPriceOverride(priced.price, input.priceOverrideCents, input.reason)
+
+    const [me] = await tx.select({ name: users.name }).from(users).where(eq(users.id, user.id))
+    const proposal: ChangeProposal = {
+      order: buildSnapshot(spec, price, priced.order, catalog.pricing),
+      totalCents: price.totalCents,
+      deliveryAddress: spec.delivery === 'house_post' ? input.deliveryAddress : null,
+      reason: input.reason,
+      proposedById: user.id,
+      proposedByName: me?.name ?? 'Druckerei',
+      proposedAt: new Date().toISOString(),
+      // Ein ersetzter Vorschlag behält das ursprüngliche Ziel.
+      returnStatus: current.proposal?.returnStatus ?? (current.status === 'confirmed' ? 'confirmed' : 'submitted'),
+    }
+    const updated = await updateWithVersion(tx, input.id, input.version, { proposal, status: 'on_hold', internalStatus: null })
+    await tx.insert(requestEvents).values({
+      requestId: input.id,
+      actorId: user.id,
+      type: 'change_proposed',
+      fromStatus: current.status,
+      toStatus: 'on_hold',
+      data: { totalCents: price.totalCents, previousTotalCents: current.totalCents, reason: input.reason },
+    })
+    await notifyChangeProposed(tx, user, { requestId: input.id, reason: input.reason })
+    return { version: updated.version }
+  })
+}
+
+export const answerChangeSchema = z.object({
+  id: z.uuid(),
+  version: z.number().int().positive(),
+  accept: z.boolean(),
+})
+
+/** Der Kunde nimmt den Vorschlag an (er wird wirksam) oder lehnt ihn ab (alles bleibt, wie es war). */
+export async function answerChange(user: Principal, input: z.infer<typeof answerChangeSchema>) {
+  return getDb().transaction(async (tx) => {
+    const current = await loadForUpdate(tx, user, input.id)
+    if (current.createdById !== user.id) throw new Error('Nur der Auftraggeber kann dem Vorschlag zustimmen')
+    if (current.version !== input.version) throw new Error(CONFLICT_MESSAGE)
+    const p = current.proposal
+    if (!p) throw new Error('Es gibt keinen offenen Änderungsvorschlag')
+
+    const values: Partial<typeof requests.$inferInsert> = input.accept
+      ? {
+          proposal: null,
+          order: p.order,
+          totalCents: p.totalCents,
+          quantity: p.order.spec.copies,
+          deliveryMethod: p.order.spec.delivery,
+          deliveryAddress: p.deliveryAddress,
+          status: p.returnStatus,
+        }
+      : { proposal: null }
+    const updated = await updateWithVersion(tx, input.id, input.version, values)
+    await tx.insert(requestEvents).values({
+      requestId: input.id,
+      actorId: user.id,
+      type: input.accept ? 'change_accepted' : 'change_rejected',
+      fromStatus: current.status,
+      toStatus: updated.status,
+      data: { totalCents: p.totalCents, previousTotalCents: current.totalCents },
+    })
+    await notifyChangeAnswered(tx, user, { requestId: input.id, accepted: input.accept, proposedById: p.proposedById })
+    return { version: updated.version, status: updated.status }
+  })
+}
+
+export const withdrawChangeSchema = z.object({ id: z.uuid(), version: z.number().int().positive() })
+
+/** Mitarbeiter ziehen einen Vorschlag zurück; der Auftrag bleibt auf „Rückfrage“. */
+export async function withdrawChange(user: Principal, input: z.infer<typeof withdrawChangeSchema>) {
+  if (!isStaffRole(user.role)) throw new Error('Keine Berechtigung')
+  return getDb().transaction(async (tx) => {
+    const current = await loadForUpdate(tx, user, input.id)
+    if (current.version !== input.version) throw new Error(CONFLICT_MESSAGE)
+    if (!current.proposal) throw new Error('Es gibt keinen offenen Änderungsvorschlag')
+    const updated = await updateWithVersion(tx, input.id, input.version, { proposal: null })
+    await tx.insert(requestEvents).values({ requestId: input.id, actorId: user.id, type: 'change_withdrawn' })
+    return { version: updated.version }
   })
 }
 

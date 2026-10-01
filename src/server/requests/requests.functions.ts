@@ -2,6 +2,12 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { requireStaff, requireUser } from '../auth/guards.server'
 import {
+  answerChange,
+  answerChangeSchema,
+  proposeChange,
+  proposeChangeSchema,
+  withdrawChange,
+  withdrawChangeSchema,
   addComment,
   addCommentSchema,
   assignRequest,
@@ -56,3 +62,15 @@ export const listAssignableStaffFn = createServerFn({ method: 'GET' }).handler(a
   await requireStaff()
   return listAssignableStaff()
 })
+
+export const proposeChangeFn = createServerFn({ method: 'POST' })
+  .validator(proposeChangeSchema)
+  .handler(async ({ data }) => proposeChange(await requireStaff(), data))
+
+export const answerChangeFn = createServerFn({ method: 'POST' })
+  .validator(answerChangeSchema)
+  .handler(async ({ data }) => answerChange(await requireUser(), data))
+
+export const withdrawChangeFn = createServerFn({ method: 'POST' })
+  .validator(withdrawChangeSchema)
+  .handler(async ({ data }) => withdrawChange(await requireStaff(), data))

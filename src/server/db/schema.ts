@@ -19,6 +19,7 @@ import type { JsonObject } from '../../lib/json'
 import type { BillingAddress, DeliveryAddress } from '../../lib/address'
 import { DELIVERY_METHODS } from '../../lib/order'
 import type { OrderSnapshot } from '../../lib/snapshot'
+import type { ChangeProposal } from '../../lib/proposal'
 
 export const userRole = pgEnum('user_role', USER_ROLES)
 export const userStatus = pgEnum('user_status', USER_STATUSES)
@@ -145,6 +146,8 @@ export const requests = pgTable(
     // Zustimmung zu den Auftragsbedingungen beim verbindlichen Absenden (Lastenheft Schritt 8).
     termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),
     termsVersion: text('terms_version'),
+    // Offener Änderungsvorschlag der Druckerei, wartet auf die Zustimmung des Kunden (Issue #50).
+    proposal: jsonb('proposal').$type<ChangeProposal>(),
     status: requestStatus('status').notNull().default('submitted'),
     // Nur für Mitarbeiter sichtbar, solange der Auftrag bestätigt ist.
     internalStatus: internalStatus('internal_status'),
@@ -188,6 +191,10 @@ export const requestEventType = pgEnum('request_event_type', [
   'internal_status_changed',
   'assigned',
   'commented',
+  'change_proposed',
+  'change_accepted',
+  'change_rejected',
+  'change_withdrawn',
 ])
 
 export const requestEvents = pgTable(
