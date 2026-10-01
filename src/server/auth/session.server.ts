@@ -55,7 +55,9 @@ export async function createSession(userId: string) {
 export async function destroyCurrentSession() {
   const token = getCookie(COOKIE_NAME)
   if (token) {
-    await getDb().delete(schema.sessions).where(eq(schema.sessions.id, hashToken(token)))
+    await getDb()
+      .delete(schema.sessions)
+      .where(eq(schema.sessions.id, hashToken(token)))
   }
   deleteCookie(COOKIE_NAME, { path: '/' })
 }

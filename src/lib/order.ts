@@ -427,9 +427,7 @@ export function resolveOrder(
 
   const colorFor = (id: string | null, label: string) => {
     if (!id) return null
-    const choice = coverColorChoices(catalog, binding, coverPaper ?? undefined).find(
-      (c) => c.item.id === id && c.item.available,
-    )
+    const choice = coverColorChoices(catalog, binding, coverPaper ?? undefined).find((c) => c.item.id === id && c.item.available)
     if (!choice) {
       errors.push(`Die Coverfarbe ${label} ist nicht verfügbar.`)
       return null

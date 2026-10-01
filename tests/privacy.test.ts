@@ -53,15 +53,13 @@ describe.skipIf(!url)('Datenschutz (Integration)', async () => {
       })
       .returning()
     const id = user!.id
-    await db
-      .insert(schema.sessions)
-      .values({
-        id: `s-${name}-${stamp}`,
-        userId: id,
-        expiresAt: new Date(Date.now() + 60_000),
-        ip: '10.9.9.9',
-        userAgent: 'Firefox',
-      })
+    await db.insert(schema.sessions).values({
+      id: `s-${name}-${stamp}`,
+      userId: id,
+      expiresAt: new Date(Date.now() + 60_000),
+      ip: '10.9.9.9',
+      userAgent: 'Firefox',
+    })
     await db.insert(schema.oidcAccounts).values({ userId: id, issuer: 'https://idp.test', subject: `sub-${name}-${stamp}` })
     await db
       .insert(schema.loginTokens)
@@ -134,7 +132,14 @@ describe.skipIf(!url)('Datenschutz (Integration)', async () => {
     // Auch über die Benutzerverwaltung ist die Adresse frei.
     await db.delete(schema.users).where(eq(schema.users.id, login.userId))
     await expect(
-      createUser(superadmin, { firstName: 'Bert', lastName: 'Neu', email: c.address, role: 'customer', organisationId: null, password: '' }),
+      createUser(superadmin, {
+        firstName: 'Bert',
+        lastName: 'Neu',
+        email: c.address,
+        role: 'customer',
+        organisationId: null,
+        password: '',
+      }),
     ).resolves.toHaveProperty('id')
   })
 

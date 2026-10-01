@@ -122,10 +122,7 @@ export async function rejectRegistration(actor: Principal, userId: string) {
 }
 
 async function deleteOrganisationIfUnused(tx: Tx, organisationId: string) {
-  const [org] = await tx
-    .select({ status: organisations.status })
-    .from(organisations)
-    .where(eq(organisations.id, organisationId))
+  const [org] = await tx.select({ status: organisations.status }).from(organisations).where(eq(organisations.id, organisationId))
   if (org?.status !== 'pending') return
   const [members] = await tx.select({ n: count() }).from(users).where(eq(users.organisationId, organisationId))
   const [reqs] = await tx.select({ n: count() }).from(requests).where(eq(requests.organisationId, organisationId))

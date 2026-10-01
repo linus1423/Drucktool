@@ -1,4 +1,4 @@
-// Meldet sich mit dem Superadmin an und prüft, dass die Auftragsübersicht erscheint.
+// Meldet sich mit dem Superadmin an und prüft, dass die Übersicht erscheint.
 // Läuft im Playwright-Container, siehe smoke-test.sh.
 import { chromium } from 'playwright'
 
@@ -17,7 +17,7 @@ try {
   await page.locator('#email').fill(email)
   await page.locator('#password').fill(password)
   await page.getByRole('button', { name: 'Anmelden', exact: true }).click()
-  await page.waitForURL('**/auftraege**', { timeout: 15_000 })
+  await page.waitForURL('**/uebersicht**', { timeout: 15_000 })
   await page.getByRole('button', { name: 'Abmelden' }).first().waitFor({ timeout: 10_000 })
   if (fehler.length > 0) throw new Error(`JavaScript-Fehler im Browser: ${fehler.join('; ')}`)
   console.log(`Anmeldung als ${email} erfolgreich: ${page.url()}`)

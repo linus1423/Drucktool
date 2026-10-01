@@ -106,8 +106,9 @@ function BoardPage() {
         <form
           onSubmit={(e) => {
             e.preventDefault()
-            const q = new FormData(e.currentTarget).get('q')?.toString().trim()
-            void navigate({ search: (s) => ({ ...s, q: q || undefined }) })
+            const q = new FormData(e.currentTarget).get('q')
+            const search = typeof q === 'string' ? q.trim() : ''
+            void navigate({ search: (s) => ({ ...s, q: search || undefined }) })
           }}
         >
           <Input
@@ -143,6 +144,8 @@ function BoardPage() {
           const cards = rows.filter((r) => r.status === col.status)
           const canDrop = !!dragging && dragging.status !== col.status && boardTargets(dragging).includes(col.status)
           return (
+            // Ziehen ist nur eine Abkürzung; per Tastatur geht es über das Menü „Status …“ an der Karte.
+            // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
             <section
               key={col.status}
               aria-label={col.title}
@@ -200,6 +203,8 @@ function BoardCard({
 }) {
   const targets = boardTargets(card)
   return (
+    // Ziehen ist nur eine Abkürzung; per Tastatur geht es über das Menü „Status …“ an der Karte.
+    // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <li
       draggable={targets.length > 0 && !busy}
       onDragStart={(e) => {
@@ -279,6 +284,8 @@ function OnHoldForm({
       </label>
       <Textarea
         id="onhold-note"
+        // Das Feld erscheint erst nach dem Verschieben; der Fokus soll direkt dorthin.
+        // oxlint-disable-next-line jsx-a11y/no-autofocus
         autoFocus
         rows={3}
         value={note}

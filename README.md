@@ -12,12 +12,12 @@ bearbeiten sie über einen Status-Workflow bis zur Auslieferung.
 
 ## Rollen
 
-| Rolle       | Rechte                                                                                     |
-| ----------- | ------------------------------------------------------------------------------------------ |
-| Superadmin  | Alles, gibt Registrierungen frei, verwaltet Administratoren, sieht das Protokoll            |
-| Admin       | Organisationen und Benutzer (Mitarbeiter, Kunden) verwalten, Anfragen bearbeiten            |
-| Mitarbeiter | Alle Anfragen bearbeiten, Status wechseln, zuweisen, interne Notizen schreiben             |
-| Kunde       | Eigene Aufträge anlegen, verfolgen und kommentieren                                        |
+| Rolle       | Rechte                                                                           |
+| ----------- | -------------------------------------------------------------------------------- |
+| Superadmin  | Alles, gibt Registrierungen frei, verwaltet Administratoren, sieht das Protokoll |
+| Admin       | Organisationen und Benutzer (Mitarbeiter, Kunden) verwalten, Anfragen bearbeiten |
+| Mitarbeiter | Alle Anfragen bearbeiten, Status wechseln, zuweisen, interne Notizen schreiben   |
+| Kunde       | Eigene Aufträge anlegen, verfolgen und kommentieren                              |
 
 ## Anmeldung
 
@@ -49,7 +49,7 @@ Im Profil sieht jeder seine angemeldeten Geräte und kann sie einzeln oder alle 
   gelöscht (Standard 365, 0 = nie).
 - **Security-Header** setzt die App selbst (Middleware in `src/start.ts`), damit sie auch ohne Caddy gelten:
   Content-Security-Policy mit Nonce pro Antwort für die Inline-Skripte von TanStack Start (`script-src 'self'
-  'nonce-…'`, `frame-ancestors 'none'`, `object-src 'none'`), `X-Content-Type-Options`, `Referrer-Policy`,
+'nonce-…'`, `frame-ancestors 'none'`, `object-src 'none'`), `X-Content-Type-Options`, `Referrer-Policy`,
   `X-Frame-Options`, `Permissions-Policy` und Cross-Origin-Header. `Strict-Transport-Security` nur mit HTTPS (gleiche
   Regel wie `COOKIE_SECURE`). Im Vite-Dev-Server entfällt die CSP.
 - **CSRF:** Schreibende Anfragen (POST-Server-Funktionen, Upload) brauchen `Sec-Fetch-Site: same-origin` bzw. bei
@@ -82,6 +82,15 @@ letzten 14 Tagen fertig gewordenen. Karten lassen sich in eine erlaubte Spalte z
 „Status …“ an der Karte verschieben. Eine Rückfrage fragt dabei nach dem Text an den Kunden. Ablehnen und Stornieren
 gehen weiter über die Detailseite. Hat jemand den Auftrag inzwischen geändert, lädt das Board neu und meldet das.
 
+## Übersicht
+
+Nach dem Anmelden landet man auf der Übersicht (`/uebersicht`). Mitarbeiter sehen dort die offenen Aufträge je Status
+samt internem Unterstatus, was ihnen zugewiesen ist, was niemandem zugewiesen ist, was seit gestern eingegangen ist und
+welche Änderungsvorschläge beim Kunden liegen. Dazu kommen die Durchlaufzeit von „Eingereicht“ bis „Fertig“ (Median
+und Durchschnitt der letzten 90 Tage), eingegangene und fertige Aufträge mit Umsatz je Monat über zwölf Monate und die
+häufigsten Formate, Bindungen und Papiere. Kunden sehen ihre offenen Aufträge und was auf ihre Antwort wartet.
+Alle Zahlen werden beim Aufruf aus den Aufträgen und ihrer Historie berechnet (`src/server/requests/dashboard.server.ts`).
+
 ## Katalog und Preise
 
 Admins pflegen unter „Katalog und Preise“ alles, was Kunden im Bestellformular wählen können:
@@ -96,6 +105,11 @@ Admins pflegen unter „Katalog und Preise“ alles, was Kunden im Bestellformul
   diese Farben und verwirft eine nicht mehr passende Farbe; der Server prüft dasselbe beim Absenden. Ohne separates
   Deckblatt gelten alle Farben, die die Bindung erlaubt. Die Migration `0014_cover_colors_per_paper.sql` gibt jedem
   bestehenden Deckblattpapier zunächst alle Farben, damit sich für Kunden nichts ändert.
+- **Vorrätige Bogengrößen** je Papier (z. B. A3, SRA3 oder eigene Maße). Am Auftrag wählen Mitarbeiter unter
+  „Druckbogen“, auf welcher davon gedruckt wird, getrennt für Innenteil und Deckblatt. Das ist rein intern: Preis
+  und Status bleiben, der Kunde sieht nichts und bekommt keine Mail. Ohne Auswahl gilt der Bogen aus der
+  Preisberechnung. Die Migration `0017_print_sheets.sql` übernimmt für bestehende Papiere die Bögen, für die ein
+  Preis hinterlegt ist, und für Plotterpapier das größte Format.
 - **Preise und Texte** (Druck pro Image, Mindestpreis, Hauspost, allgemeine Hilfetexte).
 
 Jede Änderung landet mit altem und neuem Stand in `catalog_changes` und ist unter „Änderungen“ sichtbar.
@@ -104,6 +118,11 @@ dort nur Platzhalter und müssen vor dem Start gesetzt werden. Ebenso ist der Te
 („Preise und Texte“) nur ein Platzhalter.
 
 ## Neuer Auftrag
+
+Jeder Auftrag bekommt beim Absenden eine achtstellige Nummer im Format `JJMMxxxx`, z. B. `#26100001` für den ersten
+Auftrag im Oktober 2026. Der Zähler beginnt jeden Monat (deutsche Zeit) wieder bei 0001; die Datenbank vergibt die
+Nummer über `next_request_number()`, sodass auch gleichzeitige Aufträge keine Nummer doppelt bekommen. Aufträge von
+vor der Umstellung behalten ihre alte Nummer.
 
 Kunden und Mitarbeiter legen Aufträge in sieben Schritten an: Datei, Format, Bindung, Papier (mit optionalem
 Deckblatt und Coverfarbe), Optionen, Lieferung und Absenden. Jeder Schritt zeigt nur, was zum bisher Gewählten
@@ -152,16 +171,16 @@ Kommentare hängen nur an und brauchen deshalb keine Versionsprüfung.
 
 Das Tool verschickt E-Mails bei neuen Anfragen, Statuswechseln, Nachrichten, Zuweisungen und Registrierungen:
 
-| Ereignis                         | Empfänger                                                                  |
-| -------------------------------- | -------------------------------------------------------------------------- |
-| Kunde reicht Auftrag ein         | Alle Mitarbeiter, dazu eine Eingangsbestätigung an den Kunden              |
-| Statuswechsel / Nachricht        | Alle Beobachter des Auftrags; bei Aktionen des Kunden ohne Zuständigen alle Mitarbeiter |
-| Interne Notiz                    | Nur beobachtende Mitarbeiter, nie Kunden                                   |
-| Erwähnung mit `@Name`            | Der erwähnte Mitarbeiter (eigene Mail statt der allgemeinen)                |
-| Zuweisung                        | Der neu zuständige Mitarbeiter                                             |
-| Anmeldelink                      | Die angegebene Adresse (immer, unabhängig von der Einstellung)             |
-| Neue Registrierung über OIDC     | Alle Superadmins (nur bei `OIDC_NEW_USERS=pending`)                        |
-| Freigabe / Ablehnung             | Die registrierte Person (immer, unabhängig von der Einstellung)             |
+| Ereignis                     | Empfänger                                                                               |
+| ---------------------------- | --------------------------------------------------------------------------------------- |
+| Kunde reicht Auftrag ein     | Alle Mitarbeiter, dazu eine Eingangsbestätigung an den Kunden                           |
+| Statuswechsel / Nachricht    | Alle Beobachter des Auftrags; bei Aktionen des Kunden ohne Zuständigen alle Mitarbeiter |
+| Interne Notiz                | Nur beobachtende Mitarbeiter, nie Kunden                                                |
+| Erwähnung mit `@Name`        | Der erwähnte Mitarbeiter (eigene Mail statt der allgemeinen)                            |
+| Zuweisung                    | Der neu zuständige Mitarbeiter                                                          |
+| Anmeldelink                  | Die angegebene Adresse (immer, unabhängig von der Einstellung)                          |
+| Neue Registrierung über OIDC | Alle Superadmins (nur bei `OIDC_NEW_USERS=pending`)                                     |
+| Freigabe / Ablehnung         | Die registrierte Person (immer, unabhängig von der Einstellung)                         |
 
 Wer eine Änderung selbst auslöst, bekommt keine Mail. Im Profil lassen sich Benachrichtigungen abschalten.
 
@@ -179,6 +198,19 @@ Die Mails werden in derselben Transaktion wie die Änderung in die Tabelle `emai
 eigenen Worker-Prozess verschickt (`pnpm mail:worker`, im Container `worker`). Scheitert der Versand, versucht der
 Worker es mit wachsendem Abstand bis zu acht Mal erneut. Ohne `SMTP_URL` werden Mails nur ins Log geschrieben. Derselbe
 Worker räumt stündlich abgelaufene Daten auf (siehe Sicherheit).
+
+### Vorlagen anpassen
+
+Unter **E-Mails** (nur Admins) lassen sich Betreff und Text jeder Benachrichtigung ändern. Eine Vorlage besteht aus
+Bausteinen (Absatz, Hervorhebung, Button) mit Platzhaltern wie `{{auftrag}}` oder `{{link}}`; welche es gibt, steht
+neben dem Editor. Bausteine, deren Platzhalter leer sind, entfallen beim Versand (z. B. die Notiz beim Statuswechsel).
+Wer mehr Freiheit braucht, schaltet auf eigenes HTML um. Platzhalterwerte werden immer maskiert, Buttons akzeptieren
+nur `http(s)`- und `mailto`-Links. Die Vorschau zeigt die Mail mit Beispielwerten, „Testmail an mich“ legt sie in den
+Postausgang. Unbekannte Platzhalter werden nicht gespeichert. Ohne Anpassung gelten die Standardtexte aus
+`src/lib/mail-templates.ts`; „Auf Standard zurücksetzen“ löscht die Anpassung wieder.
+
+Absendername, Antwortadresse, Kopfzeile, Signatur und Fußzeile gelten für alle Mails. Die Absenderadresse selbst kommt
+weiter aus `MAIL_FROM`. Alle Änderungen landen im Protokoll.
 
 ## Anmeldung über OpenID Connect
 
@@ -242,6 +274,8 @@ Weitere Befehle:
 
 ```sh
 pnpm typecheck
+pnpm lint                                             # oxlint mit Typinformationen
+pnpm format                                           # Prettier; pnpm format:check nur prüfen
 pnpm test                                             # Unit-Tests
 TEST_DATABASE_URL=postgres://…/drucktool_test pnpm test  # inkl. Integrationstests (Datenbank wird geleert!)
 pnpm db:generate --name <name>                        # Migration aus Schemaänderung erzeugen
@@ -262,7 +296,13 @@ und verschickt die E-Mails. Druckdateien liegen im Volume `uploads`.
 
 `.github/workflows/ci.yml` läuft bei jedem Pull Request und jedem Push auf `main`:
 
-- **Typecheck, Tests, Migrationen**: `pnpm typecheck`, `pnpm test` (mit Datenbank), `pnpm build`. Danach prüft
+- **Lint und Formatierung**: `pnpm lint` und `pnpm format:check`. Fehler lassen die CI scheitern, Warnungen nicht.
+  Gelintet wird mit [oxlint](https://oxc.rs) statt ESLint, weil typescript-eslint TypeScript 7 noch nicht unterstützt;
+  oxlint prüft über `oxlint-tsgolint` auch typbasierte Regeln wie vergessene `await` (`no-floating-promises`). Die
+  Regeln stehen in `.oxlintrc.json`, der Stil in `.prettierrc.json`. Der einmalige Formatierungs-Commit steht in
+  `.git-blame-ignore-revs` (`git config blame.ignoreRevsFile .git-blame-ignore-revs`).
+- **Typecheck, Tests, Migrationen**: `pnpm typecheck`, `pnpm test:coverage` (mit Datenbank, Abdeckung im Log),
+  `pnpm build`. Danach prüft
   `drizzle-kit`, dass `src/server/db/schema.ts` keine Änderungen ohne Migration enthält, und die neuen Migrationen
   werden auf eine Datenbank mit dem Schema des vorherigen Stands (Basis des PRs) eingespielt.
 - **Ansible prüfen**: `ansible-lint` und `ansible-playbook --syntax-check`.
@@ -300,26 +340,26 @@ Ist das Paket in der GitHub Container Registry privat, `drucktool_registry_usern
 
 ## Umgebungsvariablen
 
-| Variable                                  | Bedeutung                                                              |
-| ----------------------------------------- | ---------------------------------------------------------------------- |
-| `DATABASE_URL`                            | PostgreSQL-Verbindung                                                  |
-| `APP_URL`                                 | Öffentliche URL (für Links in E-Mails)                                 |
-| `COOKIE_SECURE`                           | `false` nur ohne HTTPS; Standard in Produktion ist `true`              |
-| `TRUST_PROXY`                             | `true` hinter einem Reverse Proxy, damit Client-IPs erkannt werden     |
-| `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD` | Legt beim ersten Start den Superadmin an                               |
-| `CUSTOMER_EMAIL_DOMAINS`                  | Optional: neue Kundenkonten nur für diese Domains, z. B. `tum.de`       |
-| `SMTP_URL`                                | SMTP-Server, z. B. `smtps://user:pass@mail.example.com:465`            |
-| `MAIL_FROM`                               | Absender, z. B. `Druckerei Muster <auftraege@example.com>`             |
-| `UPLOAD_DIR`                              | Ablage für Druckdateien, Standard `data/uploads` (im Image `/app/uploads`) |
-| `UPLOAD_MAX_MB`                           | Größte erlaubte Druckdatei in MB, Standard 500                         |
-| `ATTACHMENT_MAX_MB`, `ATTACHMENT_TYPES`   | Anhänge an Nachrichten: Größe in MB (Standard 25), erlaubte Endungen (kommagetrennt) |
-| `AUDIT_LOG_RETENTION_DAYS`                | Aufbewahrung des Audit-Logs in Tagen, Standard 365, `0` = unbegrenzt   |
-| `SESSION_IP_RETENTION_DAYS`               | IP-Adressen an Sitzungen nach so vielen Tagen löschen, Standard 30     |
-| `REJECTED_REGISTRATION_RETENTION_DAYS`    | Abgelehnte Registrierungen nach so vielen Tagen löschen, Standard 30   |
-| `PRIVACY_URL`, `IMPRINT_URL`              | Links auf Datenschutzerklärung und Impressum in der Fußzeile           |
-| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | OpenID Connect, siehe oben                                 |
-| `OIDC_DISPLAY_NAME`, `OIDC_NEW_USERS`, `OIDC_TRUST_EMAIL` | Beschriftung und Verhalten der OIDC-Anmeldung          |
-| `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_ROLES`, `OIDC_STAFF_ROLES`, `OIDC_ENFORCE_FOR_STAFF` | Rollen vom Anbieter, siehe oben |
+| Variable                                                                            | Bedeutung                                                                            |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `DATABASE_URL`                                                                      | PostgreSQL-Verbindung                                                                |
+| `APP_URL`                                                                           | Öffentliche URL (für Links in E-Mails)                                               |
+| `COOKIE_SECURE`                                                                     | `false` nur ohne HTTPS; Standard in Produktion ist `true`                            |
+| `TRUST_PROXY`                                                                       | `true` hinter einem Reverse Proxy, damit Client-IPs erkannt werden                   |
+| `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`                                           | Legt beim ersten Start den Superadmin an                                             |
+| `CUSTOMER_EMAIL_DOMAINS`                                                            | Optional: neue Kundenkonten nur für diese Domains, z. B. `tum.de`                    |
+| `SMTP_URL`                                                                          | SMTP-Server, z. B. `smtps://user:pass@mail.example.com:465`                          |
+| `MAIL_FROM`                                                                         | Absender, z. B. `Druckerei Muster <auftraege@example.com>`                           |
+| `UPLOAD_DIR`                                                                        | Ablage für Druckdateien, Standard `data/uploads` (im Image `/app/uploads`)           |
+| `UPLOAD_MAX_MB`                                                                     | Größte erlaubte Druckdatei in MB, Standard 500                                       |
+| `ATTACHMENT_MAX_MB`, `ATTACHMENT_TYPES`                                             | Anhänge an Nachrichten: Größe in MB (Standard 25), erlaubte Endungen (kommagetrennt) |
+| `AUDIT_LOG_RETENTION_DAYS`                                                          | Aufbewahrung des Audit-Logs in Tagen, Standard 365, `0` = unbegrenzt                 |
+| `SESSION_IP_RETENTION_DAYS`                                                         | IP-Adressen an Sitzungen nach so vielen Tagen löschen, Standard 30                   |
+| `REJECTED_REGISTRATION_RETENTION_DAYS`                                              | Abgelehnte Registrierungen nach so vielen Tagen löschen, Standard 30                 |
+| `PRIVACY_URL`, `IMPRINT_URL`                                                        | Links auf Datenschutzerklärung und Impressum in der Fußzeile                         |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`                               | OpenID Connect, siehe oben                                                           |
+| `OIDC_DISPLAY_NAME`, `OIDC_NEW_USERS`, `OIDC_TRUST_EMAIL`                           | Beschriftung und Verhalten der OIDC-Anmeldung                                        |
+| `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_ROLES`, `OIDC_STAFF_ROLES`, `OIDC_ENFORCE_FOR_STAFF` | Rollen vom Anbieter, siehe oben                                                      |
 
 ## Nächste Schritte
 

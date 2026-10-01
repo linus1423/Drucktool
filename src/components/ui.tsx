@@ -71,16 +71,22 @@ export function Field({
         {label}
       </label>
       {children}
-      {error ? (
-        <p className="text-sm text-rose-600">{error}</p>
-      ) : hint ? (
-        <p className="text-sm text-slate-500">{hint}</p>
-      ) : null}
+      {error ? <p className="text-sm text-rose-600">{error}</p> : hint ? <p className="text-sm text-slate-500">{hint}</p> : null}
     </div>
   )
 }
 
-export function Card({ title, actions, children, className }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
+export function Card({
+  title,
+  actions,
+  children,
+  className,
+}: {
+  title?: ReactNode
+  actions?: ReactNode
+  children: ReactNode
+  className?: string
+}) {
   return (
     <section className={cx('rounded-lg bg-white shadow-sm ring-1 ring-slate-200', className)}>
       {title || actions ? (
@@ -96,7 +102,12 @@ export function Card({ title, actions, children, className }: { title?: ReactNod
 
 export function Badge({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <span className={cx('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', className ?? 'bg-slate-100 text-slate-700')}>
+    <span
+      className={cx(
+        'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
+        className ?? 'bg-slate-100 text-slate-700',
+      )}
+    >
       {children}
     </span>
   )

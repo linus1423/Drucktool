@@ -30,6 +30,8 @@ import {
   setWatchingRequest,
   boardFilterSchema,
   listBoard,
+  setPrintSheet,
+  printSheetSchema,
   markRequestRead,
   markReadSchema,
   watchSchema,
@@ -102,3 +104,7 @@ export const listBoardFn = createServerFn({ method: 'GET' })
 export const markReadFn = createServerFn({ method: 'POST' })
   .validator(markReadSchema)
   .handler(async ({ data }) => markRequestRead(await requireUser(), data))
+
+export const setPrintSheetFn = createServerFn({ method: 'POST' })
+  .validator(printSheetSchema)
+  .handler(async ({ data }) => setPrintSheet(await requireStaff(), data))

@@ -17,7 +17,8 @@ import {
 import { deliveryAddressSchema } from '~/lib/address'
 import { orderSpecSchema } from '~/lib/order'
 import { calculatePrice } from '~/lib/pricing'
-import { buildSnapshot } from '~/lib/snapshot'
+import { buildSnapshot, type OrderSnapshot } from '~/lib/snapshot'
+import type { SheetSize } from '~/lib/catalog'
 import { applyPriceOverride, type ChangeProposal } from '~/lib/proposal'
 import { getCatalog, getDeadlineSettings } from '../catalog/catalog.server'
 import { attentionFor, berlinToday } from '~/lib/deadlines'
@@ -49,7 +50,7 @@ export type Principal = {
   organisationId: string | null
 }
 
-const { requests, requestComments, requestEvents, users, organisations } = schema
+const { requests, requestComments, requestEvents, users, organisations, papers } = schema
 
 function actorOf(user: Principal) {
   return isStaffRole(user.role) ? ('staff' as const) : ('customer' as const)
@@ -356,6 +357,10 @@ export async function getRequestDetail(user: Principal, id: string) {
     assigneeName: isStaff ? found.assigneeName : null,
     internalStatus: isStaff ? r.internalStatus : null,
     internalDueDate,
+    // Druckbogen ist rein intern (Issue #88).
+    printSheet: isStaff ? r.printSheet : null,
+    coverPrintSheet: isStaff ? r.coverPrintSheet : null,
+    printSheetOptions: isStaff ? await printSheetOptions(db, r.order) : { inner: [], cover: [] },
     reorderOf: reorderOf ?? null,
     attention: attentionFor({ ...r, internalDueDate }, deadlines),
     confirmedByName: found.confirmedByName,
@@ -803,6 +808,59 @@ export async function setInternalStatus(user: Principal, input: z.infer<typeof i
         data: { from: current.internalStatus, to: input.internalStatus },
       })
     }
+    return { version: updated.version }
+  })
+}
+
+export const printSheetSchema = z.object({
+  id: z.uuid(),
+  version: z.number().int().positive(),
+  /** Bezeichnung einer vorrätigen Bogengröße des Papiers, null für „wie berechnet“. */
+  sheet: z.string().max(30).nullable(),
+  coverSheet: z.string().max(30).nullable(),
+})
+
+/** Vorrätige Bogengrößen der Papiere eines Auftrags, aus dem aktuellen Katalog. */
+async function printSheetOptions(db: Pick<Tx, 'select'>, order: OrderSnapshot | null) {
+  const ids = [order?.paper.id, order?.coverPaper?.id].filter((x): x is string => !!x)
+  const rows = ids.length
+    ? await db.select({ id: papers.id, sheetSizes: papers.sheetSizes }).from(papers).where(inArray(papers.id, ids))
+    : []
+  const sizesOf = (id: string | undefined) => rows.find((r) => r.id === id)?.sheetSizes ?? []
+  return { inner: sizesOf(order?.paper.id), cover: order?.coverPaper ? sizesOf(order.coverPaper.id) : [] }
+}
+
+/**
+ * Legt fest, auf welchem Bogen gedruckt wird (Issue #88). Rein intern: kein Statuswechsel, keine Mail,
+ * der Preis bleibt. Erlaubt sind nur Bogengrößen, in denen das Papier laut Katalog vorrätig ist.
+ */
+export async function setPrintSheet(user: Principal, input: z.infer<typeof printSheetSchema>) {
+  if (!isStaffRole(user.role)) throw new Error('Keine Berechtigung')
+  return getDb().transaction(async (tx) => {
+    const current = await loadForUpdate(tx, user, input.id)
+    if (current.version !== input.version) throw new Error(CONFLICT_MESSAGE)
+    if (!current.order) throw new Error('Für diesen Auftrag gibt es keine Papierwahl')
+    const options = await printSheetOptions(tx, current.order)
+    const pick = (label: string | null, list: SheetSize[], what: string) => {
+      if (label === null) return null
+      const found = list.find((s) => s.label === label)
+      if (!found) throw new Error(`${what}: Diese Bogengröße ist für das Papier nicht hinterlegt`)
+      return found
+    }
+    const printSheet = pick(input.sheet, options.inner, 'Innenteil')
+    const coverPrintSheet = current.order.coverPaper ? pick(input.coverSheet, options.cover, 'Deckblatt') : null
+    const same = (a: SheetSize | null, b: SheetSize | null) => JSON.stringify(a) === JSON.stringify(b)
+    if (same(printSheet, current.printSheet) && same(coverPrintSheet, current.coverPrintSheet)) {
+      return { version: current.version }
+    }
+    const updated = await updateWithVersion(tx, input.id, input.version, { printSheet, coverPrintSheet })
+    await tx.insert(requestEvents).values({
+      requestId: input.id,
+      actorId: user.id,
+      type: 'print_sheet_changed',
+      internal: true,
+      data: { sheet: printSheet?.label ?? null, coverSheet: coverPrintSheet?.label ?? null },
+    })
     return { version: updated.version }
   })
 }

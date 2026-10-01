@@ -9,6 +9,7 @@ import { RequestFields, useRequestForm } from '~/components/RequestFields'
 import { Alert, Badge, Button, Card, Field, Input, Select, StatusBadge, Textarea, cx } from '~/components/ui'
 import { errorMessage, isConflictError } from '~/lib/errors'
 import { formatDate, formatDateTime, formatMoney, formatRequestNumber } from '~/lib/format'
+import { formatSheetSize, type SheetSize } from '~/lib/catalog'
 import { DELIVERY_LABELS, coverPagesFromMainFile } from '~/lib/order'
 import { describeOrder } from '~/lib/snapshot'
 import { assignableStaffQuery, requestDetailQuery } from '~/lib/queries'
@@ -29,6 +30,7 @@ import {
   assignRequestFn,
   changeStatusFn,
   setDatesFn,
+  setPrintSheetFn,
   setInternalStatusFn,
   markReadFn,
   setWatchingFn,
@@ -240,6 +242,7 @@ function RequestDetailPage() {
           <StatusActions request={request} staff={staff} />
           {staff && hasInternalStatus(request.status) ? <InternalStatusCard request={request} /> : null}
           {staff && !TERMINAL_STATUSES.has(request.status) ? <DatesCard request={request} /> : null}
+          {staff && request.order ? <PrintSheetCard request={request} /> : null}
           {staff ? <Assignment request={request} /> : null}
           <History request={request} isNew={isNew} />
         </div>
@@ -483,6 +486,83 @@ function DatesCard({ request }: { request: Detail }) {
         <div className="flex justify-end">
           <Button type="submit" disabled={!dirty || mutation.isPending}>
             Termine speichern
+          </Button>
+        </div>
+      </form>
+    </Card>
+  )
+}
+
+function PrintSheetCard({ request }: { request: Detail }) {
+  const refresh = useRefresh(request.id)
+  const { inner, cover } = request.printSheetOptions
+  const hasCover = !!request.order?.coverPaper
+  const [sheet, setSheet] = useState(request.printSheet?.label ?? '')
+  const [coverSheet, setCoverSheet] = useState(request.coverPrintSheet?.label ?? '')
+  const mutation = useMutation({
+    mutationFn: () =>
+      setPrintSheetFn({
+        data: { id: request.id, version: request.version, sheet: sheet || null, coverSheet: coverSheet || null },
+      }),
+    onSuccess: refresh,
+  })
+  const dirty = sheet !== (request.printSheet?.label ?? '') || coverSheet !== (request.coverPrintSheet?.label ?? '')
+  const calculated = (imp: { paperSheet: string } | null | undefined) =>
+    imp ? `Wie berechnet (${imp.paperSheet})` : 'Wie berechnet'
+  const options = (list: SheetSize[], current: SheetSize | null) =>
+    // Eine früher gewählte Größe bleibt wählbar, auch wenn sie inzwischen aus dem Katalog entfernt wurde.
+    current && !list.some((s) => s.label === current.label) ? [current, ...list] : list
+
+  return (
+    <Card title="Druckbogen">
+      <form
+        className="space-y-3"
+        onSubmit={(e) => {
+          e.preventDefault()
+          mutation.mutate()
+        }}
+      >
+        <p className="text-xs text-slate-600">Nur intern: ändert weder Preis noch Status, der Kunde wird nicht benachrichtigt.</p>
+        <ErrorBox
+          error={mutation.error}
+          onReload={() => {
+            mutation.reset()
+            void refresh()
+          }}
+        />
+        <Field
+          label={hasCover ? 'Innenteil' : 'Bogen'}
+          htmlFor="printSheet"
+          hint={inner.length ? undefined : 'Für dieses Papier sind im Katalog keine Bogengrößen hinterlegt.'}
+        >
+          <Select id="printSheet" value={sheet} onChange={(e) => setSheet(e.target.value)}>
+            <option value="">{calculated(request.order?.price.inner)}</option>
+            {options(inner, request.printSheet).map((s) => (
+              <option key={s.label} value={s.label}>
+                {formatSheetSize(s)}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        {hasCover ? (
+          <Field
+            label="Deckblatt"
+            htmlFor="coverPrintSheet"
+            hint={cover.length ? undefined : 'Für dieses Papier sind im Katalog keine Bogengrößen hinterlegt.'}
+          >
+            <Select id="coverPrintSheet" value={coverSheet} onChange={(e) => setCoverSheet(e.target.value)}>
+              <option value="">{calculated(request.order?.price.cover)}</option>
+              {options(cover, request.coverPrintSheet).map((s) => (
+                <option key={s.label} value={s.label}>
+                  {formatSheetSize(s)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        ) : null}
+        <div className="flex justify-end">
+          <Button type="submit" disabled={!dirty || mutation.isPending}>
+            Druckbogen speichern
           </Button>
         </div>
       </form>
@@ -771,6 +851,12 @@ function describeEvent(e: Detail['events'][number]) {
       return 'hat die Änderung abgelehnt'
     case 'change_withdrawn':
       return 'hat den Änderungsvorschlag zurückgezogen'
+    case 'print_sheet_changed': {
+      const name = (v: unknown) => (typeof v === 'string' ? v : 'wie berechnet')
+      return 'coverSheet' in e.data && e.data.coverSheet !== null
+        ? `hat den Druckbogen auf ${name(e.data.sheet)}, Deckblatt ${name(e.data.coverSheet)} gesetzt`
+        : `hat den Druckbogen auf ${name(e.data.sheet)} gesetzt`
+    }
     case 'dates_changed': {
       const what = e.data.field === 'internalDueDate' ? 'die interne Frist' : 'den zugesagten Termin'
       const to = typeof e.data.to === 'string' ? e.data.to : null

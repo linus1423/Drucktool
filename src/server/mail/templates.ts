@@ -1,89 +1,54 @@
-// E-Mail-Vorlagen. Reine Funktionen ohne Datenbankzugriff, damit sie testbar bleiben.
+// E-Mail-Vorlagen. Reine Funktionen ohne Datenbankzugriff, damit sie testbar bleiben. Sie liefern die Mail mit
+// den Standardtexten und merken sich Vorlage und Platzhalterwerte; enqueueMail wendet beim Einreihen die von
+// Admins geänderten Vorlagen und das Layout an (Issue #89).
 import { formatDate, formatMoney, formatRequestNumber } from '~/lib/format'
+import { DEFAULT_MAIL_LAYOUT, defaultTemplate, renderMail, type MailTemplateKey } from '~/lib/mail-templates'
 import { describeOrder, type OrderSnapshot } from '~/lib/snapshot'
 import { STATUS_LABELS, type RequestStatus } from '~/lib/status'
 
-export type MailContent = { subject: string; text: string; html: string }
+export type MailContent = {
+  subject: string
+  text: string
+  html: string
+  /** Vorlage und Werte, damit enqueueMail angepasste Vorlagen anwenden kann. */
+  template?: { key: MailTemplateKey; vars: Record<string, string> }
+}
 
 export function appUrl(path = '') {
   const base = (process.env.APP_URL ?? 'http://localhost:3000').replace(/\/+$/, '')
   return `${base}${path}`
 }
 
-function escapeHtml(value: string) {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
-}
-
-type Block = { kind: 'p'; text: string } | { kind: 'quote'; text: string } | { kind: 'button'; label: string; href: string }
-
-/** Baut Text- und HTML-Fassung aus denselben Bausteinen. */
-function compose(subject: string, blocks: Block[]): MailContent {
-  const text = [
-    ...blocks.map((b) =>
-      b.kind === 'p'
-        ? b.text
-        : b.kind === 'quote'
-          ? b.text
-              .split('\n')
-              .map((l) => `> ${l}`)
-              .join('\n')
-          : `${b.label}: ${b.href}`,
-    ),
-    '',
-    '-- ',
-    'Diese Nachricht wurde automatisch vom Drucktool verschickt.',
-  ].join('\n\n')
-
-  const body = blocks
-    .map((b) => {
-      if (b.kind === 'p') return `<p style="margin:0 0 16px">${escapeHtml(b.text).replace(/\n/g, '<br>')}</p>`
-      if (b.kind === 'quote') {
-        return `<blockquote style="margin:0 0 16px;padding:8px 12px;border-left:3px solid #cbd5e1;color:#334155;white-space:pre-wrap">${escapeHtml(b.text)}</blockquote>`
-      }
-      return `<p style="margin:24px 0"><a href="${escapeHtml(b.href)}" style="background:#0f172a;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;display:inline-block">${escapeHtml(b.label)}</a></p>`
-    })
-    .join('\n')
-
-  const html = `<!doctype html>
-<html lang="de"><body style="margin:0;padding:24px;background:#f8fafc;font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:15px;line-height:1.5;color:#0f172a">
-<div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:24px">
-<p style="margin:0 0 16px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#64748b">Drucktool</p>
-${body}
-</div>
-<p style="max-width:560px;margin:16px auto 0;font-size:12px;color:#64748b">Diese Nachricht wurde automatisch verschickt. Benachrichtigungen können Sie im Profil abschalten.</p>
-</body></html>`
-
-  return { subject, text, html }
+function compose(key: MailTemplateKey, vars: Record<string, string>): MailContent {
+  return { ...renderMail(defaultTemplate(key), vars, DEFAULT_MAIL_LAYOUT), template: { key, vars } }
 }
 
 type RequestRef = { id: string; number: number; title: string }
 type OrderRef = { order?: OrderSnapshot | null; totalCents?: number | null; deliveryMethod?: 'pickup' | 'house_post' }
 
 /** Zusammenfassung der gewählten Optionen und des Preises, falls der Auftrag aus dem Wizard kommt. */
-function orderSummary(r: OrderRef): Block[] {
-  if (!r.order) return []
+function orderSummary(r: OrderRef) {
+  if (!r.order) return ''
   const rows = describeOrder(r.order).map(([label, value]) => `${label}: ${value}`)
   if (r.totalCents != null) rows.push(`Preis: ${formatMoney(r.totalCents)}`)
-  return [{ kind: 'quote', text: rows.join('\n') }]
+  return rows.join('\n')
 }
 
-function requestLabel(r: RequestRef) {
-  return `${formatRequestNumber(r.number)} ${r.title}`
-}
-
-function requestButton(r: RequestRef): Block {
-  return { kind: 'button', label: 'Auftrag öffnen', href: appUrl(`/auftraege/${r.id}`) }
+function requestVars(r: RequestRef & { actorName?: string }) {
+  return {
+    auftrag: `${formatRequestNumber(r.number)} ${r.title}`,
+    nummer: formatRequestNumber(r.number),
+    titel: r.title,
+    link: appUrl(`/auftraege/${r.id}`),
+    akteur: r.actorName ?? '',
+  }
 }
 
 export function requestCreatedMail(
   r: RequestRef & OrderRef & { organisationName: string | null; actorName: string },
 ): MailContent {
-  const who = r.organisationName ? `${r.actorName} (${r.organisationName})` : r.actorName
-  return compose(`Neuer Auftrag ${requestLabel(r)}`, [
-    { kind: 'p', text: `${who} hat einen neuen Auftrag eingereicht: ${requestLabel(r)}.` },
-    ...orderSummary(r),
-    requestButton(r),
-  ])
+  const kunde = r.organisationName ? `${r.actorName} (${r.organisationName})` : r.actorName
+  return compose('request_created', { ...requestVars(r), kunde, zusammenfassung: orderSummary(r) })
 }
 
 /** Was der Kunde beim jeweiligen Status erfährt (Lastenheft Abschnitt 7). */
@@ -103,138 +68,92 @@ export function statusChangedMail(
   r: RequestRef &
     OrderRef & { actorName: string; from: RequestStatus; to: RequestStatus; note?: string | null; forStaff?: boolean },
 ): MailContent {
-  const blocks: Block[] = [{ kind: 'p', text: `${requestLabel(r)}: ${STATUS_LABELS[r.from]} → ${STATUS_LABELS[r.to]}.` }]
   // Die Erklärtexte richten sich an Kunden; beobachtende Mitarbeiter bekommen nur den Wechsel.
-  const text = r.forStaff
-    ? null
+  const statusText = r.forStaff
+    ? ''
     : r.to === 'completed' && r.deliveryMethod === 'house_post'
       ? COMPLETED_HOUSE_POST
-      : STATUS_TEXT[r.to]
-  if (text) blocks.push({ kind: 'p', text })
-  if (r.note) blocks.push({ kind: 'quote', text: r.note })
-  blocks.push({ kind: 'p', text: `Geändert von ${r.actorName}.` }, requestButton(r))
-  return compose(`${requestLabel(r)}: ${STATUS_LABELS[r.to]}`, blocks)
+      : (STATUS_TEXT[r.to] ?? '')
+  return compose('status_changed', {
+    ...requestVars(r),
+    alterStatus: STATUS_LABELS[r.from],
+    neuerStatus: STATUS_LABELS[r.to],
+    statusText,
+    notiz: r.note ?? '',
+  })
 }
 
 export function requestReceivedMail(r: RequestRef & OrderRef): MailContent {
-  return compose(`Auftrag eingereicht: ${requestLabel(r)}`, [
-    { kind: 'p', text: `Wir haben Ihren Auftrag ${requestLabel(r)} erhalten.` },
-    ...orderSummary(r),
-    {
-      kind: 'p',
-      text: 'Verbindlich wird er erst, wenn ein Mitarbeiter der Druckerei ihn bestätigt. Darüber informieren wir Sie per E-Mail.',
-    },
-    requestButton(r),
-  ])
+  return compose('request_received', { ...requestVars(r), zusammenfassung: orderSummary(r) })
 }
 
 export function changeProposedMail(
   r: RequestRef & { actorName: string; reason: string; before: OrderRef; after: OrderRef },
 ): MailContent {
-  const price =
+  const preisAenderung =
     r.before.totalCents != null && r.after.totalCents != null && r.before.totalCents !== r.after.totalCents
       ? `Der Preis ändert sich von ${formatMoney(r.before.totalCents)} auf ${formatMoney(r.after.totalCents)}.`
-      : null
-  return compose(`Änderungsvorschlag zu ${requestLabel(r)}`, [
-    { kind: 'p', text: `${r.actorName} schlägt eine Änderung an Ihrem Auftrag ${requestLabel(r)} vor:` },
-    { kind: 'quote', text: r.reason },
-    ...(price ? [{ kind: 'p', text: price } as Block] : []),
-    { kind: 'p', text: 'Neuer Stand:' },
-    ...orderSummary(r.after),
-    {
-      kind: 'p',
-      text: 'Die Änderung gilt erst, wenn Sie zustimmen. Bitte nehmen Sie den Vorschlag im Drucktool an oder lehnen Sie ihn ab.',
-    },
-    requestButton(r),
-  ])
+      : ''
+  return compose('change_proposed', {
+    ...requestVars(r),
+    grund: r.reason,
+    preisAenderung,
+    zusammenfassung: orderSummary(r.after),
+  })
 }
 
 export function changeAnsweredMail(r: RequestRef & { actorName: string; accepted: boolean }): MailContent {
-  return compose(`Änderung ${r.accepted ? 'angenommen' : 'abgelehnt'}: ${requestLabel(r)}`, [
-    {
-      kind: 'p',
-      text: r.accepted
-        ? `${r.actorName} hat dem Änderungsvorschlag zu ${requestLabel(r)} zugestimmt. Der neue Stand gilt.`
-        : `${r.actorName} hat den Änderungsvorschlag zu ${requestLabel(r)} abgelehnt. Der bisherige Stand gilt weiter, der Auftrag steht auf „Rückfrage“.`,
-    },
-    requestButton(r),
-  ])
+  return compose(r.accepted ? 'change_accepted' : 'change_rejected', requestVars(r))
 }
 
 export function promisedDateMail(r: RequestRef & { actorName: string; date: string | null }): MailContent {
-  const text = r.date
-    ? `Die Druckerei hat für ${requestLabel(r)} einen Termin zugesagt: ${formatDate(r.date)}.`
-    : `Der zugesagte Termin für ${requestLabel(r)} wurde aufgehoben. Wir melden uns mit einem neuen Termin.`
-  return compose(`Termin für ${requestLabel(r)}`, [{ kind: 'p', text }, requestButton(r)])
+  return r.date
+    ? compose('promised_date_set', { ...requestVars(r), termin: formatDate(r.date) })
+    : compose('promised_date_removed', requestVars(r))
 }
 
 export function commentMail(
   r: RequestRef & { actorName: string; body: string; internal: boolean; attachmentNames?: string[] },
 ): MailContent {
   const files = r.attachmentNames ?? []
-  return compose(`${r.internal ? 'Interne Notiz' : 'Neue Nachricht'} zu ${requestLabel(r)}`, [
-    {
-      kind: 'p',
-      text: `${r.actorName} hat ${r.internal ? 'eine interne Notiz' : 'eine Nachricht'} zu ${requestLabel(r)} geschrieben:`,
-    },
-    ...(r.body ? [{ kind: 'quote', text: r.body } as Block] : []),
-    ...(files.length ? [{ kind: 'p', text: `Anhänge: ${files.join(', ')}` } as Block] : []),
-    requestButton(r),
-  ])
+  return compose('comment', {
+    ...requestVars(r),
+    art: r.internal ? 'Interne Notiz' : 'Neue Nachricht',
+    artText: r.internal ? 'eine interne Notiz' : 'eine Nachricht',
+    nachricht: r.body,
+    anhaenge: files.length ? `Anhänge: ${files.join(', ')}` : '',
+  })
 }
 
 export function mentionMail(r: RequestRef & { actorName: string; body: string; internal: boolean }): MailContent {
-  return compose(`${r.actorName} hat Sie erwähnt: ${requestLabel(r)}`, [
-    {
-      kind: 'p',
-      text: `${r.actorName} hat Sie in ${r.internal ? 'einer internen Notiz' : 'einer Nachricht'} zu ${requestLabel(r)} erwähnt:`,
-    },
-    { kind: 'quote', text: r.body },
-    { kind: 'p', text: 'Sie beobachten den Auftrag jetzt und bekommen weitere Nachrichten dazu.' },
-    requestButton(r),
-  ])
+  return compose('mention', {
+    ...requestVars(r),
+    artText: r.internal ? 'einer internen Notiz' : 'einer Nachricht',
+    nachricht: r.body,
+  })
 }
 
 export function assignedMail(r: RequestRef & { actorName: string }): MailContent {
-  return compose(`Ihnen zugewiesen: ${requestLabel(r)}`, [
-    { kind: 'p', text: `${r.actorName} hat Ihnen den Auftrag ${requestLabel(r)} zugewiesen.` },
-    requestButton(r),
-  ])
+  return compose('assigned', requestVars(r))
 }
 
 export function registrationReceivedMail(u: { name: string; email: string; organisationName: string }): MailContent {
-  return compose(`Neue Registrierung: ${u.organisationName}`, [
-    { kind: 'p', text: `${u.name} <${u.email}> hat sich für ${u.organisationName} registriert und wartet auf Freigabe.` },
-    { kind: 'button', label: 'Registrierung prüfen', href: appUrl('/admin/freigaben') },
-  ])
+  return compose('registration_received', {
+    name: u.name,
+    email: u.email,
+    organisation: u.organisationName,
+    link: appUrl('/admin/freigaben'),
+  })
 }
 
 export function registrationApprovedMail(u: { name: string }): MailContent {
-  return compose('Ihr Konto wurde freigegeben', [
-    { kind: 'p', text: `Hallo ${u.name},` },
-    { kind: 'p', text: 'Ihr Konto im Drucktool wurde freigegeben. Sie können sich jetzt anmelden und Aufträge aufgeben.' },
-    { kind: 'button', label: 'Zur Anmeldung', href: appUrl('/login') },
-  ])
+  return compose('registration_approved', { name: u.name, link: appUrl('/login') })
 }
 
 export function registrationRejectedMail(u: { name: string }): MailContent {
-  return compose('Ihre Registrierung', [
-    { kind: 'p', text: `Hallo ${u.name},` },
-    {
-      kind: 'p',
-      text: 'Ihre Registrierung im Drucktool konnten wir leider nicht freigeben. Bei Fragen wenden Sie sich bitte direkt an uns.',
-    },
-  ])
+  return compose('registration_rejected', { name: u.name })
 }
 
 export function loginLinkMail(link: string, minutes: number): MailContent {
-  return compose('Ihr Anmeldelink für das Drucktool', [
-    { kind: 'p', text: 'Hallo,' },
-    {
-      kind: 'p',
-      text: `mit dem folgenden Link melden Sie sich im Drucktool an. Er ist ${minutes} Minuten gültig und funktioniert nur einmal.`,
-    },
-    { kind: 'button', label: 'Jetzt anmelden', href: link },
-    { kind: 'p', text: 'Wenn Sie keinen Link angefordert haben, können Sie diese E-Mail ignorieren.' },
-  ])
+  return compose('login_link', { link, minuten: String(minutes) })
 }
