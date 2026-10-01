@@ -34,18 +34,26 @@ mv "$target.tmp" "$target"
 echo "$(date -Is) Datenbank gesichert: $target"
 
 find "$backup_dir" -maxdepth 1 -name 'drucktool-*.sql.gz' -mtime +{{ drucktool_backup_keep_days }} -delete
-# Druckdateien werden gespiegelt; gelöschte Dateien verschwinden auch aus der Sicherung.
-rsync -a --delete "$dir/uploads/" "$backup_dir/uploads/"
+# Druckdateien werden nur beim täglichen Backup gespiegelt; gelöschte Dateien verschwinden auch aus der Sicherung.
+# Vor einem Restore auf einem frischen Server würde der leere Ordner sonst den Spiegel löschen, der gleich eingespielt
+# werden soll.
+if [ -z "$anlass" ]; then
+  rsync -a --delete "$dir/uploads/" "$backup_dir/uploads/"
+fi
 
 {% if drucktool_offsite_backup_enabled %}
-set -a
-. /etc/drucktool/restic.env
-set +a
-restic backup --quiet --host drucktool --tag drucktool ${anlass:+--tag "$anlass"} "$target" "$dir/uploads"
-# Jeder Tag hat einen anderen Dateinamen, daher alle Snapshots als eine Gruppe behandeln.
-restic forget --quiet --host drucktool --tag drucktool --group-by host --prune \
-  --keep-daily {{ drucktool_restic_keep_daily }} \
-  --keep-weekly {{ drucktool_restic_keep_weekly }} \
-  --keep-monthly {{ drucktool_restic_keep_monthly }}
-echo "$(date -Is) Kopie außer Haus gespeichert"
+# Nur das tägliche Backup geht außer Haus. Backups vor Updates oder Restores bleiben lokal, sonst könnte z. B. der
+# leere Stand vor einer Wiederherstellung auf einem frischen Server den letzten guten Stand des Tages verdrängen.
+if [ -z "$anlass" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . /etc/drucktool/restic.env
+  set +a
+  restic backup --quiet --host drucktool --tag drucktool "$target" "$dir/uploads"
+  restic forget --quiet --host drucktool --tag drucktool --group-by host --prune \
+    --keep-daily {{ drucktool_restic_keep_daily }} \
+    --keep-weekly {{ drucktool_restic_keep_weekly }} \
+    --keep-monthly {{ drucktool_restic_keep_monthly }}
+  echo "$(date -Is) Kopie außer Haus gespeichert"
+fi
 {% endif %}

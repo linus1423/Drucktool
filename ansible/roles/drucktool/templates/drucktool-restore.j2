@@ -92,7 +92,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     -h | --help) hilfe; exit 0 ;;
     --liste) modus=liste ;;
-    --test) modus=test ;;
+    --test) modus='test' ;;
     --neuestes) modus=lokal; quelle=$(neuestes_lokal) ;;
     --offsite)
       modus=offsite
