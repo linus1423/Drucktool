@@ -1,0 +1,57 @@
+import { createMiddleware } from '@tanstack/react-start'
+import { isUnexpectedError, logger, requestContext } from './log.server'
+
+const REQUEST_ID = /^[\w.-]{1,64}$/
+
+function newRequestId() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** Vergibt jeder Anfrage eine Request-ID und protokolliert Methode, Pfad, Status und Dauer. */
+export const requestLogMiddleware = createMiddleware().server(async ({ request, pathname, next }) => {
+  const incoming = request.headers.get('x-request-id')
+  const ctx = { requestId: incoming && REQUEST_ID.test(incoming) ? incoming : newRequestId() }
+  const start = performance.now()
+  return requestContext.run(ctx, async () => {
+    try {
+      const result = await next()
+      const status = result.response.status
+      const fields = { method: request.method, path: pathname, status, durationMs: Math.round(performance.now() - start) }
+      // Healthchecks kommen alle 30 Sekunden und interessieren nur im Fehlerfall.
+      if (status >= 500) logger.error('Anfrage fehlgeschlagen', fields)
+      else if (pathname === '/api/health') logger.debug('Anfrage', fields)
+      else logger.info('Anfrage', fields)
+      try {
+        result.response.headers.set('x-request-id', ctx.requestId)
+      } catch {
+        // Manche Antworten haben unveränderliche Header.
+      }
+      return result
+    } catch (error) {
+      logger.error('Unbehandelter Fehler', {
+        method: request.method,
+        path: pathname,
+        durationMs: Math.round(performance.now() - start),
+        err: error,
+      })
+      throw error
+    }
+  })
+})
+
+/**
+ * Technische Fehler (Datenbank, Programmierfehler) landen mit Stacktrace im Log; der Nutzer sieht nur eine
+ * allgemeine Meldung mit Fehlernummer. Fachliche Fehler (`throw new Error('…')` mit Text für den Nutzer) bleiben.
+ */
+export const errorMiddleware = createMiddleware({ type: 'function' }).server(async ({ next }) => {
+  try {
+    return await next()
+  } catch (error) {
+    if (!isUnexpectedError(error)) throw error
+    const requestId = requestContext.getStore()?.requestId
+    logger.error('Unerwarteter Fehler in einer Server-Funktion', { err: error })
+    throw new Error(
+      `Es ist ein unerwarteter Fehler aufgetreten. Bitte versuchen Sie es später erneut${requestId ? ` (Fehlernummer ${requestId})` : ''}.`,
+    )
+  }
+})

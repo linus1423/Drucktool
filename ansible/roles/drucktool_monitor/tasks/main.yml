@@ -1,0 +1,33 @@
+# Meldet sich regelmäßig bei einem externen Überwachungsdienst, solange die Anwendung über ihre öffentliche
+# Adresse erreichbar ist und das TLS-Zertifikat noch lange genug gilt. Bleibt die Meldung aus, schlägt der Dienst Alarm.
+
+- name: Werkzeuge für die Überwachung installieren
+  ansible.builtin.apt:
+    name: [curl, openssl]
+    state: present
+
+- name: Überwachungsskript installieren
+  ansible.builtin.template:
+    src: drucktool-monitor.j2
+    dest: /usr/local/bin/drucktool-monitor
+    mode: '0755'
+
+- name: Überwachung regelmäßig ausführen
+  ansible.builtin.cron:
+    name: drucktool-monitor
+    minute: "{{ drucktool_monitor_minute }}"
+    job: /usr/local/bin/drucktool-monitor >/dev/null 2>>/var/log/drucktool-monitor.log
+    state: "{{ 'present' if drucktool_monitor_ping_url else 'absent' }}"
+
+- name: Log der Überwachung rotieren
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/drucktool-monitor
+    mode: '0644'
+    content: |
+      /var/log/drucktool-monitor.log {
+        monthly
+        rotate 6
+        compress
+        missingok
+        notifempty
+      }

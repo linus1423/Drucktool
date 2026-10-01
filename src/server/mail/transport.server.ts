@@ -1,4 +1,5 @@
 import nodemailer, { type Transporter } from 'nodemailer'
+import { logger } from '../log.server'
 
 export type OutgoingMail = {
   to: string
@@ -46,7 +47,7 @@ function createSmtpTransport(): MailTransport {
     return {
       dryRun: true,
       send: async (mail) => {
-        console.log(`[mail] (kein SMTP_URL gesetzt) an ${mail.to}: ${mail.subject}`)
+        logger.info('E-Mail nicht verschickt (kein SMTP_URL gesetzt)', { to: mail.to, subject: mail.subject })
       },
     }
   }

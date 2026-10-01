@@ -1,0 +1,5 @@
+# Ping-URL eines Überwachungsdienstes (z. B. https://hc-ping.com/<uuid>). Leer = Überwachung aus.
+drucktool_monitor_ping_url: ''
+# Alarm, wenn das TLS-Zertifikat in weniger als so vielen Tagen abläuft (Caddy erneuert nach 60 von 90 Tagen).
+drucktool_monitor_tls_min_days: 14
+drucktool_monitor_minute: '*/5'

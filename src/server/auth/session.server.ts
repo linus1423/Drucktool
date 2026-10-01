@@ -4,6 +4,7 @@ import { getCookie, getRequestHeader, getRequestIP, setCookie, deleteCookie } fr
 import { getDb, schema } from '../db/client.server'
 import { listMemberships } from '../organisations/organisations.server'
 import type { UserRole, UserStatus } from '~/lib/roles'
+import { requestContext } from '../log.server'
 
 const COOKIE_NAME = 'drucktool_session'
 const SESSION_DAYS = 14
@@ -88,6 +89,9 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     .limit(1)
 
   if (!row || row.status !== 'active') return null
+  // Nutzer-ID für alle weiteren Logeinträge dieser Anfrage.
+  const logContext = requestContext.getStore()
+  if (logContext) logContext.userId = row.id
 
   // Gleitende Verlängerung, damit aktive Nutzer angemeldet bleiben.
   if (row.sessionExpiresAt.getTime() - Date.now() < RENEW_BEFORE_MS) {

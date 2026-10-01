@@ -1,5 +1,6 @@
 import { createCsrfMiddleware, createMiddleware, createStart } from '@tanstack/react-start'
 import { createNonce, isHttps, securityHeaders, withSecurityHeaders } from './server/security-headers'
+import { errorMiddleware, requestLogMiddleware } from './server/middleware'
 
 // Setzt CSP, HSTS und weitere Security-Header auf jede Antwort. Der Nonce wird über den
 // Kontext an den Router weitergegeben (siehe router.tsx), der ihn an seine Inline-Skripte hängt.
@@ -28,5 +29,7 @@ const csrf = createCsrfMiddleware({
 })
 
 export const startInstance = createStart(() => ({
-  requestMiddleware: [securityHeadersMiddleware, csrf],
+  // Zuerst die Request-ID, damit alle Logeinträge der Anfrage sie tragen.
+  requestMiddleware: [requestLogMiddleware, securityHeadersMiddleware, csrf],
+  functionMiddleware: [errorMiddleware],
 }))
