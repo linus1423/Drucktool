@@ -17,7 +17,7 @@ export const Route = createFileRoute('/login')({
     hinweis: z.literal('freigabe').optional().catch(undefined),
   }),
   beforeLoad: ({ context }) => {
-    if (context.user) throw redirect({ to: '/auftraege' })
+    if (context.user) throw redirect({ to: '/uebersicht' })
   },
   loader: () => getAuthOptions(),
   head: () => ({ meta: [{ title: 'Anmelden · Drucktool' }] }),

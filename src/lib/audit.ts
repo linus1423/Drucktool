@@ -11,6 +11,9 @@ export const AUDIT_ACTIONS = [
   'organisation.updated',
   'user.anonymized',
   'user.exported',
+  'mail_template.updated',
+  'mail_template.reset',
+  'mail_layout.updated',
 ] as const
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
 
@@ -25,6 +28,9 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   'organisation.updated': 'Organisation geändert',
   'user.anonymized': 'Benutzer anonymisiert',
   'user.exported': 'Datenauskunft erstellt',
+  'mail_template.updated': 'E-Mail-Vorlage geändert',
+  'mail_template.reset': 'E-Mail-Vorlage zurückgesetzt',
+  'mail_layout.updated': 'E-Mail-Layout geändert',
 }
 
 export const LOGIN_METHOD_LABELS: Record<string, string> = {
@@ -46,6 +52,8 @@ export const LOGIN_FAILURE_LABELS: Record<string, string> = {
 
 export const AUDIT_FIELD_LABELS: Record<string, string> = {
   name: 'Name',
+  firstName: 'Vorname',
+  lastName: 'Nachname',
   email: 'E-Mail',
   role: 'Rolle',
   status: 'Status',

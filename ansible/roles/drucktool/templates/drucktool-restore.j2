@@ -69,7 +69,8 @@ DELETE FROM audit_log;
 -- Superadmins bleiben als Zugang erhalten, alle anderen Konten werden zu Testkonten ohne Passwort.
 UPDATE users SET
   email = 'nutzer-' || id || '@example.invalid',
-  name = 'Testnutzer ' || left(id::text, 8),
+  first_name = 'Test',
+  last_name = 'Nutzer ' || left(id::text, 8),
   password_hash = NULL,
   billing_address = NULL,
   delivery_address = NULL

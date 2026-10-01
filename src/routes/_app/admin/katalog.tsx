@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tansta
 import { z } from 'zod'
 import { MoneyInput } from '~/components/MoneyInput'
 import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select, Textarea, cx } from '~/components/ui'
-import { BINDING_UNIT_LABELS, type CatalogTexts, type PaperInput, type Pricing } from '~/lib/catalog'
+import { BINDING_UNIT_LABELS, type CatalogTexts, type PaperInput, type Pricing, type SheetSize } from '~/lib/catalog'
 import type { DeadlineSettings } from '~/lib/deadlines'
 import { errorMessage } from '~/lib/errors'
 import { formatDateTime, formatMoney } from '~/lib/format'
@@ -16,6 +16,7 @@ import {
   saveTextsFn,
   saveDeadlineSettingsFn,
   setFormatBindingFn,
+  setPaperCoverColorFn,
   updateBindingFn,
   updateFormatFn,
 } from '~/server/catalog/catalog.functions'
@@ -367,6 +368,7 @@ const EMPTY_PAPER: PaperInput = {
   forInner: true,
   forPlotter: false,
   maxFormatId: 'A3',
+  sheetSizes: [{ label: 'A3', widthMm: 297, heightMm: 420 }],
   available: true,
   helpText: '',
   sortOrder: 100,
@@ -452,6 +454,11 @@ function PaperCard({ paper, formats, onDone }: { paper: PaperInput; formats: Cat
             </Select>
           </Field>
         </div>
+        <SheetSizesEditor
+          id={`${id}-sheets`}
+          value={value.sheetSizes}
+          onChange={(sheetSizes) => setValue({ ...value, sheetSizes })}
+        />
         {value.forPlotter ? (
           <div className="grid gap-3 sm:grid-cols-3">
             {money('priceA0Cents', 'Preis pro Plot A0')}
@@ -487,21 +494,81 @@ function PaperCard({ paper, formats, onDone }: { paper: PaperInput; formats: Cat
 function CoverTab({ catalog }: { catalog: Catalog }) {
   const [adding, setAdding] = useState(false)
   return (
-    <Card
-      title="Coverfarben für Deckblatt und Rückseite"
-      actions={!adding ? <Button onClick={() => setAdding(true)}>Farbe hinzufügen</Button> : null}
-    >
-      <ul className="divide-y divide-slate-100">
-        {adding ? (
-          <CoverRow
-            color={{ name: '', hex: '#ffffff', transparent: false, available: true, sortOrder: 100 }}
-            onDone={() => setAdding(false)}
-          />
-        ) : null}
-        {catalog.coverColors.map((c) => (
-          <CoverRow key={c.id} color={c} />
-        ))}
-      </ul>
+    <div className="space-y-6">
+      <Card
+        title="Coverfarben für Deckblatt und Rückseite"
+        actions={!adding ? <Button onClick={() => setAdding(true)}>Farbe hinzufügen</Button> : null}
+      >
+        <ul className="divide-y divide-slate-100">
+          {adding ? (
+            <CoverRow
+              color={{ name: '', hex: '#ffffff', transparent: false, available: true, sortOrder: 100 }}
+              onDone={() => setAdding(false)}
+            />
+          ) : null}
+          {catalog.coverColors.map((c) => (
+            <CoverRow key={c.id} color={c} />
+          ))}
+        </ul>
+      </Card>
+      <PaperColorsCard catalog={catalog} />
+    </div>
+  )
+}
+
+/** Welche Coverfarben es auf welchem Deckblattpapier gibt. */
+function PaperColorsCard({ catalog }: { catalog: Catalog }) {
+  const toggle = useSave(setPaperCoverColorFn)
+  const allowed = new Set(catalog.paperCoverColors.map((pc) => `${pc.paperId}/${pc.coverColorId}`))
+  const coverPapers = catalog.papers.filter((p) => p.forCover)
+
+  return (
+    <Card title="Farben je Deckblattpapier">
+      <p className="mb-3 text-sm text-slate-600">
+        Kunden sehen bei einem separaten Deckblatt nur die Farben, die es auf dem gewählten Papier gibt. Ohne separates Deckblatt
+        gelten alle verfügbaren Farben der Bindung.
+      </p>
+      {toggle.error ? <Alert>{errorMessage(toggle.error)}</Alert> : null}
+      {coverPapers.length === 0 ? (
+        <p className="text-sm text-slate-500">Kein Papier ist als Deckblatt geeignet.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr>
+                <th className="px-2 py-2 text-left font-medium text-slate-500">Papier</th>
+                {catalog.coverColors.map((c) => (
+                  <th key={c.id} className="px-2 py-2 text-center text-xs font-medium text-slate-500">
+                    {c.name}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {coverPapers.map((p) => (
+                <tr key={p.id}>
+                  <td className="px-2 py-2 font-medium whitespace-nowrap">
+                    {p.name} {p.grammage} g/m²
+                  </td>
+                  {catalog.coverColors.map((c) => (
+                    <td key={c.id} className="px-2 py-2 text-center">
+                      <input
+                        type="checkbox"
+                        aria-label={`${c.name} auf ${p.name} ${p.grammage} g/m²`}
+                        checked={allowed.has(`${p.id}/${c.id}`)}
+                        disabled={toggle.isPending}
+                        onChange={(e) =>
+                          toggle.mutate({ data: { paperId: p.id, coverColorId: c.id, allowed: e.target.checked } })
+                        }
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </Card>
   )
 }
@@ -670,6 +737,7 @@ const ENTITY_LABELS: Record<string, string> = {
   format: 'Format',
   binding: 'Bindung',
   format_binding: 'Kombination',
+  paper_cover_color: 'Coverfarbe am Papier',
   paper: 'Papier',
   cover_color: 'Coverfarbe',
   settings: 'Einstellung',
@@ -698,6 +766,7 @@ const FIELD_LABELS: Record<string, string> = {
   forInner: 'Innenteil',
   forPlotter: 'Plotter',
   maxFormatId: 'Größtes Format',
+  sheetSizes: 'Bogengrößen',
   hex: 'Farbe',
   transparent: 'Durchsichtig',
   printA4Cents: 'Druck A4',
@@ -719,6 +788,7 @@ function formatValue(key: string, v: unknown) {
   if (v === null || v === undefined || v === '') return '–'
   if (typeof v === 'number' && /Cents$/.test(key)) return formatMoney(v)
   if (typeof v === 'boolean') return v ? 'ja' : 'nein'
+  if (key === 'sheetSizes' && Array.isArray(v)) return v.length ? (v as SheetSize[]).map((s) => s.label).join(', ') : '–'
   if (key === 'priceUnit') return BINDING_UNIT_LABELS[v as keyof typeof BINDING_UNIT_LABELS] ?? String(v)
   const text = String(v)
   return text.length > 60 ? `„${text.slice(0, 57)}…“` : typeof v === 'string' ? `„${text}“` : text
@@ -740,6 +810,12 @@ function subject(
       const [f, b] = c.entityId.split('/')
       return `${formatLabel(f ?? '')} mit ${bindingLabel(b ?? '')}`
     }
+    case 'paper_cover_color': {
+      const [p, col] = c.entityId.split('/')
+      const paper = catalog.papers.find((x) => x.id === p)
+      const color = catalog.coverColors.find((x) => x.id === col)?.name ?? col
+      return `${color} auf ${paper ? `${paper.name} ${paper.grammage} g/m²` : p}`
+    }
     case 'settings':
       return SETTING_LABELS[c.entityId] ?? c.entityId
     default:
@@ -748,7 +824,7 @@ function subject(
 }
 
 function describeDiff(entity: string, before: Record<string, unknown> | null, after: Record<string, unknown> | null) {
-  if (entity === 'format_binding') return after ? 'erlaubt' : 'nicht mehr erlaubt'
+  if (entity === 'format_binding' || entity === 'paper_cover_color') return after ? 'erlaubt' : 'nicht mehr erlaubt'
   if (!before) return 'angelegt'
   if (!after) return 'entfernt'
   const changed = Object.keys(after).filter((k) => k !== 'updatedAt' && JSON.stringify(before[k]) !== JSON.stringify(after[k]))
@@ -779,5 +855,69 @@ function ChangesTab({ catalog }: { catalog: Catalog }) {
         </ul>
       )}
     </Card>
+  )
+}
+
+const SHEET_PRESETS: SheetSize[] = [
+  { label: 'A4', widthMm: 210, heightMm: 297 },
+  { label: 'A3', widthMm: 297, heightMm: 420 },
+  { label: 'SRA3', widthMm: 320, heightMm: 450 },
+]
+
+/** Bogengrößen, in denen ein Papier vorrätig ist (Issue #88). */
+function SheetSizesEditor({ id, value, onChange }: { id: string; value: SheetSize[]; onChange: (v: SheetSize[]) => void }) {
+  const update = (i: number, patch: Partial<SheetSize>) => onChange(value.map((s, j) => (j === i ? { ...s, ...patch } : s)))
+  const missing = SHEET_PRESETS.filter((p) => !value.some((s) => s.label.toLowerCase() === p.label.toLowerCase()))
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-medium text-slate-700">Vorrätige Bogengrößen</legend>
+      <p className="text-xs text-slate-600">
+        Daraus wählen Mitarbeiter am Auftrag, auf welchem Bogen gedruckt wird. Das ändert weder Preis noch Status.
+      </p>
+      {value.length === 0 ? <p className="text-sm text-slate-600">Noch keine Bogengröße hinterlegt.</p> : null}
+      {value.map((s, i) => (
+        <div key={i} className="flex flex-wrap items-end gap-2">
+          <Field label="Bezeichnung" htmlFor={`${id}-${i}-label`}>
+            <Input
+              id={`${id}-${i}-label`}
+              className="w-28"
+              value={s.label}
+              onChange={(e) => update(i, { label: e.target.value })}
+            />
+          </Field>
+          <Field label="Breite (mm)" htmlFor={`${id}-${i}-w`}>
+            <Input
+              id={`${id}-${i}-w`}
+              type="number"
+              className="w-24"
+              value={s.widthMm}
+              onChange={(e) => update(i, { widthMm: Number(e.target.value) })}
+            />
+          </Field>
+          <Field label="Höhe (mm)" htmlFor={`${id}-${i}-h`}>
+            <Input
+              id={`${id}-${i}-h`}
+              type="number"
+              className="w-24"
+              value={s.heightMm}
+              onChange={(e) => update(i, { heightMm: Number(e.target.value) })}
+            />
+          </Field>
+          <Button type="button" variant="secondary" onClick={() => onChange(value.filter((_, j) => j !== i))}>
+            Entfernen<span className="sr-only"> {s.label}</span>
+          </Button>
+        </div>
+      ))}
+      <div className="flex flex-wrap gap-2">
+        {missing.map((p) => (
+          <Button key={p.label} type="button" variant="secondary" onClick={() => onChange([...value, p])}>
+            + {p.label}
+          </Button>
+        ))}
+        <Button type="button" variant="secondary" onClick={() => onChange([...value, { label: '', widthMm: 0, heightMm: 0 }])}>
+          + Andere Größe
+        </Button>
+      </div>
+    </fieldset>
   )
 }

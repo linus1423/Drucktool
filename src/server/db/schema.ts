@@ -18,9 +18,11 @@ import {
 import { INTERNAL_STATUSES, REQUEST_STATUSES } from '../../lib/status'
 import { USER_ROLES, USER_STATUSES } from '../../lib/roles'
 import type { JsonObject } from '../../lib/json'
-import type { BillingAddress, DeliveryAddress } from '../../lib/address'
+import type { BillingAddress, DeliveryAddress, StoredBillingAddress } from '../../lib/address'
 import { DELIVERY_METHODS } from '../../lib/order'
 import type { OrderSnapshot } from '../../lib/snapshot'
+import type { SheetSize } from '../../lib/catalog'
+import type { MailBlock } from '../../lib/mail-templates'
 import type { ChangeProposal } from '../../lib/proposal'
 
 export const userRole = pgEnum('user_role', USER_ROLES)
@@ -54,7 +56,12 @@ export const users = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     email: text('email').notNull(),
-    name: text('name').notNull(),
+    firstName: text('first_name').notNull().default(''),
+    lastName: text('last_name').notNull().default(''),
+    /** Anzeigename „Vorname Nachname“, von der Datenbank berechnet (siehe displayName in lib/name.ts). */
+    name: text('name')
+      .notNull()
+      .generatedAlwaysAs(sql`btrim(first_name || ' ' || last_name)`),
     passwordHash: text('password_hash'),
     role: userRole('role').notNull().default('customer'),
     status: userStatus('status').notNull().default('pending'),
@@ -142,7 +149,12 @@ export const requests = pgTable(
   'requests',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    number: integer('number').generatedAlwaysAsIdentity({ startWith: 1001 }).notNull().unique(),
+    // Auftragsnummer im Format JJMMxxxx, fortlaufend je Monat (Issue #90). Vergibt die Datenbank über
+    // next_request_number(), damit auch gleichzeitige Aufträge keine Nummer doppelt bekommen.
+    number: integer('number')
+      .notNull()
+      .unique()
+      .default(sql`next_request_number()`),
     // Organisationen sind optional; sichtbar ist ein Auftrag für seinen Ersteller.
     organisationId: uuid('organisation_id').references(() => organisations.id, { onDelete: 'restrict' }),
     createdById: uuid('created_by_id')
@@ -162,7 +174,8 @@ export const requests = pgTable(
     order: jsonb('order').$type<OrderSnapshot>(),
     totalCents: integer('total_cents'),
     // Kopie der Rechnungsadresse beim Absenden; spätere Profiländerungen wirken nicht zurück.
-    billingAddress: jsonb('billing_address').$type<BillingAddress>(),
+    // Kopie zum Zeitpunkt des Absendens; ältere Aufträge haben noch ein gemeinsames Namensfeld.
+    billingAddress: jsonb('billing_address').$type<StoredBillingAddress>(),
     deliveryMethod: deliveryMethod('delivery_method').notNull().default('pickup'),
     deliveryAddress: jsonb('delivery_address').$type<DeliveryAddress>(),
     // Zustimmung zu den Auftragsbedingungen beim verbindlichen Absenden (Lastenheft Schritt 8).
@@ -175,6 +188,9 @@ export const requests = pgTable(
     statusChangedAt: timestamp('status_changed_at', { withTimezone: true }).notNull().defaultNow(),
     // Von der Druckerei zugesagter Termin, für Kunden sichtbar.
     promisedDate: date('promised_date'),
+    // Bogen, auf dem gedruckt wird, nur für Mitarbeiter (Issue #88). Kopie der Katalogwerte, null heißt: wie berechnet.
+    printSheet: jsonb('print_sheet').$type<SheetSize>(),
+    coverPrintSheet: jsonb('cover_print_sheet').$type<SheetSize>(),
     // Interne Frist, nur für Mitarbeiter.
     internalDueDate: date('internal_due_date'),
     // Nur für Mitarbeiter sichtbar, solange der Auftrag bestätigt ist.
@@ -233,6 +249,21 @@ export const requestWatchers = pgTable(
   (t) => [primaryKey({ columns: [t.requestId, t.userId] }), index('request_watchers_user_idx').on(t.userId)],
 )
 
+/** Wann ein Benutzer einen Auftrag zuletzt angesehen hat (Ungelesen-Markierung, Issue #18). */
+export const requestReads = pgTable(
+  'request_reads',
+  {
+    requestId: uuid('request_id')
+      .notNull()
+      .references(() => requests.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    readAt: timestamp('read_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.requestId, t.userId] })],
+)
+
 export const requestEventType = pgEnum('request_event_type', [
   'created',
   'updated',
@@ -245,6 +276,7 @@ export const requestEventType = pgEnum('request_event_type', [
   'change_rejected',
   'change_withdrawn',
   'dates_changed',
+  'print_sheet_changed',
 ])
 
 export const requestEvents = pgTable(
@@ -402,6 +434,8 @@ export const papers = pgTable('papers', {
   forPlotter: boolean('for_plotter').notNull().default(false),
   /** Größtes Endformat, das auf diesem Papier möglich ist. */
   maxFormatId: text('max_format_id').references(() => formats.id, { onDelete: 'set null' }),
+  /** Bogengrößen, in denen das Papier vorrätig ist (Issue #88); daraus wählen Mitarbeiter das Druckformat. */
+  sheetSizes: jsonb('sheet_sizes').$type<SheetSize[]>().notNull().default([]),
   available: boolean('available').notNull().default(true),
   helpText: text('help_text').notNull().default(''),
   sortOrder: integer('sort_order').notNull().default(0),
@@ -415,6 +449,37 @@ export const coverColors = pgTable('cover_colors', {
   transparent: boolean('transparent').notNull().default(false),
   available: boolean('available').notNull().default(true),
   sortOrder: integer('sort_order').notNull().default(0),
+})
+
+/** Coverfarben, die es auf einem Deckblattpapier gibt (z. B. 250 g/m² nur Weiß). */
+export const paperCoverColors = pgTable(
+  'paper_cover_colors',
+  {
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => papers.id, { onDelete: 'cascade' }),
+    coverColorId: uuid('cover_color_id')
+      .notNull()
+      .references(() => coverColors.id, { onDelete: 'cascade' }),
+  },
+  (t) => [uniqueIndex('paper_cover_colors_unique').on(t.paperId, t.coverColorId)],
+)
+
+/** Zähler für die Auftragsnummern je Monat (JJMM), siehe next_request_number() in Migration 0016. */
+export const requestNumberCounters = pgTable('request_number_counters', {
+  month: integer('month').primaryKey(),
+  last: integer('last').notNull(),
+})
+
+/** Von Admins angepasste E-Mail-Vorlagen (Issue #89); fehlt eine Zeile, gilt der Standard aus src/lib/mail-templates.ts. */
+export const mailTemplates = pgTable('mail_templates', {
+  key: text('key').primaryKey(),
+  subject: text('subject').notNull(),
+  mode: text('mode').$type<'blocks' | 'html'>().notNull().default('blocks'),
+  blocks: jsonb('blocks').$type<MailBlock[]>().notNull().default([]),
+  html: text('html').notNull().default(''),
+  updatedById: uuid('updated_by_id').references(() => users.id, { onDelete: 'set null' }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
 /** Übrige Preise und Texte als Schlüssel/Wert, z. B. Druckpreise pro Image und Mindestpreis. */

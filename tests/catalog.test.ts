@@ -12,7 +12,7 @@ type Principal = import('~/server/requests/requests.server').Principal
 async function admin(): Promise<Principal> {
   const [u] = await getDb()
     .insert(schema.users)
-    .values({ email: `admin-${Date.now()}-${Math.random()}@test`, name: 'Admin', role: 'admin', status: 'active' })
+    .values({ email: `admin-${Date.now()}-${Math.random()}@test`, lastName: 'Admin', role: 'admin', status: 'active' })
     .returning()
   return { id: u!.id, role: 'admin', organisationId: null }
 }
@@ -33,6 +33,7 @@ const paper = (overrides: Partial<PaperInput> = {}): PaperInput => ({
   forInner: true,
   forPlotter: false,
   maxFormatId: null,
+  sheetSizes: [],
   available: true,
   helpText: '',
   sortOrder: 50,
@@ -92,6 +93,50 @@ describe.skipIf(!url)('Katalog (Integration)', () => {
     expect((await catalog.getCatalog({ onlyAvailable: true })).papers.some((p) => p.id === id)).toBe(false)
     expect((await catalog.getCatalog()).papers.some((p) => p.id === id)).toBe(true)
     expect(await changesFor(id)).toHaveLength(2)
+  })
+
+  it('ordnet Coverfarben Deckblattpapieren zu und prüft sie beim Bestellen', async () => {
+    const before = await catalog.getCatalog()
+    // Die Migration gibt jedem vorhandenen Deckblattpapier alle Farben, damit sich nichts ändert.
+    const karton = before.papers.find((p) => p.name === 'Karton')!
+    const kartonColors = before.paperCoverColors.filter((pc) => pc.paperId === karton.id).map((pc) => pc.coverColorId)
+    expect(kartonColors.length).toBeGreaterThanOrEqual(5)
+    expect(before.paperCoverColors.some((pc) => pc.paperId === before.papers.find((p) => !p.forCover)!.id)).toBe(false)
+
+    const actor = await admin()
+    const { id: paperId } = await catalog.savePaper(actor, paper({ forCover: true, forInner: false, grammage: 250 }))
+    const white = before.coverColors.find((c) => c.name === 'Weiß')!
+    const blue = before.coverColors.find((c) => c.name === 'Dunkelblau')!
+    await catalog.setPaperCoverColor(actor, { paperId, coverColorId: white.id, allowed: true })
+    await catalog.setPaperCoverColor(actor, { paperId, coverColorId: white.id, allowed: true })
+    expect(await changesFor(`${paperId}/${white.id}`)).toHaveLength(1)
+
+    const { calculatePrice } = await import('~/lib/pricing')
+    const c = await catalog.getCatalog({ onlyAvailable: true })
+    const spec = {
+      formatId: 'A4',
+      customWidthMm: null,
+      customHeightMm: null,
+      bindingId: 'plastic_comb',
+      duplex: false,
+      paperId: c.papers.find((p) => p.name === 'Standardpapier')!.id,
+      coverPaperId: paperId,
+      coverPages: 1,
+      coverFromMainFile: null,
+      coverColorId: white.id,
+      coverBackColorId: null,
+      borderless: false,
+      copies: 1,
+      pages: 4,
+      delivery: 'pickup' as const,
+    }
+    expect(calculatePrice(c, spec).ok).toBe(true)
+    const rejected = calculatePrice(c, { ...spec, coverColorId: blue.id })
+    expect(rejected.ok ? [] : rejected.errors).toEqual([`Dunkelblau gibt es nicht auf ${c.papers.find((p) => p.id === paperId)!.name} 250 g/m².`])
+
+    await catalog.setPaperCoverColor(actor, { paperId, coverColorId: white.id, allowed: false })
+    expect((await catalog.getCatalog()).paperCoverColors.some((pc) => pc.paperId === paperId)).toBe(false)
+    expect(await changesFor(`${paperId}/${white.id}`)).toHaveLength(2)
   })
 
   it('speichert Preise mit altem und neuem Stand', async () => {

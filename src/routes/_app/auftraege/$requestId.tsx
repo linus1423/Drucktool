@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { formatBillingAddress, formatDeliveryAddress } from '~/lib/address'
@@ -9,7 +9,8 @@ import { RequestFields, useRequestForm } from '~/components/RequestFields'
 import { Alert, Badge, Button, Card, Field, Input, Select, StatusBadge, Textarea, cx } from '~/components/ui'
 import { errorMessage, isConflictError } from '~/lib/errors'
 import { formatDate, formatDateTime, formatMoney, formatRequestNumber } from '~/lib/format'
-import { DELIVERY_LABELS } from '~/lib/order'
+import { formatSheetSize, type SheetSize } from '~/lib/catalog'
+import { DELIVERY_LABELS, coverPagesFromMainFile } from '~/lib/order'
 import { describeOrder } from '~/lib/snapshot'
 import { assignableStaffQuery, requestDetailQuery } from '~/lib/queries'
 import { isStaffRole } from '~/lib/roles'
@@ -29,7 +30,9 @@ import {
   assignRequestFn,
   changeStatusFn,
   setDatesFn,
+  setPrintSheetFn,
   setInternalStatusFn,
+  markReadFn,
   setWatchingFn,
   updateRequestFn,
 } from '~/server/requests/requests.functions'
@@ -64,6 +67,25 @@ function useRefresh(id: string) {
   }
 }
 
+type Entry = { createdAt: Date | string; mine: boolean }
+
+/**
+ * Ungelesen-Markierung (Issue #18): Merkt sich beim Öffnen, bis wann der Auftrag gelesen war, hebt neuere
+ * Einträge anderer hervor und meldet dem Server, dass der Auftrag jetzt gesehen ist.
+ */
+function useUnreadMarker(request: Detail) {
+  const queryClient = useQueryClient()
+  const [seen, setSeen] = useState({ id: request.id, at: request.readAt })
+  if (seen.id !== request.id) setSeen({ id: request.id, at: request.readAt })
+  useEffect(() => {
+    void markReadFn({ data: { id: request.id, at: request.loadedAt } })
+      .then(() => queryClient.invalidateQueries({ queryKey: ['requests', 'list'] }))
+      .catch(() => {})
+  }, [request.id, request.loadedAt, queryClient])
+  const since = seen.id === request.id ? seen.at : request.readAt
+  return (e: Entry) => !!since && !e.mine && new Date(e.createdAt) > new Date(since)
+}
+
 function RequestDetailPage() {
   const { requestId } = Route.useParams()
   const { user } = Route.useRouteContext()
@@ -73,6 +95,7 @@ function RequestDetailPage() {
   const [proposing, setProposing] = useState(false)
   const refresh = useRefresh(requestId)
   const canPropose = staff && !!request.order && !TERMINAL_STATUSES.has(request.status)
+  const isNew = useUnreadMarker(request)
 
   return (
     <div className="space-y-6">
@@ -211,7 +234,7 @@ function RequestDetailPage() {
           )}
 
           <Files request={request} staff={staff} />
-          <Comments request={request} staff={staff} />
+          <Comments request={request} staff={staff} isNew={isNew} />
         </div>
 
         <div className="space-y-6">
@@ -219,8 +242,9 @@ function RequestDetailPage() {
           <StatusActions request={request} staff={staff} />
           {staff && hasInternalStatus(request.status) ? <InternalStatusCard request={request} /> : null}
           {staff && !TERMINAL_STATUSES.has(request.status) ? <DatesCard request={request} /> : null}
+          {staff && request.order ? <PrintSheetCard request={request} /> : null}
           {staff ? <Assignment request={request} /> : null}
-          <History request={request} />
+          <History request={request} isNew={isNew} />
         </div>
       </div>
     </div>
@@ -469,6 +493,83 @@ function DatesCard({ request }: { request: Detail }) {
   )
 }
 
+function PrintSheetCard({ request }: { request: Detail }) {
+  const refresh = useRefresh(request.id)
+  const { inner, cover } = request.printSheetOptions
+  const hasCover = !!request.order?.coverPaper
+  const [sheet, setSheet] = useState(request.printSheet?.label ?? '')
+  const [coverSheet, setCoverSheet] = useState(request.coverPrintSheet?.label ?? '')
+  const mutation = useMutation({
+    mutationFn: () =>
+      setPrintSheetFn({
+        data: { id: request.id, version: request.version, sheet: sheet || null, coverSheet: coverSheet || null },
+      }),
+    onSuccess: refresh,
+  })
+  const dirty = sheet !== (request.printSheet?.label ?? '') || coverSheet !== (request.coverPrintSheet?.label ?? '')
+  const calculated = (imp: { paperSheet: string } | null | undefined) =>
+    imp ? `Wie berechnet (${imp.paperSheet})` : 'Wie berechnet'
+  const options = (list: SheetSize[], current: SheetSize | null) =>
+    // Eine früher gewählte Größe bleibt wählbar, auch wenn sie inzwischen aus dem Katalog entfernt wurde.
+    current && !list.some((s) => s.label === current.label) ? [current, ...list] : list
+
+  return (
+    <Card title="Druckbogen">
+      <form
+        className="space-y-3"
+        onSubmit={(e) => {
+          e.preventDefault()
+          mutation.mutate()
+        }}
+      >
+        <p className="text-xs text-slate-600">Nur intern: ändert weder Preis noch Status, der Kunde wird nicht benachrichtigt.</p>
+        <ErrorBox
+          error={mutation.error}
+          onReload={() => {
+            mutation.reset()
+            void refresh()
+          }}
+        />
+        <Field
+          label={hasCover ? 'Innenteil' : 'Bogen'}
+          htmlFor="printSheet"
+          hint={inner.length ? undefined : 'Für dieses Papier sind im Katalog keine Bogengrößen hinterlegt.'}
+        >
+          <Select id="printSheet" value={sheet} onChange={(e) => setSheet(e.target.value)}>
+            <option value="">{calculated(request.order?.price.inner)}</option>
+            {options(inner, request.printSheet).map((s) => (
+              <option key={s.label} value={s.label}>
+                {formatSheetSize(s)}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        {hasCover ? (
+          <Field
+            label="Deckblatt"
+            htmlFor="coverPrintSheet"
+            hint={cover.length ? undefined : 'Für dieses Papier sind im Katalog keine Bogengrößen hinterlegt.'}
+          >
+            <Select id="coverPrintSheet" value={coverSheet} onChange={(e) => setCoverSheet(e.target.value)}>
+              <option value="">{calculated(request.order?.price.cover)}</option>
+              {options(cover, request.coverPrintSheet).map((s) => (
+                <option key={s.label} value={s.label}>
+                  {formatSheetSize(s)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        ) : null}
+        <div className="flex justify-end">
+          <Button type="submit" disabled={!dirty || mutation.isPending}>
+            Druckbogen speichern
+          </Button>
+        </div>
+      </form>
+    </Card>
+  )
+}
+
 function Assignment({ request }: { request: Detail }) {
   const refresh = useRefresh(request.id)
   const staffList = useQuery(assignableStaffQuery)
@@ -573,7 +674,7 @@ function MentionPicker({ onPick }: { onPick: (name: string) => void }) {
   )
 }
 
-function Comments({ request, staff }: { request: Detail; staff: boolean }) {
+function Comments({ request, staff, isNew }: { request: Detail; staff: boolean; isNew: (e: Entry) => boolean }) {
   const refresh = useRefresh(request.id)
   const [body, setBody] = useState('')
   const [internal, setInternal] = useState(false)
@@ -616,6 +717,7 @@ function Comments({ request, staff }: { request: Detail; staff: boolean }) {
                 key={c.id}
                 className={cx(
                   'rounded-md p-3 text-sm ring-1',
+                  isNew(c) && 'ring-2 ring-sky-400',
                   c.internal
                     ? 'bg-amber-50 ring-amber-200'
                     : c.authorIsStaff
@@ -628,6 +730,7 @@ function Comments({ request, staff }: { request: Detail; staff: boolean }) {
                   {c.authorIsStaff ? <Badge>Druckerei</Badge> : null}
                   {c.internal ? <Badge className="bg-amber-200 text-amber-900">Intern</Badge> : null}
                   <span>{formatDateTime(c.createdAt)}</span>
+                  {isNew(c) ? <Badge className="bg-sky-100 text-sky-900">Neu</Badge> : null}
                 </div>
                 {c.body ? (
                   <p className="whitespace-pre-wrap">
@@ -748,6 +851,12 @@ function describeEvent(e: Detail['events'][number]) {
       return 'hat die Änderung abgelehnt'
     case 'change_withdrawn':
       return 'hat den Änderungsvorschlag zurückgezogen'
+    case 'print_sheet_changed': {
+      const name = (v: unknown) => (typeof v === 'string' ? v : 'wie berechnet')
+      return 'coverSheet' in e.data && e.data.coverSheet !== null
+        ? `hat den Druckbogen auf ${name(e.data.sheet)}, Deckblatt ${name(e.data.coverSheet)} gesetzt`
+        : `hat den Druckbogen auf ${name(e.data.sheet)} gesetzt`
+    }
     case 'dates_changed': {
       const what = e.data.field === 'internalDueDate' ? 'die interne Frist' : 'den zugesagten Termin'
       const to = typeof e.data.to === 'string' ? e.data.to : null
@@ -756,12 +865,12 @@ function describeEvent(e: Detail['events'][number]) {
   }
 }
 
-function History({ request }: { request: Detail }) {
+function History({ request, isNew }: { request: Detail; isNew: (e: Entry) => boolean }) {
   return (
     <Card title="Verlauf">
       <ol className="space-y-3 text-sm">
         {request.events.map((e) => (
-          <li key={e.id} className="border-l-2 border-slate-200 pl-3">
+          <li key={e.id} className={cx('border-l-2 pl-3', isNew(e) ? 'border-sky-500 bg-sky-50' : 'border-slate-200')}>
             <div>
               <span className="font-medium">{e.actorName ?? 'System'}</span> {describeEvent(e)}
             </div>
@@ -782,6 +891,8 @@ const PDF_STATUS_TEXT = {
 
 function Files({ request, staff }: { request: Detail; staff: boolean }) {
   if (request.files.length === 0) return null
+  // Ohne eigene Deckblatt-Datei kommt das Deckblatt aus der Druckdatei (Issue #85).
+  const coverFromMain = request.order?.coverPaper ? coverPagesFromMainFile(request.order.spec) : null
   return (
     <Card title="Dateien">
       <ul className="divide-y divide-slate-100 text-sm">
@@ -807,6 +918,12 @@ function Files({ request, staff }: { request: Detail; staff: boolean }) {
           )
         })}
       </ul>
+      {coverFromMain ? (
+        <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Keine separate Deckblatt-Datei: Das Deckblatt wird aus der Druckdatei gedruckt, vorne {coverFromMain.front}
+          {coverFromMain.back ? `, hinten ${coverFromMain.back}` : ''}.
+        </p>
+      ) : null}
     </Card>
   )
 }
