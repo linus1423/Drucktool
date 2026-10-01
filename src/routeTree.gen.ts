@@ -17,13 +17,17 @@ import { Route as RegistrierenRouteImport } from './routes/registrieren'
 import { Route as AppAdminRouteRouteImport } from './routes/_app/admin/route'
 import { Route as AppKontoRouteImport } from './routes/_app/konto'
 import { Route as AppProfilRouteImport } from './routes/_app/profil'
+import { Route as AnfragenIndexRouteImport } from './routes/anfragen/index'
+import { Route as AnfragenSplatRouteImport } from './routes/anfragen/$'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppAdminBenutzerRouteImport } from './routes/_app/admin/benutzer'
 import { Route as AppAdminFreigabenRouteImport } from './routes/_app/admin/freigaben'
 import { Route as AppAdminKatalogRouteImport } from './routes/_app/admin/katalog'
-import { Route as AppAnfragenIndexRouteImport } from './routes/_app/anfragen/index'
-import { Route as AppAnfragenRequestIdRouteImport } from './routes/_app/anfragen/$requestId'
-import { Route as AppAnfragenNeuRouteImport } from './routes/_app/anfragen/neu'
+import { Route as AppAuftraegeIndexRouteImport } from './routes/_app/auftraege/index'
+import { Route as AppAuftraegeRequestIdRouteImport } from './routes/_app/auftraege/$requestId'
+import { Route as AppAuftraegeNeuRouteImport } from './routes/_app/auftraege/neu'
+import { Route as ApiDateienIndexRouteImport } from './routes/api/dateien/index'
+import { Route as ApiDateienFileIdRouteImport } from './routes/api/dateien/$fileId'
 import { Route as AppAdminOrganisationenIndexRouteImport } from './routes/_app/admin/organisationen/index'
 import { Route as AppAdminOrganisationenOrganisationIdRouteImport } from './routes/_app/admin/organisationen/$organisationId'
 import { Route as AppAdminOrganisationenNeuRouteImport } from './routes/_app/admin/organisationen/neu'
@@ -69,6 +73,16 @@ const AppProfilRoute = AppProfilRouteImport.update({
   path: '/profil',
   getParentRoute: () => AppRoute,
 } as any)
+const AnfragenIndexRoute = AnfragenIndexRouteImport.update({
+  id: '/anfragen/',
+  path: '/anfragen/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnfragenSplatRoute = AnfragenSplatRouteImport.update({
+  id: '/anfragen/$',
+  path: '/anfragen/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
@@ -89,20 +103,30 @@ const AppAdminKatalogRoute = AppAdminKatalogRouteImport.update({
   path: '/katalog',
   getParentRoute: () => AppAdminRouteRoute,
 } as any)
-const AppAnfragenIndexRoute = AppAnfragenIndexRouteImport.update({
-  id: '/anfragen/',
-  path: '/anfragen/',
+const AppAuftraegeIndexRoute = AppAuftraegeIndexRouteImport.update({
+  id: '/auftraege/',
+  path: '/auftraege/',
   getParentRoute: () => AppRoute,
 } as any)
-const AppAnfragenRequestIdRoute = AppAnfragenRequestIdRouteImport.update({
-  id: '/anfragen/$requestId',
-  path: '/anfragen/$requestId',
+const AppAuftraegeRequestIdRoute = AppAuftraegeRequestIdRouteImport.update({
+  id: '/auftraege/$requestId',
+  path: '/auftraege/$requestId',
   getParentRoute: () => AppRoute,
 } as any)
-const AppAnfragenNeuRoute = AppAnfragenNeuRouteImport.update({
-  id: '/anfragen/neu',
-  path: '/anfragen/neu',
+const AppAuftraegeNeuRoute = AppAuftraegeNeuRouteImport.update({
+  id: '/auftraege/neu',
+  path: '/auftraege/neu',
   getParentRoute: () => AppRoute,
+} as any)
+const ApiDateienIndexRoute = ApiDateienIndexRouteImport.update({
+  id: '/api/dateien/',
+  path: '/api/dateien/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDateienFileIdRoute = ApiDateienFileIdRouteImport.update({
+  id: '/api/dateien/$fileId',
+  path: '/api/dateien/$fileId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppAdminOrganisationenIndexRoute =
   AppAdminOrganisationenIndexRouteImport.update({
@@ -141,13 +165,17 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AppAdminRouteRouteWithChildren
   '/konto': typeof AppKontoRoute
   '/profil': typeof AppProfilRoute
+  '/anfragen/$': typeof AnfragenSplatRoute
   '/api/health': typeof ApiHealthRoute
+  '/anfragen/': typeof AnfragenIndexRoute
   '/admin/benutzer': typeof AppAdminBenutzerRoute
   '/admin/freigaben': typeof AppAdminFreigabenRoute
   '/admin/katalog': typeof AppAdminKatalogRoute
-  '/anfragen/$requestId': typeof AppAnfragenRequestIdRoute
-  '/anfragen/neu': typeof AppAnfragenNeuRoute
-  '/anfragen/': typeof AppAnfragenIndexRoute
+  '/auftraege/$requestId': typeof AppAuftraegeRequestIdRoute
+  '/auftraege/neu': typeof AppAuftraegeNeuRoute
+  '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
+  '/auftraege/': typeof AppAuftraegeIndexRoute
+  '/api/dateien/': typeof ApiDateienIndexRoute
   '/admin/organisationen/$organisationId': typeof AppAdminOrganisationenOrganisationIdRoute
   '/admin/organisationen/neu': typeof AppAdminOrganisationenNeuRoute
   '/api/auth/oidc/callback': typeof ApiAuthOidcCallbackRoute
@@ -162,13 +190,17 @@ export interface FileRoutesByTo {
   '/admin': typeof AppAdminRouteRouteWithChildren
   '/konto': typeof AppKontoRoute
   '/profil': typeof AppProfilRoute
+  '/anfragen/$': typeof AnfragenSplatRoute
   '/api/health': typeof ApiHealthRoute
+  '/anfragen': typeof AnfragenIndexRoute
   '/admin/benutzer': typeof AppAdminBenutzerRoute
   '/admin/freigaben': typeof AppAdminFreigabenRoute
   '/admin/katalog': typeof AppAdminKatalogRoute
-  '/anfragen/$requestId': typeof AppAnfragenRequestIdRoute
-  '/anfragen/neu': typeof AppAnfragenNeuRoute
-  '/anfragen': typeof AppAnfragenIndexRoute
+  '/auftraege/$requestId': typeof AppAuftraegeRequestIdRoute
+  '/auftraege/neu': typeof AppAuftraegeNeuRoute
+  '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
+  '/auftraege': typeof AppAuftraegeIndexRoute
+  '/api/dateien': typeof ApiDateienIndexRoute
   '/admin/organisationen/$organisationId': typeof AppAdminOrganisationenOrganisationIdRoute
   '/admin/organisationen/neu': typeof AppAdminOrganisationenNeuRoute
   '/api/auth/oidc/callback': typeof ApiAuthOidcCallbackRoute
@@ -185,13 +217,17 @@ export interface FileRoutesById {
   '/_app/admin': typeof AppAdminRouteRouteWithChildren
   '/_app/konto': typeof AppKontoRoute
   '/_app/profil': typeof AppProfilRoute
+  '/anfragen/$': typeof AnfragenSplatRoute
   '/api/health': typeof ApiHealthRoute
+  '/anfragen/': typeof AnfragenIndexRoute
   '/_app/admin/benutzer': typeof AppAdminBenutzerRoute
   '/_app/admin/freigaben': typeof AppAdminFreigabenRoute
   '/_app/admin/katalog': typeof AppAdminKatalogRoute
-  '/_app/anfragen/$requestId': typeof AppAnfragenRequestIdRoute
-  '/_app/anfragen/neu': typeof AppAnfragenNeuRoute
-  '/_app/anfragen/': typeof AppAnfragenIndexRoute
+  '/_app/auftraege/$requestId': typeof AppAuftraegeRequestIdRoute
+  '/_app/auftraege/neu': typeof AppAuftraegeNeuRoute
+  '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
+  '/_app/auftraege/': typeof AppAuftraegeIndexRoute
+  '/api/dateien/': typeof ApiDateienIndexRoute
   '/_app/admin/organisationen/$organisationId': typeof AppAdminOrganisationenOrganisationIdRoute
   '/_app/admin/organisationen/neu': typeof AppAdminOrganisationenNeuRoute
   '/api/auth/oidc/callback': typeof ApiAuthOidcCallbackRoute
@@ -208,13 +244,17 @@ export interface FileRouteTypes {
     | '/admin'
     | '/konto'
     | '/profil'
+    | '/anfragen/$'
     | '/api/health'
+    | '/anfragen/'
     | '/admin/benutzer'
     | '/admin/freigaben'
     | '/admin/katalog'
-    | '/anfragen/$requestId'
-    | '/anfragen/neu'
-    | '/anfragen/'
+    | '/auftraege/$requestId'
+    | '/auftraege/neu'
+    | '/api/dateien/$fileId'
+    | '/auftraege/'
+    | '/api/dateien/'
     | '/admin/organisationen/$organisationId'
     | '/admin/organisationen/neu'
     | '/api/auth/oidc/callback'
@@ -229,13 +269,17 @@ export interface FileRouteTypes {
     | '/admin'
     | '/konto'
     | '/profil'
+    | '/anfragen/$'
     | '/api/health'
+    | '/anfragen'
     | '/admin/benutzer'
     | '/admin/freigaben'
     | '/admin/katalog'
-    | '/anfragen/$requestId'
-    | '/anfragen/neu'
-    | '/anfragen'
+    | '/auftraege/$requestId'
+    | '/auftraege/neu'
+    | '/api/dateien/$fileId'
+    | '/auftraege'
+    | '/api/dateien'
     | '/admin/organisationen/$organisationId'
     | '/admin/organisationen/neu'
     | '/api/auth/oidc/callback'
@@ -251,13 +295,17 @@ export interface FileRouteTypes {
     | '/_app/admin'
     | '/_app/konto'
     | '/_app/profil'
+    | '/anfragen/$'
     | '/api/health'
+    | '/anfragen/'
     | '/_app/admin/benutzer'
     | '/_app/admin/freigaben'
     | '/_app/admin/katalog'
-    | '/_app/anfragen/$requestId'
-    | '/_app/anfragen/neu'
-    | '/_app/anfragen/'
+    | '/_app/auftraege/$requestId'
+    | '/_app/auftraege/neu'
+    | '/api/dateien/$fileId'
+    | '/_app/auftraege/'
+    | '/api/dateien/'
     | '/_app/admin/organisationen/$organisationId'
     | '/_app/admin/organisationen/neu'
     | '/api/auth/oidc/callback'
@@ -271,7 +319,11 @@ export interface RootRouteChildren {
   AnmeldenRoute: typeof AnmeldenRoute
   LoginRoute: typeof LoginRoute
   RegistrierenRoute: typeof RegistrierenRoute
+  AnfragenSplatRoute: typeof AnfragenSplatRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  AnfragenIndexRoute: typeof AnfragenIndexRoute
+  ApiDateienFileIdRoute: typeof ApiDateienFileIdRoute
+  ApiDateienIndexRoute: typeof ApiDateienIndexRoute
   ApiAuthOidcCallbackRoute: typeof ApiAuthOidcCallbackRoute
   ApiAuthOidcLoginRoute: typeof ApiAuthOidcLoginRoute
 }
@@ -334,6 +386,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProfilRouteImport
       parentRoute: typeof AppRoute
     }
+    '/anfragen/': {
+      id: '/anfragen/'
+      path: '/anfragen'
+      fullPath: '/anfragen/'
+      preLoaderRoute: typeof AnfragenIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/anfragen/$': {
+      id: '/anfragen/$'
+      path: '/anfragen/$'
+      fullPath: '/anfragen/$'
+      preLoaderRoute: typeof AnfragenSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/health': {
       id: '/api/health'
       path: '/api/health'
@@ -362,26 +428,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminKatalogRouteImport
       parentRoute: typeof AppAdminRouteRoute
     }
-    '/_app/anfragen/': {
-      id: '/_app/anfragen/'
-      path: '/anfragen'
-      fullPath: '/anfragen/'
-      preLoaderRoute: typeof AppAnfragenIndexRouteImport
+    '/_app/auftraege/': {
+      id: '/_app/auftraege/'
+      path: '/auftraege'
+      fullPath: '/auftraege/'
+      preLoaderRoute: typeof AppAuftraegeIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/anfragen/$requestId': {
-      id: '/_app/anfragen/$requestId'
-      path: '/anfragen/$requestId'
-      fullPath: '/anfragen/$requestId'
-      preLoaderRoute: typeof AppAnfragenRequestIdRouteImport
+    '/_app/auftraege/$requestId': {
+      id: '/_app/auftraege/$requestId'
+      path: '/auftraege/$requestId'
+      fullPath: '/auftraege/$requestId'
+      preLoaderRoute: typeof AppAuftraegeRequestIdRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/anfragen/neu': {
-      id: '/_app/anfragen/neu'
-      path: '/anfragen/neu'
-      fullPath: '/anfragen/neu'
-      preLoaderRoute: typeof AppAnfragenNeuRouteImport
+    '/_app/auftraege/neu': {
+      id: '/_app/auftraege/neu'
+      path: '/auftraege/neu'
+      fullPath: '/auftraege/neu'
+      preLoaderRoute: typeof AppAuftraegeNeuRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/api/dateien/': {
+      id: '/api/dateien/'
+      path: '/api/dateien'
+      fullPath: '/api/dateien/'
+      preLoaderRoute: typeof ApiDateienIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dateien/$fileId': {
+      id: '/api/dateien/$fileId'
+      path: '/api/dateien/$fileId'
+      fullPath: '/api/dateien/$fileId'
+      preLoaderRoute: typeof ApiDateienFileIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_app/admin/organisationen/': {
       id: '/_app/admin/organisationen/'
@@ -448,18 +528,18 @@ interface AppRouteChildren {
   AppAdminRouteRoute: typeof AppAdminRouteRouteWithChildren
   AppKontoRoute: typeof AppKontoRoute
   AppProfilRoute: typeof AppProfilRoute
-  AppAnfragenRequestIdRoute: typeof AppAnfragenRequestIdRoute
-  AppAnfragenNeuRoute: typeof AppAnfragenNeuRoute
-  AppAnfragenIndexRoute: typeof AppAnfragenIndexRoute
+  AppAuftraegeRequestIdRoute: typeof AppAuftraegeRequestIdRoute
+  AppAuftraegeNeuRoute: typeof AppAuftraegeNeuRoute
+  AppAuftraegeIndexRoute: typeof AppAuftraegeIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppAdminRouteRoute: AppAdminRouteRouteWithChildren,
   AppKontoRoute: AppKontoRoute,
   AppProfilRoute: AppProfilRoute,
-  AppAnfragenRequestIdRoute: AppAnfragenRequestIdRoute,
-  AppAnfragenNeuRoute: AppAnfragenNeuRoute,
-  AppAnfragenIndexRoute: AppAnfragenIndexRoute,
+  AppAuftraegeRequestIdRoute: AppAuftraegeRequestIdRoute,
+  AppAuftraegeNeuRoute: AppAuftraegeNeuRoute,
+  AppAuftraegeIndexRoute: AppAuftraegeIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -470,7 +550,11 @@ const rootRouteChildren: RootRouteChildren = {
   AnmeldenRoute: AnmeldenRoute,
   LoginRoute: LoginRoute,
   RegistrierenRoute: RegistrierenRoute,
+  AnfragenSplatRoute: AnfragenSplatRoute,
   ApiHealthRoute: ApiHealthRoute,
+  AnfragenIndexRoute: AnfragenIndexRoute,
+  ApiDateienFileIdRoute: ApiDateienFileIdRoute,
+  ApiDateienIndexRoute: ApiDateienIndexRoute,
   ApiAuthOidcCallbackRoute: ApiAuthOidcCallbackRoute,
   ApiAuthOidcLoginRoute: ApiAuthOidcLoginRoute,
 }

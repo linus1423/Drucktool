@@ -19,6 +19,20 @@
     - "{{ drucktool_dir }}"
     - "{{ drucktool_backup_dir }}"
 
+- name: Ablage für Druckdateien anlegen
+  ansible.builtin.file:
+    path: "{{ drucktool_dir }}/uploads"
+    state: directory
+    # UID des Benutzers node im Container
+    owner: '1000'
+    group: '1000'
+    mode: '0750'
+
+- name: Rsync für das Backup der Druckdateien installieren
+  ansible.builtin.package:
+    name: rsync
+    state: present
+
 - name: Umgebungsdatei schreiben
   ansible.builtin.template:
     src: env.j2

@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import {
+  bigint,
   boolean,
   date,
   index,
@@ -16,12 +17,15 @@ import { INTERNAL_STATUSES, REQUEST_STATUSES } from '../../lib/status'
 import { USER_ROLES, USER_STATUSES } from '../../lib/roles'
 import type { JsonObject } from '../../lib/json'
 import type { BillingAddress, DeliveryAddress } from '../../lib/address'
+import { DELIVERY_METHODS } from '../../lib/order'
+import type { OrderSnapshot } from '../../lib/snapshot'
 
 export const userRole = pgEnum('user_role', USER_ROLES)
 export const userStatus = pgEnum('user_status', USER_STATUSES)
 export const organisationStatus = pgEnum('organisation_status', ['pending', 'active', 'disabled'])
 export const requestStatus = pgEnum('request_status', REQUEST_STATUSES)
 export const internalStatus = pgEnum('internal_status', INTERNAL_STATUSES)
+export const deliveryMethod = pgEnum('delivery_method', DELIVERY_METHODS)
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -128,10 +132,19 @@ export const requests = pgTable(
     description: text('description').notNull().default(''),
     quantity: integer('quantity'),
     desiredDate: date('desired_date'),
-    // Konfigurierbare Produktoptionen (Material, Bindung, ...), folgt mit dem Bestellformular.
+    // Veraltet: freie Optionen aus der Zeit vor dem Wizard.
     options: jsonb('options').$type<JsonObject>().notNull().default({}),
+    // Auswahl aus dem Wizard samt Preis und den dabei geltenden Katalogwerten (Lastenheft 6:
+    // spätere Preisänderungen wirken nicht auf abgeschickte Aufträge). Null bei Altaufträgen.
+    order: jsonb('order').$type<OrderSnapshot>(),
+    totalCents: integer('total_cents'),
     // Kopie der Rechnungsadresse beim Absenden; spätere Profiländerungen wirken nicht zurück.
     billingAddress: jsonb('billing_address').$type<BillingAddress>(),
+    deliveryMethod: deliveryMethod('delivery_method').notNull().default('pickup'),
+    deliveryAddress: jsonb('delivery_address').$type<DeliveryAddress>(),
+    // Zustimmung zu den Auftragsbedingungen beim verbindlichen Absenden (Lastenheft Schritt 8).
+    termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),
+    termsVersion: text('terms_version'),
     status: requestStatus('status').notNull().default('submitted'),
     // Nur für Mitarbeiter sichtbar, solange der Auftrag bestätigt ist.
     internalStatus: internalStatus('internal_status'),
@@ -193,6 +206,38 @@ export const requestEvents = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('request_events_request_idx').on(t.requestId)],
+)
+
+export const fileRole = pgEnum('file_role', ['main', 'cover'])
+export const pdfStatus = pgEnum('pdf_status', ['ok', 'encrypted', 'unreadable', 'not_pdf'])
+
+/**
+ * Hochgeladene Druckdaten. Dateien werden vor dem Absenden hochgeladen und hängen
+ * bis dahin nur am Besitzer; beim Absenden werden sie dem Auftrag zugeordnet.
+ */
+export const requestFiles = pgTable(
+  'request_files',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    requestId: uuid('request_id').references(() => requests.id, { onDelete: 'cascade' }),
+    role: fileRole('role').notNull(),
+    filename: text('filename').notNull(),
+    sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull(),
+    mimeType: text('mime_type').notNull(),
+    sha256: text('sha256').notNull(),
+    storageKey: text('storage_key').notNull().unique(),
+    // Ergebnis der PDF-Prüfung. Auch unlesbare Dateien werden angenommen (Lastenheft 8).
+    pdfStatus: pdfStatus('pdf_status').notNull(),
+    pageCount: integer('page_count'),
+    pageWidthMm: integer('page_width_mm'),
+    pageHeightMm: integer('page_height_mm'),
+    mixedPageSizes: boolean('mixed_page_sizes').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('request_files_request_idx').on(t.requestId), index('request_files_owner_idx').on(t.ownerId)],
 )
 
 export const emailStatus = pgEnum('email_status', ['pending', 'sent', 'failed'])
@@ -335,3 +380,4 @@ export type Format = typeof formats.$inferSelect
 export type Binding = typeof bindings.$inferSelect
 export type Paper = typeof papers.$inferSelect
 export type CoverColor = typeof coverColors.$inferSelect
+export type RequestFile = typeof requestFiles.$inferSelect

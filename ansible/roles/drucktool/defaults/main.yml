@@ -1,6 +1,7 @@
 drucktool_dir: /opt/drucktool
 drucktool_backup_dir: /var/backups/drucktool
 drucktool_backup_keep_days: 14
+drucktool_upload_max_mb: 500
 drucktool_registry_username: ''
 drucktool_registry_password: ''
 drucktool_customer_email_domains: []

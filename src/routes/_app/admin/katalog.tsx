@@ -602,6 +602,11 @@ function PricingTab({ catalog }: { catalog: Catalog }) {
             onChange={(turnaround) => setTexts({ ...texts, turnaround })}
           />
           <TextField label="Was sind Plots?" value={texts.plots} onChange={(plots) => setTexts({ ...texts, plots })} />
+          <TextField
+            label="Auftragsbedingungen beim Absenden"
+            value={texts.terms}
+            onChange={(terms) => setTexts({ ...texts, terms })}
+          />
           <SaveRow
             mutation={saveTexts}
             dirty={JSON.stringify(texts) !== JSON.stringify(catalog.texts)}
@@ -667,6 +672,7 @@ const FIELD_LABELS: Record<string, string> = {
   housePostPlotCents: 'Hauspost Plots',
   turnaround: 'Bearbeitungsdauer',
   plots: 'Was sind Plots?',
+  terms: 'Auftragsbedingungen',
 }
 
 const SETTING_LABELS: Record<string, string> = { pricing: 'Preise', texts: 'Hilfetexte' }

@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import { SMTPServer } from 'smtp-server'
 import { commentMail, statusChangedMail } from '~/server/mail/templates'
 import { BILLING } from './fixtures'
+import { placeOrder } from './order-fixture'
 import { retryDelayMs } from '~/server/mail/worker.server'
 
 describe('E-Mail-Vorlagen', () => {
@@ -20,7 +21,14 @@ describe('E-Mail-Vorlagen', () => {
     const mail = statusChangedMail({ ...ref, from: 'submitted', to: 'confirmed' })
     expect(mail.subject).toBe('#1001 Flyer <b>A5</b>: Bestätigt')
     expect(mail.text).toContain('verbindlich')
-    expect(mail.text).toContain('https://druck.example.com/anfragen/abc')
+    expect(mail.text).toContain('https://druck.example.com/auftraege/abc')
+  })
+
+  it('nennt die Lieferart, wenn der Auftrag fertig ist', () => {
+    expect(statusChangedMail({ ...ref, from: 'confirmed', to: 'completed' }).text).toContain('Regal')
+    const post = statusChangedMail({ ...ref, from: 'confirmed', to: 'completed', deliveryMethod: 'house_post' })
+    expect(post.text).toContain('Hauspost')
+    expect(post.text).not.toContain('Regal')
   })
 
   it('wartet bei Fehlern immer länger, höchstens zwei Stunden', () => {
@@ -35,9 +43,7 @@ process.env.DATABASE_URL = url
 
 describe.skipIf(!url)('Benachrichtigungen (Integration)', async () => {
   const { getDb, schema } = await import('~/server/db/client.server')
-  const { addComment, assignRequest, changeStatus, createRequest, setInternalStatus } = await import(
-    '~/server/requests/requests.server'
-  )
+  const { addComment, assignRequest, changeStatus, setInternalStatus } = await import('~/server/requests/requests.server')
   const { processOutbox } = await import('~/server/mail/worker.server')
   const { createMailTransport } = await import('~/server/mail/transport.server')
   type Principal = import('~/server/requests/requests.server').Principal
@@ -51,7 +57,10 @@ describe.skipIf(!url)('Benachrichtigungen (Integration)', async () => {
 
   async function outboxFor(requestNumber: number) {
     const rows = await getDb().select().from(schema.emailOutbox)
-    return rows.filter((r) => r.subject.includes(`#${requestNumber}`)).map((r) => r.to).sort()
+    return rows
+      .filter((r) => r.subject.includes(`#${requestNumber}`))
+      .map((r) => r.to)
+      .sort()
   }
 
   beforeAll(async () => {
@@ -65,9 +74,23 @@ describe.skipIf(!url)('Benachrichtigungen (Integration)', async () => {
       .values([
         { email: email('staff'), name: 'Staff', role: 'staff', status: 'active' },
         { email: email('staff2'), name: 'Staff 2', role: 'staff', status: 'active' },
-        { email: email('kunde'), name: 'Kunde', role: 'customer', status: 'active', organisationId: org, billingAddress: BILLING },
+        {
+          email: email('kunde'),
+          name: 'Kunde',
+          role: 'customer',
+          status: 'active',
+          organisationId: org,
+          billingAddress: BILLING,
+        },
         { email: email('kollege'), name: 'Kollege', role: 'customer', status: 'active', organisationId: org },
-        { email: email('stumm'), name: 'Stumm', role: 'customer', status: 'active', organisationId: org, emailNotifications: false },
+        {
+          email: email('stumm'),
+          name: 'Stumm',
+          role: 'customer',
+          status: 'active',
+          organisationId: org,
+          emailNotifications: false,
+        },
       ])
       .returning()
     staff = { id: rows[0]!.id, role: 'staff', organisationId: null }
@@ -79,17 +102,20 @@ describe.skipIf(!url)('Benachrichtigungen (Integration)', async () => {
     await (getDb().$client as { end: () => Promise<void> }).end()
   })
 
-  const input = { title: 'Plakate', description: '', quantity: 10, desiredDate: null }
-
   it('informiert bei neuen Aufträgen alle Mitarbeiter und bestätigt dem Kunden den Eingang', async () => {
-    const { number } = await createRequest(customer, input)
+    const { number } = await placeOrder(customer)
     expect(await outboxFor(number)).toEqual([email('kunde'), email('staff'), email('staff2')])
-    const rows = await getDb().select().from(schema.emailOutbox).where(eq(schema.emailOutbox.to, email('kunde')))
-    expect(rows.some((r) => r.subject.startsWith('Auftrag eingereicht'))).toBe(true)
+    const rows = await getDb()
+      .select()
+      .from(schema.emailOutbox)
+      .where(eq(schema.emailOutbox.to, email('kunde')))
+    const receipt = rows.find((r) => r.subject.startsWith('Auftrag eingereicht'))
+    expect(receipt?.text).toContain('> Exemplare:')
+    expect(receipt?.text).toMatch(/> Preis: [\d,.]+\s€/)
   })
 
   it('schreibt bei Statuswechseln durch Mitarbeiter nur den Ersteller an', async () => {
-    const { id, number } = await createRequest(customer, input)
+    const { id, number } = await placeOrder(customer)
     await getDb().delete(schema.emailOutbox)
     await changeStatus(staff, { id, version: 1, to: 'confirmed', note: 'Passt.' })
     // Kollegen derselben Organisation bekommen keine Mail.
@@ -97,7 +123,7 @@ describe.skipIf(!url)('Benachrichtigungen (Integration)', async () => {
   })
 
   it('schreibt nach einer Zuweisung nur noch den Zuständigen an', async () => {
-    const { id, number } = await createRequest(customer, input)
+    const { id, number } = await placeOrder(customer)
     await assignRequest(staff, { id, version: 1, assigneeId: staff2.id })
     await getDb().delete(schema.emailOutbox)
     await addComment(customer, { id, body: 'Frage', internal: false })
@@ -105,7 +131,7 @@ describe.skipIf(!url)('Benachrichtigungen (Integration)', async () => {
   })
 
   it('verschickt interne Notizen nie an Kunden', async () => {
-    const { id, number } = await createRequest(customer, input)
+    const { id, number } = await placeOrder(customer)
     await assignRequest(staff, { id, version: 1, assigneeId: staff2.id })
     await getDb().delete(schema.emailOutbox)
     await addComment(staff, { id, body: 'intern', internal: true })
@@ -113,7 +139,7 @@ describe.skipIf(!url)('Benachrichtigungen (Integration)', async () => {
   })
 
   it('schickt bei internen Unterstatus keine Mail an Kunden', async () => {
-    const { id, number } = await createRequest(customer, input)
+    const { id, number } = await placeOrder(customer)
     await changeStatus(staff, { id, version: 1, to: 'confirmed' })
     await getDb().delete(schema.emailOutbox)
     await setInternalStatus(staff, { id, version: 2, internalStatus: 'problem' })
@@ -121,7 +147,7 @@ describe.skipIf(!url)('Benachrichtigungen (Integration)', async () => {
   })
 
   it('legt bei einem Konflikt keine Mail ab', async () => {
-    const { id, number } = await createRequest(customer, input)
+    const { id, number } = await placeOrder(customer)
     await changeStatus(staff, { id, version: 1, to: 'confirmed' })
     await getDb().delete(schema.emailOutbox)
     await expect(changeStatus(staff, { id, version: 1, to: 'rejected' })).rejects.toThrow()
@@ -169,7 +195,10 @@ describe.skipIf(!url)('Benachrichtigungen (Integration)', async () => {
       expect(failed.nextAttemptAt.getTime()).toBeGreaterThan(Date.now())
       // Noch nicht fällig: nichts zu tun.
       expect(await processOutbox(db, createMailTransport())).toBe(0)
-      await db.update(schema.emailOutbox).set({ nextAttemptAt: new Date(0) }).where(eq(schema.emailOutbox.id, failed.id))
+      await db
+        .update(schema.emailOutbox)
+        .set({ nextAttemptAt: new Date(0) })
+        .where(eq(schema.emailOutbox.id, failed.id))
       expect(await processOutbox(db, createMailTransport())).toBe(1)
     } finally {
       delete process.env.SMTP_URL

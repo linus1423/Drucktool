@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { and, asc, desc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { z } from 'zod'
@@ -12,7 +13,12 @@ import {
   hasInternalStatus,
   type RequestStatus,
 } from '~/lib/status'
-import { requestInputSchema } from '~/lib/validation'
+import { deliveryAddressSchema } from '~/lib/address'
+import { MAX_COVER_PAGES, orderSpecSchema } from '~/lib/order'
+import { calculatePrice } from '~/lib/pricing'
+import { buildSnapshot } from '~/lib/snapshot'
+import { getCatalog } from '../catalog/catalog.server'
+import { claimFiles, listRequestFiles } from '../files/files.server'
 import { getDb, schema, type Tx } from '../db/client.server'
 import { notifyAssigned, notifyComment, notifyRequestCreated, notifyStatusChanged } from '../mail/notifications.server'
 
@@ -30,7 +36,7 @@ function actorOf(user: Principal) {
 }
 
 function notFound(): never {
-  throw new Error('Anfrage nicht gefunden')
+  throw new Error('Auftrag nicht gefunden')
 }
 
 /** Kunden sehen nur ihre eigenen Aufträge (Lastenheft: Organisationen sind optional). */
@@ -52,12 +58,7 @@ async function loadForUpdate(tx: Tx, user: Principal, id: string) {
  * Schreibt eine Änderung nur, wenn die Version noch der erwarteten entspricht
  * (Optimistic Locking). Sonst hat jemand anderes die Anfrage inzwischen geändert.
  */
-async function updateWithVersion(
-  tx: Tx,
-  id: string,
-  expectedVersion: number,
-  values: Partial<typeof requests.$inferInsert>,
-) {
+async function updateWithVersion(tx: Tx, id: string, expectedVersion: number, values: Partial<typeof requests.$inferInsert>) {
   const rows = await tx
     .update(requests)
     .set({ ...values, version: sql`${requests.version} + 1`, updatedAt: new Date() })
@@ -105,7 +106,8 @@ export async function listRequests(user: Principal, filter: z.infer<typeof listF
       status: requests.status,
       internalStatus: isStaffRole(user.role) ? requests.internalStatus : sql<null>`null`,
       quantity: requests.quantity,
-      desiredDate: requests.desiredDate,
+      totalCents: requests.totalCents,
+      deliveryMethod: requests.deliveryMethod,
       createdAt: requests.createdAt,
       updatedAt: requests.updatedAt,
       organisationName: organisations.name,
@@ -144,7 +146,7 @@ export async function getRequestDetail(user: Principal, id: string) {
     .leftJoin(confirmer, eq(confirmer.id, requests.confirmedById))
     .where(and(eq(requests.id, id), visibilityFilter(user)))
     .limit(1)
-  if (!found) throw new Error('Anfrage nicht gefunden')
+  if (!found) throw new Error('Auftrag nicht gefunden')
 
   const comments = await db
     .select({
@@ -176,8 +178,12 @@ export async function getRequestDetail(user: Principal, id: string) {
     .orderBy(asc(requestEvents.createdAt))
 
   const r = found.request
+  const files = await listRequestFiles(id)
   return {
     ...r,
+    // Kunden sehen nur Druck- und Lieferkosten, nicht den internen Rechenweg (Lastenheft Schritt 7).
+    order: r.order && !isStaff ? { ...r.order, price: { ...r.order.price, lines: [] }, pricing: null } : r.order,
+    files,
     organisationName: found.organisationName,
     creatorName: found.creatorName,
     creatorEmail: isStaff ? found.creatorEmail : null,
@@ -198,10 +204,27 @@ function canEditRequest(user: Principal, status: RequestStatus) {
   return status === 'submitted' || status === 'on_hold'
 }
 
-export const createRequestSchema = requestInputSchema.extend({
+export const createRequestSchema = z.object({
+  title: z.string().trim().min(1, 'Titel ist erforderlich').max(200, 'Der Titel ist zu lang'),
+  notes: z.string().trim().max(10_000, 'Die Bemerkungen sind zu lang'),
+  spec: orderSpecSchema,
+  mainFileId: z.uuid('Bitte die Druckdatei hochladen'),
+  coverFileId: z.uuid().nullable(),
+  deliveryAddress: deliveryAddressSchema.nullable(),
+  acceptTerms: z.literal(true, 'Bitte stimmen Sie den Auftragsbedingungen zu.'),
+  /** Der Preis, den der Kunde gesehen hat. Weicht der Server ab, wird nicht abgeschickt. */
+  expectedTotalCents: z.number().int().min(0),
   organisationId: z.uuid().optional(),
 })
 
+export const PRICE_CHANGED_MESSAGE =
+  'Der Preis hat sich inzwischen geändert. Bitte prüfen Sie den neuen Preis und senden Sie den Auftrag erneut ab.'
+
+export function termsVersion(terms: string) {
+  return createHash('sha256').update(terms).digest('hex').slice(0, 12)
+}
+
+/** Verbindliches Absenden aus dem Wizard (Lastenheft Schritt 8). */
 export async function createRequest(user: Principal, input: z.infer<typeof createRequestSchema>) {
   return getDb().transaction(async (tx) => {
     const [me] = await tx
@@ -221,6 +244,20 @@ export async function createRequest(user: Principal, input: z.infer<typeof creat
       if (!org || org.status !== 'active') throw new Error('Die Organisation ist nicht aktiv')
     }
 
+    const { spec } = input
+    if (spec.delivery === 'house_post' && !input.deliveryAddress) {
+      throw new Error('Bitte die Lieferadresse für die Hauspost angeben.')
+    }
+    if (!!spec.coverPaperId !== !!input.coverFileId) {
+      throw new Error(spec.coverPaperId ? 'Bitte die Datei für das Deckblatt hochladen.' : 'Ein Deckblatt ist nicht ausgewählt.')
+    }
+
+    // Preis mit dem aktuellen Katalog neu berechnen; der Browser-Wert ist nur die Vorschau.
+    const catalog = await getCatalog({ onlyAvailable: true }, tx)
+    const priced = calculatePrice(catalog, spec)
+    if (!priced.ok) throw new Error(priced.errors.join(' '))
+    if (priced.price.totalCents !== input.expectedTotalCents) throw new Error(PRICE_CHANGED_MESSAGE)
+
     const [created] = await tx
       .insert(requests)
       .values({
@@ -228,34 +265,51 @@ export async function createRequest(user: Principal, input: z.infer<typeof creat
         createdById: user.id,
         billingAddress: me?.billingAddress ?? null,
         title: input.title,
-        description: input.description,
-        quantity: input.quantity,
-        desiredDate: input.desiredDate,
+        description: input.notes,
+        quantity: spec.copies,
+        order: buildSnapshot(spec, priced.price, priced.order, catalog.pricing),
+        totalCents: priced.price.totalCents,
+        deliveryMethod: spec.delivery,
+        deliveryAddress: spec.delivery === 'house_post' ? input.deliveryAddress : null,
+        termsAcceptedAt: new Date(),
+        termsVersion: termsVersion(catalog.texts.terms),
       })
       .returning({ id: requests.id, number: requests.number })
+
+    const files = await claimFiles(tx, user, created!.id, { main: input.mainFileId, cover: input.coverFileId })
+    // Lesbare PDFs geben die Seitenzahl vor; nur bei unlesbaren Dateien zählt die Angabe des Kunden.
+    if (files.main.pageCount != null && files.main.pageCount !== spec.pages) {
+      throw new Error(`Die Seitenzahl passt nicht zur Datei (${files.main.pageCount} Seiten).`)
+    }
+    if (files.cover?.pageCount != null && files.cover.pageCount !== spec.coverPages) {
+      throw new Error(
+        files.cover.pageCount > MAX_COVER_PAGES
+          ? `Die Deckblatt-Datei darf höchstens ${MAX_COVER_PAGES} Seiten haben (vorne und hinten).`
+          : `Die Seitenzahl passt nicht zur Deckblatt-Datei (${files.cover.pageCount} Seiten).`,
+      )
+    }
+
     await tx.insert(requestEvents).values({ requestId: created!.id, actorId: user.id, type: 'created', toStatus: 'submitted' })
     await notifyRequestCreated(tx, user, created!.id)
     return created!
   })
 }
 
-export const updateRequestSchema = requestInputSchema.extend({
+export const updateRequestSchema = z.object({
   id: z.uuid(),
   version: z.number().int().positive(),
+  title: z.string().trim().min(1, 'Titel ist erforderlich').max(200, 'Der Titel ist zu lang'),
+  notes: z.string().trim().max(10_000, 'Die Bemerkungen sind zu lang'),
 })
 
+/** Titel und Bemerkungen. Optionen und Preis ändern Mitarbeiter gesondert (Issue #50). */
 export async function updateRequest(user: Principal, input: z.infer<typeof updateRequestSchema>) {
   return getDb().transaction(async (tx) => {
     const current = await loadForUpdate(tx, user, input.id)
     if (!canEditRequest(user, current.status)) {
-      throw new Error('Die Anfrage kann in diesem Status nicht mehr bearbeitet werden')
+      throw new Error('Der Auftrag kann in diesem Status nicht mehr bearbeitet werden')
     }
-    const values = {
-      title: input.title,
-      description: input.description,
-      quantity: input.quantity,
-      desiredDate: input.desiredDate,
-    }
+    const values = { title: input.title, description: input.notes }
     const changed = (Object.keys(values) as (keyof typeof values)[]).filter((k) => values[k] !== current[k])
     const updated = await updateWithVersion(tx, input.id, input.version, values)
     if (changed.length > 0) {
@@ -357,11 +411,7 @@ export async function assignRequest(user: Principal, input: z.infer<typeof assig
         .select({ name: users.name })
         .from(users)
         .where(
-          and(
-            eq(users.id, input.assigneeId),
-            eq(users.status, 'active'),
-            inArray(users.role, ['staff', 'admin', 'superadmin']),
-          ),
+          and(eq(users.id, input.assigneeId), eq(users.status, 'active'), inArray(users.role, ['staff', 'admin', 'superadmin'])),
         )
       if (!assignee) throw new Error('Mitarbeiter nicht gefunden')
       assigneeName = assignee.name
@@ -376,7 +426,7 @@ export async function assignRequest(user: Principal, input: z.infer<typeof assig
         data: { assigneeId: input.assigneeId, assigneeName },
       })
     }
-      await notifyAssigned(tx, user, { requestId: input.id, assigneeId: input.assigneeId })
+    await notifyAssigned(tx, user, { requestId: input.id, assigneeId: input.assigneeId })
     return { version: updated.version }
   })
 }

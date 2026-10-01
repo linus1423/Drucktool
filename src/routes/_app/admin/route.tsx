@@ -3,7 +3,7 @@ import { isAdminRole } from '~/lib/roles'
 
 export const Route = createFileRoute('/_app/admin')({
   beforeLoad: ({ context }) => {
-    if (!isAdminRole(context.user.role)) throw redirect({ to: '/anfragen' })
+    if (!isAdminRole(context.user.role)) throw redirect({ to: '/auftraege' })
   },
   component: Outlet,
 })

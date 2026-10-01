@@ -9,7 +9,7 @@ import { approveRegistrationFn, rejectRegistrationFn } from '~/server/admin/admi
 
 export const Route = createFileRoute('/_app/admin/freigaben')({
   beforeLoad: ({ context }) => {
-    if (context.user.role !== 'superadmin') throw redirect({ to: '/anfragen' })
+    if (context.user.role !== 'superadmin') throw redirect({ to: '/auftraege' })
   },
   loader: ({ context }) => context.queryClient.ensureQueryData(pendingRegistrationsQuery),
   head: () => ({ meta: [{ title: 'Freigaben · Drucktool' }] }),

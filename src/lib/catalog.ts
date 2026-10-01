@@ -20,6 +20,8 @@ export type Pricing = z.infer<typeof pricingSchema>
 export const textsSchema = z.object({
   turnaround: z.string().trim().max(2000),
   plots: z.string().trim().max(2000),
+  /** Auftragsbedingungen, denen Kunden beim Absenden zustimmen. */
+  terms: z.string().trim().max(10_000).default(''),
 })
 export type CatalogTexts = z.infer<typeof textsSchema>
 

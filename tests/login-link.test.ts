@@ -21,14 +21,14 @@ describe.skipIf(!url)('Anmeldung per E-Mail-Link (Integration)', async () => {
   }
 
   it('legt beim ersten Link ein aktives Kundenkonto ohne Organisation an', async () => {
-    const token = await issueLoginLink(email('neu'), '/anfragen/neu')
+    const token = await issueLoginLink(email('neu'), '/auftraege/neu')
     expect(token).toBeTruthy()
     const mails = await getDb().select().from(schema.emailOutbox).where(eq(schema.emailOutbox.to, email('neu')))
     expect(mails).toHaveLength(1)
     expect(mails[0]!.text).toContain(`/anmelden?token=${token}`)
 
     const result = await redeemLoginLink(token!)
-    expect(result).toMatchObject({ redirect: '/anfragen/neu', isNew: true })
+    expect(result).toMatchObject({ redirect: '/auftraege/neu', isNew: true })
     expect(await userByEmail(email('neu'))).toMatchObject({
       role: 'customer',
       status: 'active',

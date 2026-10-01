@@ -1,23 +1,21 @@
 import { useState } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useForm } from '@tanstack/react-form'
-import { queryOptions, useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { z } from 'zod'
 import { Alert, Button, Card, Field, Input, PageHeader, fieldError } from '~/components/ui'
 import { EMPTY_BILLING, EMPTY_DELIVERY } from '~/lib/address'
 import { errorMessage } from '~/lib/errors'
 import { formatDateTime } from '~/lib/format'
-import { currentUserQuery } from '~/lib/queries'
+import { accountQuery, currentUserQuery } from '~/lib/queries'
 import { ROLE_LABELS } from '~/lib/roles'
 import {
-  getMyAccountFn,
+  type getMyAccountFn,
   profileSchema,
   revokeMySessionsFn,
   updateMyNotificationsFn,
   updateMyProfileFn,
 } from '~/server/account/account.functions'
-
-const accountQuery = queryOptions({ queryKey: ['account'], queryFn: () => getMyAccountFn() })
 
 export const Route = createFileRoute('/_app/profil')({
   validateSearch: z.object({ neu: z.coerce.boolean().optional().catch(undefined) }),

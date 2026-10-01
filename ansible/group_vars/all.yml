@@ -16,6 +16,9 @@ drucktool_customer_email_domains: []
 # Absender für E-Mail-Benachrichtigungen. Die SMTP-Zugangsdaten stehen im Vault.
 drucktool_mail_from: 'Drucktool <noreply@example.com>'
 
+# Größte erlaubte Druckdatei in MB. Bei Caddy gibt es kein eigenes Limit.
+drucktool_upload_max_mb: 500
+
 # Anmeldung über OpenID Connect. Leer lassen, um sie abzuschalten.
 # Beim Anbieter als Redirect-URI eintragen: https://<drucktool_domain>/api/auth/oidc/callback
 drucktool_oidc_issuer: ''

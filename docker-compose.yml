@@ -29,6 +29,9 @@ services:
       TRUST_PROXY: ${TRUST_PROXY:-false}
       SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-}
       SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-}
+      UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-500}
+    volumes:
+      - uploads:/app/uploads
     ports:
       - '${APP_PORT:-3000}:3000'
 
@@ -50,3 +53,4 @@ services:
 
 volumes:
   db-data:
+  uploads:

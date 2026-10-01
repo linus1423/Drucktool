@@ -39,11 +39,14 @@ async function loadRequest(tx: Tx, requestId: string) {
       createdById: requests.createdById,
       assigneeId: requests.assigneeId,
       organisationName: organisations.name,
+      order: requests.order,
+      totalCents: requests.totalCents,
+      deliveryMethod: requests.deliveryMethod,
     })
     .from(requests)
     .leftJoin(organisations, eq(organisations.id, requests.organisationId))
     .where(eq(requests.id, requestId))
-  if (!row) throw new Error('Anfrage nicht gefunden')
+  if (!row) throw new Error('Auftrag nicht gefunden')
   return row
 }
 
