@@ -100,10 +100,16 @@ const STATUS_TEXT: Partial<Record<RequestStatus, string>> = {
 const COMPLETED_HOUSE_POST = 'Ihr Auftrag ist fertig und geht mit der nächsten Hauspost an die angegebene Adresse.'
 
 export function statusChangedMail(
-  r: RequestRef & OrderRef & { actorName: string; from: RequestStatus; to: RequestStatus; note?: string | null },
+  r: RequestRef &
+    OrderRef & { actorName: string; from: RequestStatus; to: RequestStatus; note?: string | null; forStaff?: boolean },
 ): MailContent {
   const blocks: Block[] = [{ kind: 'p', text: `${requestLabel(r)}: ${STATUS_LABELS[r.from]} → ${STATUS_LABELS[r.to]}.` }]
-  const text = r.to === 'completed' && r.deliveryMethod === 'house_post' ? COMPLETED_HOUSE_POST : STATUS_TEXT[r.to]
+  // Die Erklärtexte richten sich an Kunden; beobachtende Mitarbeiter bekommen nur den Wechsel.
+  const text = r.forStaff
+    ? null
+    : r.to === 'completed' && r.deliveryMethod === 'house_post'
+      ? COMPLETED_HOUSE_POST
+      : STATUS_TEXT[r.to]
   if (text) blocks.push({ kind: 'p', text })
   if (r.note) blocks.push({ kind: 'quote', text: r.note })
   blocks.push({ kind: 'p', text: `Geändert von ${r.actorName}.` }, requestButton(r))
@@ -173,6 +179,18 @@ export function commentMail(
     },
     ...(r.body ? [{ kind: 'quote', text: r.body } as Block] : []),
     ...(files.length ? [{ kind: 'p', text: `Anhänge: ${files.join(', ')}` } as Block] : []),
+    requestButton(r),
+  ])
+}
+
+export function mentionMail(r: RequestRef & { actorName: string; body: string; internal: boolean }): MailContent {
+  return compose(`${r.actorName} hat Sie erwähnt: ${requestLabel(r)}`, [
+    {
+      kind: 'p',
+      text: `${r.actorName} hat Sie in ${r.internal ? 'einer internen Notiz' : 'einer Nachricht'} zu ${requestLabel(r)} erwähnt:`,
+    },
+    { kind: 'quote', text: r.body },
+    { kind: 'p', text: 'Sie beobachten den Auftrag jetzt und bekommen weitere Nachrichten dazu.' },
     requestButton(r),
   ])
 }
