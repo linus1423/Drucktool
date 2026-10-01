@@ -51,10 +51,7 @@ export const getOrganisationFn = createServerFn({ method: 'GET' })
 
 export const saveOrganisationFn = createServerFn({ method: 'POST' })
   .validator(saveOrganisationSchema)
-  .handler(async ({ data }) => {
-    await requireAdmin()
-    return saveOrganisation(data)
-  })
+  .handler(async ({ data }) => saveOrganisation(await requireAdmin(), data))
 
 export const listUsersFn = createServerFn({ method: 'GET' }).handler(async () => {
   await requireAdmin()

@@ -57,6 +57,11 @@ function AppLayout() {
                 </Link>
               </>
             ) : null}
+            {user.role === 'superadmin' ? (
+              <Link to="/admin/protokoll" className={navLink} activeProps={navActive}>
+                Protokoll
+              </Link>
+            ) : null}
           </nav>
           <div className="flex items-center gap-3 text-sm">
             <Link to="/profil" className="text-right leading-tight hover:underline">

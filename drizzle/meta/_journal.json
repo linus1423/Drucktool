@@ -64,6 +64,13 @@
       "when": 1790867130465,
       "tag": "0008_rate_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790867522889,
+      "tag": "0009_audit_log",
+      "breakpoints": true
     }
   ]
 }
