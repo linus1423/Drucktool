@@ -3,7 +3,7 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
 import { z } from 'zod'
 import { DataTable, dataColumnHelper } from '~/components/DataTable'
-import { Badge, Button, Input, PageHeader, Select, StatusBadge } from '~/components/ui'
+import { Badge, Button, Input, PageHeader, Select, StatusBadge, cx } from '~/components/ui'
 import { AttentionBadge } from '~/components/AttentionBadge'
 import { formatDate, formatDateTime, formatMoney, formatRequestNumber } from '~/lib/format'
 import { DELIVERY_LABELS } from '~/lib/order'
@@ -18,7 +18,7 @@ const date = z.iso.date().optional().catch(undefined)
 // Filter, Sortierung und Seite stehen in der URL, damit Links und „Zurück“ funktionieren (Issue #15).
 const searchSchema = z.object({
   status: z.enum(REQUEST_STATUSES).optional().catch(undefined),
-  ansicht: z.enum(['offen', 'fertig', 'alle', 'meine', 'fuer_mich', 'ueberfaellig']).optional().catch(undefined),
+  ansicht: z.enum(['offen', 'fertig', 'alle', 'meine', 'fuer_mich', 'ungelesen', 'ueberfaellig']).optional().catch(undefined),
   q: z.string().optional().catch(undefined),
   org: z.uuid().optional().catch(undefined),
   zustaendig: z
@@ -67,6 +67,7 @@ function toFilter(search: Search) {
     assignedToMe: view === 'meine' ? true : undefined,
     overdue: view === 'ueberfaellig' ? true : undefined,
     watching: view === 'fuer_mich' ? true : undefined,
+    unread: view === 'ungelesen' ? true : undefined,
     search: search.q || undefined,
     organisationId: search.org,
     assigneeId: search.zustaendig,
@@ -109,7 +110,14 @@ function RequestListPage() {
         header: 'Titel',
         sortFn: 'text',
         cell: (info) => (
-          <Link to="/auftraege/$requestId" params={{ requestId: info.row.original.id }} className="font-medium hover:underline">
+          <Link
+            to="/auftraege/$requestId"
+            params={{ requestId: info.row.original.id }}
+            className={cx('hover:underline', info.row.original.unread ? 'font-bold' : 'font-medium')}
+          >
+            {info.row.original.unread ? (
+              <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-sky-500 align-middle" aria-label="Ungelesen" />
+            ) : null}
             {info.getValue()}
           </Link>
         ),
@@ -286,6 +294,7 @@ function RequestListPage() {
               <option value="alle">Alle Aufträge</option>
               {staff ? <option value="meine">Mir zugewiesen</option> : null}
               {staff ? <option value="fuer_mich">Für mich (beobachtet)</option> : null}
+              <option value="ungelesen">Ungelesen</option>
               <option value="ueberfaellig">Überfällig</option>
             </Select>
             <Select

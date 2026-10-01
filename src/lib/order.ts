@@ -70,30 +70,35 @@ export const DELIVERY_LABELS: Record<DeliveryMethod, string> = {
 /** Größtes Sonderformat: ein SRA3-Bogen. */
 export const CUSTOM_MAX_MM = { short: 320, long: 450 }
 export const CUSTOM_MIN_MM = 20
-/** Ein Deckblatt besteht aus höchstens zwei Seiten: vorne und hinten. */
-export const MAX_COVER_PAGES = 2
+/** Deckblatt aus der Druckdatei (Issue #85): nur vorne oder vorne und hinten. */
+export const COVER_FROM_MAIN_FILE = ['front', 'frontBack'] as const
+export type CoverFromMainFile = (typeof COVER_FROM_MAIN_FILE)[number]
+export const COVER_FROM_MAIN_FILE_LABELS: Record<CoverFromMainFile, string> = {
+  front: 'nur vorne',
+  frontBack: 'vorne und hinten',
+}
 
 /**
- * Seiten der Druckdatei, die bei einem Deckblatt aus der Druckdatei je Deckblatt
- * genutzt werden: doppelseitig Außen- und Innenseite, einseitig nur die Außenseite.
+ * Deckblätter pro Exemplar. Jedes Deckblatt ist ein beidseitig bedrucktes Blatt, egal wie
+ * viele Seiten die Deckblatt-Datei hat (Issue #87). Aus der Druckdatei gibt es vorne und hinten zwei.
  */
-export function coverPagesPerSheet(duplex: boolean) {
-  return duplex ? 2 : 1
+export function coverSheetsPerCopy(spec: Pick<OrderSpec, 'coverFromMainFile'>) {
+  return spec.coverFromMainFile === 'frontBack' ? 2 : 1
 }
 
 /**
  * Welche Seiten der Druckdatei auf das Deckblattpapier kommen, oder null, wenn das
- * Deckblatt eine eigene Datei hat. Für Hinweise im Wizard und auf der Detailseite.
+ * Deckblatt eine eigene Datei hat. Das Deckblatt ist immer beidseitig bedruckt, daher
+ * je Deckblatt zwei Seiten: vorne die ersten zwei, hinten die letzten zwei.
  */
-export function coverPagesFromMainFile(spec: Pick<OrderSpec, 'coverPages' | 'coverFromMainFile' | 'duplex' | 'pages'>) {
-  if (!spec.coverFromMainFile || !spec.coverPages) return null
-  const perSheet = coverPagesPerSheet(spec.duplex)
-  const range = (from: number, to: number) => (from === to ? `Seite ${from}` : `Seiten ${from}–${to}`)
+export function coverPagesFromMainFile(spec: Pick<OrderSpec, 'coverFromMainFile' | 'pages'>) {
+  if (!spec.coverFromMainFile) return null
+  const back = spec.coverFromMainFile === 'frontBack'
   return {
     /** Seiten, die damit nicht mehr im Innenteil gedruckt werden */
-    taken: perSheet * spec.coverPages,
-    front: range(1, perSheet),
-    back: spec.coverPages === 2 ? range(spec.pages - perSheet + 1, spec.pages) : null,
+    taken: back ? 4 : 2,
+    front: 'Seiten 1–2',
+    back: back ? `Seiten ${spec.pages - 1}–${spec.pages}` : null,
   }
 }
 
@@ -106,13 +111,13 @@ export const orderSpecSchema = z.object({
   paperId: z.uuid('Bitte ein Papier wählen'),
   /** Separates Deckblatt auf eigenem Papier. */
   coverPaperId: z.uuid().nullable(),
-  /** Deckblätter: 1 = nur vorne, 2 = vorne und hinten. Mit eigener Datei deren Seitenzahl. */
-  coverPages: z.number().int().min(1).max(MAX_COVER_PAGES).nullable(),
+  /** Seitenzahl der Deckblatt-Datei, nur zur Info: Berechnet wird immer ein beidseitig bedrucktes Blatt. */
+  coverPages: z.number().int().min(1).max(10_000).nullable(),
   /**
    * Ohne eigene Deckblatt-Datei (Issue #85) kommt das Deckblatt aus der Druckdatei:
-   * die ersten Seiten für vorne, ggf. die letzten für hinten. Fehlt in älteren Aufträgen.
+   * die ersten zwei Seiten für vorne, ggf. die letzten zwei für hinten. Fehlt in älteren Aufträgen.
    */
-  coverFromMainFile: z.boolean().default(false),
+  coverFromMainFile: z.enum(COVER_FROM_MAIN_FILE).nullable().default(null),
   coverColorId: z.uuid().nullable(),
   coverBackColorId: z.uuid().nullable(),
   borderless: z.boolean(),
@@ -409,13 +414,6 @@ export function resolveOrder(
     else {
       const ok = paperChoices(catalog, format, size, 'cover').find((c) => c.item.id === coverPaper!.id)
       if (!ok?.allowed) errors.push(`${coverPaper.name}: ${ok?.reason ?? plotterOnlyReason(coverPaper)}`)
-    }
-    if (!spec.coverPages) {
-      errors.push(
-        spec.coverFromMainFile
-          ? 'Bitte angeben, ob das Deckblatt nur vorne oder vorne und hinten ist.'
-          : 'Bitte die Datei für das Deckblatt hochladen.',
-      )
     }
     const fromMain = coverPagesFromMainFile(spec)
     if (fromMain && fromMain.taken >= spec.pages) {

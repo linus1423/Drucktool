@@ -1,6 +1,6 @@
 {
-  "id": "b621880e-b615-45fd-ba21-12dd9f5cdcf3",
-  "prevId": "333b7ad5-13bc-4d47-baac-fb3439d7d39d",
+  "id": "c7681217-ff6d-4372-b59f-4dc246a35698",
+  "prevId": "d5e3b817-46c6-40e4-b3f5-b11821bd8df0",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -923,80 +923,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.paper_cover_colors": {
-      "name": "paper_cover_colors",
-      "schema": "",
-      "columns": {
-        "paper_id": {
-          "name": "paper_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "cover_color_id": {
-          "name": "cover_color_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "paper_cover_colors_unique": {
-          "name": "paper_cover_colors_unique",
-          "columns": [
-            {
-              "expression": "paper_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "cover_color_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "paper_cover_colors_paper_id_papers_id_fk": {
-          "name": "paper_cover_colors_paper_id_papers_id_fk",
-          "tableFrom": "paper_cover_colors",
-          "tableTo": "papers",
-          "columnsFrom": [
-            "paper_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "paper_cover_colors_cover_color_id_cover_colors_id_fk": {
-          "name": "paper_cover_colors_cover_color_id_cover_colors_id_fk",
-          "tableFrom": "paper_cover_colors",
-          "tableTo": "cover_colors",
-          "columnsFrom": [
-            "cover_color_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.papers": {
       "name": "papers",
       "schema": "",
@@ -1616,6 +1542,72 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.request_reads": {
+      "name": "request_reads",
+      "schema": "",
+      "columns": {
+        "request_id": {
+          "name": "request_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "request_reads_request_id_requests_id_fk": {
+          "name": "request_reads_request_id_requests_id_fk",
+          "tableFrom": "request_reads",
+          "tableTo": "requests",
+          "columnsFrom": [
+            "request_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "request_reads_user_id_users_id_fk": {
+          "name": "request_reads_user_id_users_id_fk",
+          "tableFrom": "request_reads",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "request_reads_request_id_user_id_pk": {
+          "name": "request_reads_request_id_user_id_pk",
+          "columns": [
+            "request_id",
+            "user_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.request_watchers": {
       "name": "request_watchers",
       "schema": "",
@@ -2180,29 +2172,11 @@
           "primaryKey": false,
           "notNull": true
         },
-        "first_name": {
-          "name": "first_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "''"
-        },
-        "last_name": {
-          "name": "last_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "''"
-        },
         "name": {
           "name": "name",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "generated": {
-            "as": "btrim(first_name || ' ' || last_name)",
-            "type": "stored"
-          }
+          "notNull": true
         },
         "password_hash": {
           "name": "password_hash",
@@ -2338,72 +2312,6 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.request_reads": {
-      "name": "request_reads",
-      "schema": "",
-      "columns": {
-        "request_id": {
-          "name": "request_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "read_at": {
-          "name": "read_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "request_reads_request_id_requests_id_fk": {
-          "name": "request_reads_request_id_requests_id_fk",
-          "tableFrom": "request_reads",
-          "tableTo": "requests",
-          "columnsFrom": [
-            "request_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "request_reads_user_id_users_id_fk": {
-          "name": "request_reads_user_id_users_id_fk",
-          "tableFrom": "request_reads",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "request_reads_request_id_user_id_pk": {
-          "name": "request_reads_request_id_user_id_pk",
-          "columns": [
-            "request_id",
-            "user_id"
-          ]
-        }
-      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},

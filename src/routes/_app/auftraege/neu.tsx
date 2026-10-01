@@ -12,7 +12,8 @@ import {
   CUSTOM_MAX_MM,
   CUSTOM_MIN_MM,
   DELIVERY_LABELS,
-  MAX_COVER_PAGES,
+  COVER_FROM_MAIN_FILE,
+  COVER_FROM_MAIN_FILE_LABELS,
   coverPagesFromMainFile,
   bindingChoices,
   borderlessChoice,
@@ -22,6 +23,7 @@ import {
   formatSize,
   paperChoices,
   suggestFormat,
+  type CoverFromMainFile,
   type DeliveryMethod,
   type OrderCatalog,
   type OrderSpec,
@@ -54,7 +56,8 @@ type Draft = {
   coverEnabled: boolean
   coverPaperId: string
   coverFile: UploadedFile | null
-  coverManualPages: number
+  /** Ohne Deckblatt-Datei: nur vorne oder vorne und hinten aus der Druckdatei. */
+  coverFromMain: CoverFromMainFile
   coverColorId: string
   coverBackColorId: string
   borderless: boolean
@@ -75,7 +78,7 @@ function pagesOf(d: Draft) {
 function coverPagesOf(d: Draft) {
   if (!d.coverEnabled) return null
   // Ohne Deckblatt-Datei gibt der Kunde an, ob es nur vorne oder vorne und hinten ist.
-  return d.coverFile?.pageCount ?? d.coverManualPages
+  return d.coverFile?.pageCount ?? null
 }
 
 /** Baut aus dem Entwurf eine Bestellung, sobald alle Pflichtangaben da sind. */
@@ -92,7 +95,7 @@ function toSpec(d: Draft): OrderSpec | null {
     paperId: d.paperId,
     coverPaperId: d.coverEnabled && d.coverPaperId ? d.coverPaperId : null,
     coverPages: coverPagesOf(d),
-    coverFromMainFile: d.coverEnabled && !d.coverFile,
+    coverFromMainFile: d.coverEnabled && !d.coverFile ? d.coverFromMain : null,
     coverColorId: d.coverColorId || null,
     coverBackColorId: d.coverBackColorId || null,
     borderless: d.borderless,
@@ -171,7 +174,7 @@ function NewOrderPage() {
     coverEnabled: false,
     coverPaperId: '',
     coverFile: null,
-    coverManualPages: 1,
+    coverFromMain: 'front',
     coverColorId: '',
     coverBackColorId: '',
     borderless: false,
@@ -205,7 +208,7 @@ function NewOrderPage() {
         coverEnabled: !!s.coverPaperId,
         coverPaperId: s.coverPaperId ?? '',
         coverFile: t.coverFile,
-        coverManualPages: s.coverPages ?? 1,
+        coverFromMain: s.coverFromMainFile ?? 'front',
         coverColorId: s.coverColorId ?? '',
         coverBackColorId: s.coverBackColorId ?? '',
         borderless: s.borderless,
@@ -422,8 +425,6 @@ function stepBlockers(catalog: OrderCatalog, d: Draft): (string | null)[] {
   let paper: string | null = !d.paperId ? 'Bitte ein Papier wählen.' : null
   if (!paper && d.coverEnabled) {
     if (!d.coverPaperId) paper = 'Bitte ein Papier für das Deckblatt wählen.'
-    else if ((d.coverFile?.pageCount ?? 0) > MAX_COVER_PAGES)
-      paper = `Die Deckblatt-Datei darf höchstens ${MAX_COVER_PAGES} Seiten haben.`
   }
   const copies = int(d.copies)
   const options = !d.title.trim()
@@ -693,9 +694,9 @@ function PaperStep({ draft, update, catalog }: StepProps) {
             <input type="checkbox" checked={draft.coverEnabled} onChange={(e) => update({ coverEnabled: e.target.checked })} />
             Separates Deckblatt aus anderem Papier
             <HelpTip label="Deckblatt">
-              Das Deckblatt können Sie als eigene PDF hochladen: eine Seite für vorne und optional eine zweite für hinten.
-              Es wird dann einseitig auf das gewählte Papier gedruckt. Ohne eigene Datei nehmen wir die ersten bzw. letzten
-              Seiten Ihrer Druckdatei.
+              Das Deckblatt können Sie als eigene PDF mit beliebig vielen Seiten hochladen. Ohne eigene Datei nehmen
+              wir die ersten bzw. letzten zwei Seiten Ihrer Druckdatei. Jedes Deckblatt wird beidseitig auf das gewählte
+              Papier gedruckt und als ein Blatt berechnet.
             </HelpTip>
           </label>
           {draft.coverEnabled ? (
@@ -708,19 +709,22 @@ function PaperStep({ draft, update, catalog }: StepProps) {
                 onChange={(coverFile) => update({ coverFile })}
               />
               {draft.coverFile ? null : <CoverFromMainFileNote draft={draft} />}
-              {!draft.coverFile || draft.coverFile.pageCount == null ? (
-                <Field label={draft.coverFile ? 'Seiten im Deckblatt' : 'Deckblatt aus der Druckdatei'} htmlFor="coverPages">
+              {draft.coverFile ? null : (
+                <Field label="Deckblatt aus der Druckdatei" htmlFor="coverFromMain">
                   <Select
-                    id="coverPages"
+                    id="coverFromMain"
                     className="w-48"
-                    value={draft.coverManualPages}
-                    onChange={(e) => update({ coverManualPages: Number(e.target.value) })}
+                    value={draft.coverFromMain}
+                    onChange={(e) => update({ coverFromMain: e.target.value as CoverFromMainFile })}
                   >
-                    <option value={1}>{draft.coverFile ? '1 (nur vorne)' : 'nur vorne'}</option>
-                    <option value={2}>{draft.coverFile ? '2 (vorne und hinten)' : 'vorne und hinten'}</option>
+                    {COVER_FROM_MAIN_FILE.map((mode) => (
+                      <option key={mode} value={mode}>
+                        {COVER_FROM_MAIN_FILE_LABELS[mode]}
+                      </option>
+                    ))}
                   </Select>
                 </Field>
-              ) : null}
+              )}
             </>
           ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
@@ -768,22 +772,19 @@ function PaperStep({ draft, update, catalog }: StepProps) {
 /** Erklärt, was ohne eigene Deckblatt-Datei gedruckt wird (Issue #85). */
 function CoverFromMainFileNote({ draft }: { draft: Draft }) {
   const pages = pagesOf(draft)
-  const coverPages = coverPagesOf(draft)
-  const fromMain =
-    pages && coverPages
-      ? coverPagesFromMainFile({ coverFromMainFile: true, coverPages, duplex: draft.duplex, pages })
-      : null
+  const fromMain = pages ? coverPagesFromMainFile({ coverFromMainFile: draft.coverFromMain, pages }) : null
   const which = fromMain
     ? fromMain.back
       ? `${fromMain.front} für das vordere und ${fromMain.back} für das hintere Deckblatt`
       : `${fromMain.front} für das vordere Deckblatt`
-    : draft.duplex
-      ? 'die ersten zwei Seiten für das vordere und ggf. die letzten zwei Seiten für das hintere Deckblatt'
-      : 'die erste Seite für das vordere und ggf. die letzte Seite für das hintere Deckblatt'
+    : draft.coverFromMain === 'frontBack'
+      ? 'die ersten zwei Seiten für das vordere und die letzten zwei Seiten für das hintere Deckblatt'
+      : 'die ersten zwei Seiten für das vordere Deckblatt'
   return (
     <Alert tone="info">
-      Ohne eigene Deckblatt-Datei drucken wir {which} aus Ihrer Druckdatei auf das Deckblattpapier. Diese Seiten werden
-      nicht zusätzlich im Innenteil gedruckt. Bitte legen Sie die Druckdatei entsprechend an.
+      Ohne eigene Deckblatt-Datei drucken wir {which} aus Ihrer Druckdatei beidseitig auf das Deckblattpapier, auch bei
+      einseitigem Druck. Diese Seiten werden nicht zusätzlich im Innenteil gedruckt. Bitte legen Sie die Druckdatei
+      entsprechend an.
     </Alert>
   )
 }

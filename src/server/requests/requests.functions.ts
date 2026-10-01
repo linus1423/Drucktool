@@ -30,6 +30,8 @@ import {
   setWatchingRequest,
   boardFilterSchema,
   listBoard,
+  markRequestRead,
+  markReadSchema,
   watchSchema,
 } from './requests.server'
 
@@ -97,3 +99,6 @@ export const setWatchingFn = createServerFn({ method: 'POST' })
 export const listBoardFn = createServerFn({ method: 'GET' })
   .validator(boardFilterSchema)
   .handler(async ({ data }) => listBoard(await requireStaff(), data))
+export const markReadFn = createServerFn({ method: 'POST' })
+  .validator(markReadSchema)
+  .handler(async ({ data }) => markRequestRead(await requireUser(), data))

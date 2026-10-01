@@ -15,7 +15,7 @@ import {
   type RequestStatus,
 } from '~/lib/status'
 import { deliveryAddressSchema } from '~/lib/address'
-import { MAX_COVER_PAGES, orderSpecSchema } from '~/lib/order'
+import { orderSpecSchema } from '~/lib/order'
 import { calculatePrice } from '~/lib/pricing'
 import { buildSnapshot } from '~/lib/snapshot'
 import { applyPriceOverride, type ChangeProposal } from '~/lib/proposal'
@@ -30,6 +30,7 @@ import {
   listRequestFiles,
 } from '../files/files.server'
 import { getDb, schema, type Tx } from '../db/client.server'
+import { markRead, markReadSchema, readAtFor, unreadExpression } from './reads.server'
 import { addWatchers, clearMute, listWatchers, resolveMentions, setWatching, watchedBy, watcherIds } from './watchers.server'
 import {
   notifyAssigned,
@@ -107,6 +108,8 @@ export const listFilterSchema = z.object({
   overdue: z.boolean().optional(),
   /** Aufträge, die der Benutzer beobachtet (Ansicht "Für mich", Issue #13). */
   watching: z.boolean().optional(),
+  /** Aufträge mit Aktivität anderer seit dem letzten Öffnen (Issue #18). */
+  unread: z.boolean().optional(),
   sort: z.enum(LIST_SORTS).optional(),
   dir: z.enum(['asc', 'desc']).optional(),
   page: z.number().int().min(1).max(100_000).optional(),
@@ -130,6 +133,7 @@ function listConditions(user: Principal, filter: ListFilter) {
   if (filter.done) conditions.push(eq(requests.status, 'completed'))
   if (filter.assignedToMe) conditions.push(eq(requests.assigneeId, user.id))
   if (filter.watching) conditions.push(watchedBy(user.id, requests))
+  if (filter.unread) conditions.push(unreadExpression(user))
   if (staff && filter.organisationId) conditions.push(eq(requests.organisationId, filter.organisationId))
   if (staff && filter.assigneeId) {
     conditions.push(filter.assigneeId === 'none' ? isNull(requests.assigneeId) : eq(requests.assigneeId, filter.assigneeId))
@@ -199,6 +203,7 @@ function listSelection(user: Principal) {
     creatorName: creatorAlias.name,
     creatorEmail: staff ? creatorAlias.email : sql<null>`null`,
     assigneeName: staff ? assigneeAlias.name : sql<null>`null`,
+    unread: unreadExpression(user),
   }
 }
 
@@ -284,6 +289,7 @@ export async function getRequestDetail(user: Principal, id: string) {
       createdAt: requestComments.createdAt,
       authorName: users.name,
       authorIsStaff: sql<boolean>`${users.role} <> 'customer'`,
+      mine: sql<boolean>`${requestComments.authorId} = ${user.id}`,
     })
     .from(requestComments)
     .innerJoin(users, eq(users.id, requestComments.authorId))
@@ -299,6 +305,7 @@ export async function getRequestDetail(user: Principal, id: string) {
       data: requestEvents.data,
       createdAt: requestEvents.createdAt,
       actorName: users.name,
+      mine: sql<boolean>`${requestEvents.actorId} is not distinct from ${user.id}`,
     })
     .from(requestEvents)
     .leftJoin(users, eq(users.id, requestEvents.actorId))
@@ -358,6 +365,9 @@ export async function getRequestDetail(user: Principal, id: string) {
       mentions: mentionedIds.flatMap((m) => (mentionNames.has(m) ? [{ id: m, name: mentionNames.get(m)! }] : [])),
     })),
     watching: watchers.some((w) => w.id === user.id),
+    // Bis hierhin hat der Benutzer den Auftrag gesehen; neuere Einträge anderer werden hervorgehoben (Issue #18).
+    readAt: await readAtFor(user.id, id),
+    loadedAt: new Date(),
     // Wer sonst noch beobachtet, ist eine interne Information.
     watchers: isStaff ? watchers : [],
     events,
@@ -421,7 +431,7 @@ export async function createRequest(user: Principal, input: z.infer<typeof creat
     }
     // Die Deckblatt-Datei ist freiwillig (Issue #85): ohne sie kommt das Deckblatt aus der Druckdatei.
     if (input.coverFileId && !spec.coverPaperId) throw new Error('Ein Deckblatt ist nicht ausgewählt.')
-    if (spec.coverPaperId && spec.coverFromMainFile === !!input.coverFileId) {
+    if (spec.coverPaperId && !!spec.coverFromMainFile === !!input.coverFileId) {
       throw new Error(
         input.coverFileId
           ? 'Mit eigener Deckblatt-Datei wird das Deckblatt nicht aus der Druckdatei gedruckt.'
@@ -469,11 +479,7 @@ export async function createRequest(user: Principal, input: z.infer<typeof creat
       throw new Error(`Die Seitenzahl passt nicht zur Datei (${files.main.pageCount} Seiten).`)
     }
     if (files.cover?.pageCount != null && files.cover.pageCount !== spec.coverPages) {
-      throw new Error(
-        files.cover.pageCount > MAX_COVER_PAGES
-          ? `Die Deckblatt-Datei darf höchstens ${MAX_COVER_PAGES} Seiten haben (vorne und hinten).`
-          : `Die Seitenzahl passt nicht zur Deckblatt-Datei (${files.cover.pageCount} Seiten).`,
-      )
+      throw new Error(`Die Seitenzahl passt nicht zur Deckblatt-Datei (${files.cover.pageCount} Seiten).`)
     }
 
     await tx.insert(requestEvents).values({
@@ -628,7 +634,7 @@ export async function proposeChange(user: Principal, input: z.infer<typeof propo
     const files = await listRequestFiles(input.id)
     // Ohne Deckblatt-Datei kann das Deckblatt nur aus der Druckdatei kommen (Issue #85).
     const hasCoverFile = files.some((f) => f.role === 'cover')
-    if (spec.coverPaperId && spec.coverFromMainFile === hasCoverFile) {
+    if (spec.coverPaperId && !!spec.coverFromMainFile === hasCoverFile) {
       throw new Error(
         hasCoverFile
           ? 'Zu diesem Auftrag gibt es eine Deckblatt-Datei, das Deckblatt kommt nicht aus der Druckdatei.'
@@ -935,4 +941,11 @@ export async function listBoard(user: Principal, filter: z.infer<typeof boardFil
     rows: rows.map((r) => ({ ...r, attention: attentionFor(r, deadlines, now) })),
     truncated: rows.length === BOARD_LIMIT,
   }
+}
+
+export { markReadSchema }
+
+/** Merkt sich, dass der Benutzer den Auftrag gesehen hat (Issue #18). */
+export async function markRequestRead(user: Principal, input: z.infer<typeof markReadSchema>) {
+  return markRead(user, input, (id) => getDb().transaction((tx) => loadForUpdate(tx, user, id)))
 }
