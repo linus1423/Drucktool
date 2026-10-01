@@ -16,8 +16,9 @@ async function pendingRegistration(name: string) {
     .returning()
   const [user] = await db
     .insert(schema.users)
-    .values({ email: `${name}-${Date.now()}@test`, lastName: name, role: 'customer', status: 'pending', organisationId: org!.id })
+    .values({ email: `${name}-${Date.now()}@test`, lastName: name, role: 'customer', status: 'pending' })
     .returning()
+  await db.insert(schema.organisationMembers).values({ userId: user!.id, organisationId: org!.id })
   return { org: org!, user: user! }
 }
 
@@ -26,7 +27,7 @@ async function principal(role: Principal['role']): Promise<Principal> {
     .insert(schema.users)
     .values({ email: `${role}-${Date.now()}-${Math.random()}@test`, lastName: role, role, status: 'active' })
     .returning()
-  return { id: u!.id, role, organisationId: null }
+  return { id: u!.id, role }
 }
 
 describe.skipIf(!url)('Freigabe von Registrierungen (Integration)', () => {
@@ -53,8 +54,8 @@ describe.skipIf(!url)('Freigabe von Registrierungen (Integration)', () => {
     const [existing] = await getDb().insert(schema.organisations).values({ name: 'Bestand AG', status: 'active' }).returning()
     const { org, user } = await pendingRegistration('Ben')
     await approveRegistration(superadmin, { userId: user.id, existingOrganisationId: existing!.id })
-    const [u] = await getDb().select().from(schema.users).where(eq(schema.users.id, user.id))
-    expect(u!.organisationId).toBe(existing!.id)
+    const members = await getDb().select().from(schema.organisationMembers).where(eq(schema.organisationMembers.userId, user.id))
+    expect(members.map((m) => m.organisationId)).toEqual([existing!.id])
     const leftover = await getDb().select().from(schema.organisations).where(eq(schema.organisations.id, org.id))
     expect(leftover).toHaveLength(0)
   })
@@ -79,7 +80,7 @@ describe.skipIf(!url)('Freigabe von Registrierungen (Integration)', () => {
         lastName: user.lastName,
         email: user.email,
         role: 'customer',
-        organisationId: org.id,
+        organisationIds: [org.id],
         status: 'active',
         password: '',
       }),
@@ -96,7 +97,7 @@ describe.skipIf(!url)('Freigabe von Registrierungen (Integration)', () => {
         lastName: 'x',
         email: `x-${Date.now()}@test`,
         role: 'staff',
-        organisationId: null,
+        organisationIds: [],
         status: 'active',
         password: '',
       }),

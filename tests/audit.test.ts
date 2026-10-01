@@ -25,7 +25,7 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
       .insert(schema.users)
       .values({ email: email(`${role}-${Math.random()}`), lastName: role, role, status: 'active' })
       .returning()
-    return { id: u!.id, role, organisationId: null }
+    return { id: u!.id, role }
   }
 
   async function entriesFor(targetId: string) {
@@ -41,8 +41,9 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
       .returning()
     const [anna] = await db
       .insert(schema.users)
-      .values({ email: email('anna'), lastName: 'Anna', role: 'customer', status: 'pending', organisationId: org!.id })
+      .values({ email: email('anna'), lastName: 'Anna', role: 'customer', status: 'pending' })
       .returning()
+    await db.insert(schema.organisationMembers).values({ userId: anna!.id, organisationId: org!.id })
     const [bert] = await db
       .insert(schema.users)
       .values({ email: email('bert'), lastName: 'Bert', role: 'customer', status: 'pending' })
@@ -70,7 +71,7 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
       lastName: 'Clara',
       email: email('clara'),
       role: 'staff',
-      organisationId: null,
+      organisationIds: [],
       password: 'geheimes-passwort-1',
     })
     await admin.updateUser(superadmin, {
@@ -80,7 +81,7 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
       email: email('clara'),
       role: 'admin',
       status: 'active',
-      organisationId: null,
+      organisationIds: [],
       password: 'noch-geheimer-2',
     })
     const entries = await entriesFor(created.id)
@@ -105,7 +106,7 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
         lastName: 'X',
         email: email('verboten'),
         role: 'superadmin',
-        organisationId: null,
+        organisationIds: [],
         password: '',
       }),
     ).rejects.toThrow('Superadmin')
@@ -116,7 +117,7 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
         lastName: 'Y',
         email: email('clara'),
         role: 'staff',
-        organisationId: null,
+        organisationIds: [],
         password: '',
       }),
     ).rejects.toThrow('vergeben')
@@ -177,7 +178,7 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
       lastName: 'Dora',
       email: email('dora'),
       role: 'customer',
-      organisationId: org!.id,
+      organisationIds: [org!.id],
       password: '',
     })
 

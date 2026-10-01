@@ -31,6 +31,7 @@ import {
   listRequestFiles,
 } from '../files/files.server'
 import { getDb, schema, type Tx } from '../db/client.server'
+import { isActiveMember } from '../organisations/organisations.server'
 import { markRead, markReadSchema, readAtFor, unreadExpression } from './reads.server'
 import { addWatchers, clearMute, listWatchers, resolveMentions, setWatching, watchedBy, watcherIds } from './watchers.server'
 import {
@@ -47,7 +48,6 @@ import {
 export type Principal = {
   id: string
   role: 'superadmin' | 'admin' | 'staff' | 'customer'
-  organisationId: string | null
 }
 
 const { requests, requestComments, requestEvents, users, organisations, papers } = schema
@@ -413,15 +413,16 @@ export function termsVersion(terms: string) {
 /** Verbindliches Absenden aus dem Wizard (Lastenheft Schritt 8). */
 export async function createRequest(user: Principal, input: z.infer<typeof createRequestSchema>) {
   return getDb().transaction(async (tx) => {
-    const [me] = await tx
-      .select({ billingAddress: users.billingAddress, organisationId: users.organisationId })
-      .from(users)
-      .where(eq(users.id, user.id))
+    const [me] = await tx.select({ billingAddress: users.billingAddress }).from(users).where(eq(users.id, user.id))
     // Lastenheft 3.1: Die Rechnungsadresse muss vor dem ersten Auftrag hinterlegt sein.
     if (!isStaffRole(user.role) && !me?.billingAddress) {
       throw new Error('Bitte hinterlegen Sie zuerst eine Rechnungsadresse in Ihrem Profil.')
     }
-    const organisationId = isStaffRole(user.role) ? (input.organisationId ?? null) : (me?.organisationId ?? null)
+    // Kunden wählen eine ihrer Organisationen oder bestellen ohne (Issue #68).
+    const organisationId = input.organisationId ?? null
+    if (organisationId && !isStaffRole(user.role) && !(await isActiveMember(tx, user.id, organisationId))) {
+      throw new Error('Sie gehören dieser Organisation nicht (mehr) an.')
+    }
     if (organisationId) {
       const [org] = await tx
         .select({ status: organisations.status })

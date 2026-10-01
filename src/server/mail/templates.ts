@@ -146,6 +146,38 @@ export function registrationReceivedMail(u: { name: string; email: string; organ
   })
 }
 
+export function organisationRequestedMail(r: {
+  customerName: string
+  customerEmail: string
+  name: string
+  details: string
+}): MailContent {
+  return compose('organisation_requested', {
+    kunde: r.customerName,
+    email: r.customerEmail,
+    organisation: r.name,
+    angaben: r.details,
+    link: appUrl('/organisationsanfragen'),
+  })
+}
+
+export function organisationRequestDecisionMail(r: {
+  name: string
+  requested: string
+  organisation: string | null
+  note: string | null
+}): MailContent {
+  if (r.organisation) {
+    return compose('organisation_assigned', {
+      name: r.name,
+      angefragt: r.requested,
+      organisation: r.organisation,
+      link: appUrl('/profil'),
+    })
+  }
+  return compose('organisation_rejected', { name: r.name, angefragt: r.requested, notiz: r.note ?? '' })
+}
+
 export function registrationApprovedMail(u: { name: string }): MailContent {
   return compose('registration_approved', { name: u.name, link: appUrl('/login') })
 }

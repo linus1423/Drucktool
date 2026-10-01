@@ -31,8 +31,8 @@ describe.skipIf(!url)('Druckbogen (Integration)', async () => {
         { email: `${tag}-s@test`, lastName: 'Bogenstaff', role: 'staff', status: 'active' },
       ])
       .returning()
-    customer = { id: rows[0]!.id, role: 'customer', organisationId: null }
-    staff = { id: rows[1]!.id, role: 'staff', organisationId: null }
+    customer = { id: rows[0]!.id, role: 'customer' }
+    staff = { id: rows[1]!.id, role: 'staff' }
     id = (await placeOrder(customer, { title: `${tag} Skript` })).id
   })
 

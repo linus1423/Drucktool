@@ -134,6 +134,13 @@
       "when": 1790888470335,
       "tag": "0018_mail_templates",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790889378130,
+      "tag": "0019_organisation_members",
+      "breakpoints": true
     }
   ]
 }

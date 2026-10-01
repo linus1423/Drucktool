@@ -24,7 +24,7 @@ export type ResolveOptions = {
   roles?: RoleMapping | null
 }
 
-const { users, organisations, oidcAccounts, sessions } = schema
+const { users, organisationMembers, oidcAccounts, sessions } = schema
 
 const INACTIVE = 'Ihr Konto ist nicht aktiv. Bitte wenden Sie sich an die Druckerei.'
 const NO_ROLE = 'Ihr Firmenkonto ist nicht (mehr) für das Drucktool freigeschaltet. Bitte wenden Sie sich an die IT.'
@@ -54,11 +54,7 @@ export function roleFromClaims(claims: OidcClaims, mapping: RoleMapping): 'admin
 
 async function decide(userId: string, claims: OidcClaims, options: ResolveOptions): Promise<OidcResolution> {
   const db = getDb()
-  const [row] = await db
-    .select({ status: users.status, role: users.role, orgStatus: organisations.status })
-    .from(users)
-    .leftJoin(organisations, eq(organisations.id, users.organisationId))
-    .where(eq(users.id, userId))
+  const [row] = await db.select({ status: users.status, role: users.role }).from(users).where(eq(users.id, userId))
   if (!row) return { kind: 'denied', message: INACTIVE }
 
   // Die Rollen der Mitarbeiter kommen bei jeder Anmeldung neu vom Anbieter. Der Superadmin
@@ -74,11 +70,12 @@ async function decide(userId: string, claims: OidcClaims, options: ResolveOption
         .update(users)
         .set({
           role: mapped,
-          organisationId: null,
           status: row.status === 'pending' ? 'active' : row.status,
           updatedAt: new Date(),
         })
         .where(eq(users.id, userId))
+      // Mitarbeiter gehören keiner Kunden-Organisation an.
+      await db.delete(organisationMembers).where(eq(organisationMembers.userId, userId))
       await db.delete(sessions).where(eq(sessions.userId, userId))
       row.role = mapped
       if (row.status === 'pending') row.status = 'active'
@@ -87,7 +84,6 @@ async function decide(userId: string, claims: OidcClaims, options: ResolveOption
 
   if (row.status === 'pending') return { kind: 'pending' }
   if (row.status !== 'active') return { kind: 'denied', message: INACTIVE }
-  if (row.role === 'customer' && row.orgStatus !== 'active') return { kind: 'denied', message: INACTIVE }
   return { kind: 'login', userId }
 }
 
