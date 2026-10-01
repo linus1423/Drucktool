@@ -57,6 +57,13 @@
       "when": 1790866554219,
       "tag": "0007_change_proposals",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790867290161,
+      "tag": "0008_deadlines",
+      "breakpoints": true
     }
   ]
 }

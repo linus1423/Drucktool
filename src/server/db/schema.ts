@@ -149,6 +149,12 @@ export const requests = pgTable(
     // Offener Änderungsvorschlag der Druckerei, wartet auf die Zustimmung des Kunden (Issue #50).
     proposal: jsonb('proposal').$type<ChangeProposal>(),
     status: requestStatus('status').notNull().default('submitted'),
+    // Seit wann der Auftrag im aktuellen Status steht (für „wartet lange“, Issue #14).
+    statusChangedAt: timestamp('status_changed_at', { withTimezone: true }).notNull().defaultNow(),
+    // Von der Druckerei zugesagter Termin, für Kunden sichtbar.
+    promisedDate: date('promised_date'),
+    // Interne Frist, nur für Mitarbeiter.
+    internalDueDate: date('internal_due_date'),
     // Nur für Mitarbeiter sichtbar, solange der Auftrag bestätigt ist.
     internalStatus: internalStatus('internal_status'),
     // Die Druckerei nimmt einen Auftrag immer durch einen Mitarbeiter an.
@@ -195,6 +201,7 @@ export const requestEventType = pgEnum('request_event_type', [
   'change_accepted',
   'change_rejected',
   'change_withdrawn',
+  'dates_changed',
 ])
 
 export const requestEvents = pgTable(

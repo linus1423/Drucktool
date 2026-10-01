@@ -13,6 +13,7 @@ import {
 import type { JsonObject } from '~/lib/json'
 import { getDb, schema, type Tx } from '../db/client.server'
 import type { Principal } from '../requests/requests.server'
+import { DEFAULT_DEADLINE_SETTINGS, deadlineSettingsSchema, type DeadlineSettings } from '~/lib/deadlines'
 
 const { formats, bindings, formatBindings, papers, coverColors, settings, catalogChanges, users } = schema
 
@@ -30,6 +31,13 @@ export function getPricing(db: Db = getDb()): Promise<Pricing> {
 
 export function getTexts(db: Db = getDb()): Promise<CatalogTexts> {
   return readSetting(db, 'texts', (v) => textsSchema.parse(v))
+}
+
+/** Schwellwerte für „wartet lange“; fehlt die Einstellung, gelten die Standardwerte. */
+export async function getDeadlineSettings(db: Db = getDb()): Promise<DeadlineSettings> {
+  const [row] = await db.select({ value: settings.value }).from(settings).where(eq(settings.key, 'deadlines'))
+  const parsed = deadlineSettingsSchema.safeParse(row?.value)
+  return parsed.success ? parsed.data : DEFAULT_DEADLINE_SETTINGS
 }
 
 /** Vollständiger Katalog. Mit onlyAvailable nur, was Kunden gerade wählen dürfen. */
@@ -181,6 +189,10 @@ export async function savePricing(actor: Principal, input: Pricing) {
 
 export async function saveTexts(actor: Principal, input: CatalogTexts) {
   await saveSetting(actor, 'texts', input)
+}
+
+export async function saveDeadlineSettings(actor: Principal, input: DeadlineSettings) {
+  await saveSetting(actor, 'deadlines', input)
 }
 
 export async function listCatalogChanges(limit = 100) {

@@ -4,6 +4,8 @@ import { requireStaff, requireUser } from '../auth/guards.server'
 import {
   answerChange,
   answerChangeSchema,
+  setDates,
+  setDatesSchema,
   proposeChange,
   proposeChangeSchema,
   withdrawChange,
@@ -74,3 +76,7 @@ export const answerChangeFn = createServerFn({ method: 'POST' })
 export const withdrawChangeFn = createServerFn({ method: 'POST' })
   .validator(withdrawChangeSchema)
   .handler(async ({ data }) => withdrawChange(await requireStaff(), data))
+
+export const setDatesFn = createServerFn({ method: 'POST' })
+  .validator(setDatesSchema)
+  .handler(async ({ data }) => setDates(await requireStaff(), data))

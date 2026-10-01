@@ -19,7 +19,8 @@ import { MAX_COVER_PAGES, orderSpecSchema } from '~/lib/order'
 import { calculatePrice } from '~/lib/pricing'
 import { buildSnapshot } from '~/lib/snapshot'
 import { applyPriceOverride, type ChangeProposal } from '~/lib/proposal'
-import { getCatalog } from '../catalog/catalog.server'
+import { getCatalog, getDeadlineSettings } from '../catalog/catalog.server'
+import { attentionFor, berlinToday } from '~/lib/deadlines'
 import { claimFiles, listRequestFiles } from '../files/files.server'
 import { getDb, schema, type Tx } from '../db/client.server'
 import {
@@ -27,6 +28,7 @@ import {
   notifyChangeAnswered,
   notifyChangeProposed,
   notifyComment,
+  notifyPromisedDate,
   notifyRequestCreated,
   notifyStatusChanged,
 } from '../mail/notifications.server'
@@ -93,6 +95,8 @@ export const listFilterSchema = z.object({
   /** Angelegt ab bzw. bis einschließlich (YYYY-MM-DD, deutsche Zeit). */
   from: z.iso.date().optional(),
   to: z.iso.date().optional(),
+  /** Offene Aufträge, deren zugesagter Termin (bei Mitarbeitern auch die interne Frist) verstrichen ist. */
+  overdue: z.boolean().optional(),
   sort: z.enum(LIST_SORTS).optional(),
   dir: z.enum(['asc', 'desc']).optional(),
   page: z.number().int().min(1).max(100_000).optional(),
@@ -123,6 +127,13 @@ function listConditions(user: Principal, filter: ListFilter) {
   if (filter.from) conditions.push(sql`${requests.createdAt} >= (${filter.from}::date)::timestamp at time zone 'Europe/Berlin'`)
   if (filter.to) {
     conditions.push(sql`${requests.createdAt} < (${filter.to}::date + 1)::timestamp at time zone 'Europe/Berlin'`)
+  }
+  if (filter.overdue) {
+    const today = berlinToday()
+    conditions.push(
+      inArray(requests.status, OPEN_STATUSES),
+      or(sql`${requests.promisedDate} < ${today}`, staff ? sql`${requests.internalDueDate} < ${today}` : undefined),
+    )
   }
   if (filter.search) {
     const term = `%${filter.search.replace(/[%_\\]/g, '\\$&')}%`
@@ -170,6 +181,9 @@ function listSelection(user: Principal) {
     deliveryMethod: requests.deliveryMethod,
     createdAt: requests.createdAt,
     updatedAt: requests.updatedAt,
+    statusChangedAt: requests.statusChangedAt,
+    promisedDate: requests.promisedDate,
+    internalDueDate: staff ? requests.internalDueDate : sql<null>`null`,
     organisationName: organisations.name,
     creatorName: creatorAlias.name,
     creatorEmail: staff ? creatorAlias.email : sql<null>`null`,
@@ -192,7 +206,7 @@ export async function listRequests(user: Principal, filter: ListFilter) {
   const pageSize = filter.pageSize ?? 50
   const page = filter.page ?? 1
   const where = listConditions(user, filter)
-  const [rows, [counted]] = await Promise.all([
+  const [rows, [counted], deadlines] = await Promise.all([
     listRowsQuery(user)
       .where(where)
       .orderBy(...listOrder(filter))
@@ -204,8 +218,15 @@ export async function listRequests(user: Principal, filter: ListFilter) {
       .leftJoin(organisations, eq(organisations.id, requests.organisationId))
       .innerJoin(creatorAlias, eq(creatorAlias.id, requests.createdById))
       .where(where),
+    getDeadlineSettings(),
   ])
-  return { rows, total: counted?.count ?? 0, page, pageSize }
+  const now = new Date()
+  return {
+    rows: rows.map((r) => ({ ...r, attention: attentionFor(r, deadlines, now) })),
+    total: counted?.count ?? 0,
+    page,
+    pageSize,
+  }
 }
 
 export const EXPORT_LIMIT = 10_000
@@ -273,7 +294,8 @@ export async function getRequestDetail(user: Principal, id: string) {
     .orderBy(asc(requestEvents.createdAt))
 
   const r = found.request
-  const files = await listRequestFiles(id)
+  const [files, deadlines] = await Promise.all([listRequestFiles(id), getDeadlineSettings()])
+  const internalDueDate = isStaff ? r.internalDueDate : null
   return {
     ...r,
     // Kunden sehen nur Druck- und Lieferkosten, nicht den internen Rechenweg (Lastenheft Schritt 7).
@@ -294,6 +316,8 @@ export async function getRequestDetail(user: Principal, id: string) {
     assigneeId: isStaff ? r.assigneeId : null,
     assigneeName: isStaff ? found.assigneeName : null,
     internalStatus: isStaff ? r.internalStatus : null,
+    internalDueDate,
+    attention: attentionFor({ ...r, internalDueDate }, deadlines),
     confirmedByName: found.confirmedByName,
     comments,
     events,
@@ -457,7 +481,7 @@ export async function changeStatus(user: Principal, input: z.infer<typeof change
       )
     }
 
-    const values: Partial<typeof requests.$inferInsert> = { status: input.to }
+    const values: Partial<typeof requests.$inferInsert> = { status: input.to, statusChangedAt: new Date() }
     if (endsOrder) values.proposal = null
     // Der interne Unterstatus gilt nur, solange der Auftrag bestätigt ist.
     if (!hasInternalStatus(input.to)) values.internalStatus = null
@@ -533,7 +557,12 @@ export async function proposeChange(user: Principal, input: z.infer<typeof propo
       // Ein ersetzter Vorschlag behält das ursprüngliche Ziel.
       returnStatus: current.proposal?.returnStatus ?? (current.status === 'confirmed' ? 'confirmed' : 'submitted'),
     }
-    const updated = await updateWithVersion(tx, input.id, input.version, { proposal, status: 'on_hold', internalStatus: null })
+    const updated = await updateWithVersion(tx, input.id, input.version, {
+      proposal,
+      status: 'on_hold',
+      internalStatus: null,
+      ...(current.status !== 'on_hold' ? { statusChangedAt: new Date() } : {}),
+    })
     await tx.insert(requestEvents).values({
       requestId: input.id,
       actorId: user.id,
@@ -571,6 +600,7 @@ export async function answerChange(user: Principal, input: z.infer<typeof answer
           deliveryMethod: p.order.spec.delivery,
           deliveryAddress: p.deliveryAddress,
           status: p.returnStatus,
+          statusChangedAt: new Date(),
         }
       : { proposal: null }
     const updated = await updateWithVersion(tx, input.id, input.version, values)
@@ -598,6 +628,49 @@ export async function withdrawChange(user: Principal, input: z.infer<typeof with
     if (!current.proposal) throw new Error('Es gibt keinen offenen Änderungsvorschlag')
     const updated = await updateWithVersion(tx, input.id, input.version, { proposal: null })
     await tx.insert(requestEvents).values({ requestId: input.id, actorId: user.id, type: 'change_withdrawn' })
+    return { version: updated.version }
+  })
+}
+
+export const setDatesSchema = z.object({
+  id: z.uuid(),
+  version: z.number().int().positive(),
+  promisedDate: z.iso.date('Bitte ein gültiges Datum angeben').nullable(),
+  internalDueDate: z.iso.date('Bitte ein gültiges Datum angeben').nullable(),
+})
+
+/**
+ * Zugesagter Termin (für den Kunden sichtbar, er bekommt eine Mail) und interne Frist (nur Mitarbeiter).
+ * Beide Änderungen landen getrennt im Verlauf, damit Kunden die interne Frist nie sehen.
+ */
+export async function setDates(user: Principal, input: z.infer<typeof setDatesSchema>) {
+  if (!isStaffRole(user.role)) throw new Error('Keine Berechtigung')
+  return getDb().transaction(async (tx) => {
+    const current = await loadForUpdate(tx, user, input.id)
+    if (current.version !== input.version) throw new Error(CONFLICT_MESSAGE)
+    if (TERMINAL_STATUSES.has(current.status)) throw new Error('Der Auftrag ist abgeschlossen')
+    const updated = await updateWithVersion(tx, input.id, input.version, {
+      promisedDate: input.promisedDate,
+      internalDueDate: input.internalDueDate,
+    })
+    if (current.promisedDate !== input.promisedDate) {
+      await tx.insert(requestEvents).values({
+        requestId: input.id,
+        actorId: user.id,
+        type: 'dates_changed',
+        data: { field: 'promisedDate', from: current.promisedDate, to: input.promisedDate },
+      })
+      await notifyPromisedDate(tx, user, { requestId: input.id, date: input.promisedDate })
+    }
+    if (current.internalDueDate !== input.internalDueDate) {
+      await tx.insert(requestEvents).values({
+        requestId: input.id,
+        actorId: user.id,
+        type: 'dates_changed',
+        internal: true,
+        data: { field: 'internalDueDate', from: current.internalDueDate, to: input.internalDueDate },
+      })
+    }
     return { version: updated.version }
   })
 }

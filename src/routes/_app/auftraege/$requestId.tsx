@@ -3,9 +3,10 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { formatBillingAddress, formatDeliveryAddress } from '~/lib/address'
 import { formatBytes } from '~/components/FileUpload'
+import { AttentionBadge } from '~/components/AttentionBadge'
 import { ProposalCard, ProposeChangeForm } from '~/components/ChangeProposal'
 import { RequestFields, useRequestForm } from '~/components/RequestFields'
-import { Alert, Badge, Button, Card, Field, Select, StatusBadge, Textarea, cx } from '~/components/ui'
+import { Alert, Badge, Button, Card, Field, Input, Select, StatusBadge, Textarea, cx } from '~/components/ui'
 import { errorMessage, isConflictError } from '~/lib/errors'
 import { formatDate, formatDateTime, formatMoney, formatRequestNumber } from '~/lib/format'
 import { DELIVERY_LABELS } from '~/lib/order'
@@ -27,6 +28,7 @@ import {
   addCommentFn,
   assignRequestFn,
   changeStatusFn,
+  setDatesFn,
   setInternalStatusFn,
   updateRequestFn,
 } from '~/server/requests/requests.functions'
@@ -83,6 +85,7 @@ function RequestDetailPage() {
             {request.title}
           </h1>
           <StatusBadge status={request.status} />
+          {request.attention ? <AttentionBadge attention={request.attention} /> : null}
           {request.internalStatus ? (
             <Badge className={INTERNAL_STATUS_TONES[request.internalStatus]}>
               {INTERNAL_STATUS_LABELS[request.internalStatus]}
@@ -145,6 +148,12 @@ function RequestDetailPage() {
                     </div>
                   </>
                 )}
+                {request.promisedDate ? (
+                  <div>
+                    <dt className="font-medium text-slate-500">Zugesagter Termin</dt>
+                    <dd className="mt-0.5">{formatDate(request.promisedDate)}</dd>
+                  </div>
+                ) : null}
                 <div className="sm:col-span-2">
                   <dt className="font-medium text-slate-500">Bemerkungen</dt>
                   <dd className="mt-0.5 whitespace-pre-wrap">{request.description || '–'}</dd>
@@ -185,6 +194,7 @@ function RequestDetailPage() {
           <PriceCard request={request} staff={staff} />
           <StatusActions request={request} staff={staff} />
           {staff && hasInternalStatus(request.status) ? <InternalStatusCard request={request} /> : null}
+          {staff && !TERMINAL_STATUSES.has(request.status) ? <DatesCard request={request} /> : null}
           {staff ? <Assignment request={request} /> : null}
           <History request={request} />
         </div>
@@ -390,6 +400,51 @@ function InternalStatusCard({ request }: { request: Detail }) {
   )
 }
 
+function DatesCard({ request }: { request: Detail }) {
+  const refresh = useRefresh(request.id)
+  const [promised, setPromised] = useState(request.promisedDate ?? '')
+  const [internal, setInternal] = useState(request.internalDueDate ?? '')
+  const mutation = useMutation({
+    mutationFn: () =>
+      setDatesFn({
+        data: { id: request.id, version: request.version, promisedDate: promised || null, internalDueDate: internal || null },
+      }),
+    onSuccess: refresh,
+  })
+  const dirty = promised !== (request.promisedDate ?? '') || internal !== (request.internalDueDate ?? '')
+
+  return (
+    <Card title="Termine">
+      <form
+        className="space-y-3"
+        onSubmit={(e) => {
+          e.preventDefault()
+          mutation.mutate()
+        }}
+      >
+        <ErrorBox
+          error={mutation.error}
+          onReload={() => {
+            mutation.reset()
+            void refresh()
+          }}
+        />
+        <Field label="Zugesagter Termin" htmlFor="promisedDate" hint="Sieht der Kunde, er bekommt eine E-Mail.">
+          <Input id="promisedDate" type="date" value={promised} onChange={(e) => setPromised(e.target.value)} />
+        </Field>
+        <Field label="Interne Frist" htmlFor="internalDueDate" hint="Nur für Mitarbeiter sichtbar.">
+          <Input id="internalDueDate" type="date" value={internal} onChange={(e) => setInternal(e.target.value)} />
+        </Field>
+        <div className="flex justify-end">
+          <Button type="submit" disabled={!dirty || mutation.isPending}>
+            Termine speichern
+          </Button>
+        </div>
+      </form>
+    </Card>
+  )
+}
+
 function Assignment({ request }: { request: Detail }) {
   const refresh = useRefresh(request.id)
   const staffList = useQuery(assignableStaffQuery)
@@ -532,6 +587,11 @@ function describeEvent(e: Detail['events'][number]) {
       return 'hat die Änderung abgelehnt'
     case 'change_withdrawn':
       return 'hat den Änderungsvorschlag zurückgezogen'
+    case 'dates_changed': {
+      const what = e.data.field === 'internalDueDate' ? 'die interne Frist' : 'den zugesagten Termin'
+      const to = typeof e.data.to === 'string' ? e.data.to : null
+      return to ? `hat ${what} auf ${formatDate(to)} gesetzt` : `hat ${what} entfernt`
+    }
   }
 }
 

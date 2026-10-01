@@ -4,7 +4,8 @@ import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
 import { z } from 'zod'
 import { DataTable, dataColumnHelper } from '~/components/DataTable'
 import { Badge, Button, Input, PageHeader, Select, StatusBadge } from '~/components/ui'
-import { formatDateTime, formatMoney, formatRequestNumber } from '~/lib/format'
+import { AttentionBadge } from '~/components/AttentionBadge'
+import { formatDate, formatDateTime, formatMoney, formatRequestNumber } from '~/lib/format'
 import { DELIVERY_LABELS } from '~/lib/order'
 import { activeOrganisationsQuery, assignableStaffQuery, requestListQuery } from '~/lib/queries'
 import { isStaffRole } from '~/lib/roles'
@@ -17,7 +18,7 @@ const date = z.iso.date().optional().catch(undefined)
 // Filter, Sortierung und Seite stehen in der URL, damit Links und „Zurück“ funktionieren (Issue #15).
 const searchSchema = z.object({
   status: z.enum(REQUEST_STATUSES).optional().catch(undefined),
-  ansicht: z.enum(['offen', 'fertig', 'alle', 'meine']).optional().catch(undefined),
+  ansicht: z.enum(['offen', 'fertig', 'alle', 'meine', 'ueberfaellig']).optional().catch(undefined),
   q: z.string().optional().catch(undefined),
   org: z.uuid().optional().catch(undefined),
   zustaendig: z
@@ -64,6 +65,7 @@ function toFilter(search: Search) {
     open: view === 'offen' && !search.status ? true : undefined,
     done: view === 'fertig' && !search.status ? true : undefined,
     assignedToMe: view === 'meine' ? true : undefined,
+    overdue: view === 'ueberfaellig' ? true : undefined,
     search: search.q || undefined,
     organisationId: search.org,
     assigneeId: search.zustaendig,
@@ -135,9 +137,22 @@ function RequestListPage() {
             <span className="inline-flex flex-wrap gap-1">
               <StatusBadge status={info.getValue()} />
               {internal ? <Badge className={INTERNAL_STATUS_TONES[internal]}>{INTERNAL_STATUS_LABELS[internal]}</Badge> : null}
+              {info.row.original.attention ? <AttentionBadge attention={info.row.original.attention} /> : null}
             </span>
           )
         },
+      }),
+      col.accessor('promisedDate', {
+        header: 'Termin',
+        enableSorting: false,
+        cell: (info) => (
+          <>
+            {info.getValue() ? formatDate(info.getValue()) : '–'}
+            {info.row.original.internalDueDate ? (
+              <span className="block text-xs text-slate-500">intern {formatDate(info.row.original.internalDueDate)}</span>
+            ) : null}
+          </>
+        ),
       }),
       col.accessor('quantity', {
         header: 'Exemplare',
@@ -252,13 +267,14 @@ function RequestListPage() {
             <Select
               aria-label="Ansicht"
               value={search.ansicht ?? 'offen'}
-              onChange={(e) => setFilter({ ansicht: e.target.value as 'offen' | 'fertig' | 'alle' | 'meine' })}
+              onChange={(e) => setFilter({ ansicht: e.target.value as NonNullable<Search['ansicht']> })}
               className="w-auto"
             >
               <option value="offen">{staff ? 'Warteschlange (offen)' : 'Offene Aufträge'}</option>
               <option value="fertig">Fertige Aufträge</option>
               <option value="alle">Alle Aufträge</option>
               {staff ? <option value="meine">Mir zugewiesen</option> : null}
+              <option value="ueberfaellig">Überfällig</option>
             </Select>
             <Select
               aria-label="Status"
