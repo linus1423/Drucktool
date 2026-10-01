@@ -3,7 +3,15 @@ import { alias } from 'drizzle-orm/pg-core'
 import { z } from 'zod'
 import { CONFLICT_MESSAGE } from '~/lib/errors'
 import { isStaffRole } from '~/lib/roles'
-import { REQUEST_STATUSES, allowedTransitions, canTransition, TERMINAL_STATUSES, type RequestStatus } from '~/lib/status'
+import {
+  INTERNAL_STATUSES,
+  OPEN_STATUSES,
+  REQUEST_STATUSES,
+  allowedTransitions,
+  canTransition,
+  hasInternalStatus,
+  type RequestStatus,
+} from '~/lib/status'
 import { requestInputSchema } from '~/lib/validation'
 import { getDb, schema, type Tx } from '../db/client.server'
 import { notifyAssigned, notifyComment, notifyRequestCreated, notifyStatusChanged } from '../mail/notifications.server'
@@ -25,11 +33,10 @@ function notFound(): never {
   throw new Error('Anfrage nicht gefunden')
 }
 
-/** Filter, der Kunden auf die Anfragen ihrer eigenen Organisation beschränkt. */
+/** Kunden sehen nur ihre eigenen Aufträge (Lastenheft: Organisationen sind optional). */
 function visibilityFilter(user: Principal): SQL | undefined {
   if (isStaffRole(user.role)) return undefined
-  if (!user.organisationId) return sql`false`
-  return eq(requests.organisationId, user.organisationId)
+  return eq(requests.createdById, user.id)
 }
 
 async function loadForUpdate(tx: Tx, user: Principal, id: string) {
@@ -63,17 +70,18 @@ async function updateWithVersion(
 export const listFilterSchema = z.object({
   status: z.enum(REQUEST_STATUSES).optional(),
   open: z.boolean().optional(),
+  done: z.boolean().optional(),
   assignedToMe: z.boolean().optional(),
   search: z.string().trim().max(200).optional(),
 })
 
 export async function listRequests(user: Principal, filter: z.infer<typeof listFilterSchema>) {
   const assignee = alias(users, 'assignee')
+  const creator = alias(users, 'creator')
   const conditions: (SQL | undefined)[] = [visibilityFilter(user)]
   if (filter.status) conditions.push(eq(requests.status, filter.status))
-  if (filter.open) {
-    conditions.push(sql`${requests.status} not in ('completed', 'rejected', 'cancelled')`)
-  }
+  if (filter.open) conditions.push(inArray(requests.status, OPEN_STATUSES))
+  if (filter.done) conditions.push(eq(requests.status, 'completed'))
   if (filter.assignedToMe) conditions.push(eq(requests.assigneeId, user.id))
   if (filter.search) {
     const term = `%${filter.search.replace(/[%_\\]/g, '\\$&')}%`
@@ -82,6 +90,8 @@ export async function listRequests(user: Principal, filter: z.infer<typeof listF
       or(
         ilike(requests.title, term),
         ilike(organisations.name, term),
+        ilike(creator.name, term),
+        ilike(creator.email, term),
         Number.isFinite(asNumber) ? eq(requests.number, asNumber) : undefined,
       ),
     )
@@ -93,15 +103,18 @@ export async function listRequests(user: Principal, filter: z.infer<typeof listF
       number: requests.number,
       title: requests.title,
       status: requests.status,
+      internalStatus: isStaffRole(user.role) ? requests.internalStatus : sql<null>`null`,
       quantity: requests.quantity,
       desiredDate: requests.desiredDate,
       createdAt: requests.createdAt,
       updatedAt: requests.updatedAt,
       organisationName: organisations.name,
+      creatorName: creator.name,
       assigneeName: assignee.name,
     })
     .from(requests)
-    .innerJoin(organisations, eq(organisations.id, requests.organisationId))
+    .leftJoin(organisations, eq(organisations.id, requests.organisationId))
+    .innerJoin(creator, eq(creator.id, requests.createdById))
     .leftJoin(assignee, eq(assignee.id, requests.assigneeId))
     .where(and(...conditions))
     .orderBy(desc(requests.updatedAt))
@@ -113,18 +126,22 @@ export async function getRequestDetail(user: Principal, id: string) {
   const isStaff = isStaffRole(user.role)
   const creator = alias(users, 'creator')
   const assignee = alias(users, 'assignee')
+  const confirmer = alias(users, 'confirmer')
 
   const [found] = await db
     .select({
       request: requests,
       organisationName: organisations.name,
       creatorName: creator.name,
+      creatorEmail: creator.email,
       assigneeName: assignee.name,
+      confirmedByName: confirmer.name,
     })
     .from(requests)
-    .innerJoin(organisations, eq(organisations.id, requests.organisationId))
+    .leftJoin(organisations, eq(organisations.id, requests.organisationId))
     .innerJoin(creator, eq(creator.id, requests.createdById))
     .leftJoin(assignee, eq(assignee.id, requests.assigneeId))
+    .leftJoin(confirmer, eq(confirmer.id, requests.confirmedById))
     .where(and(eq(requests.id, id), visibilityFilter(user)))
     .limit(1)
   if (!found) throw new Error('Anfrage nicht gefunden')
@@ -163,9 +180,12 @@ export async function getRequestDetail(user: Principal, id: string) {
     ...r,
     organisationName: found.organisationName,
     creatorName: found.creatorName,
+    creatorEmail: isStaff ? found.creatorEmail : null,
     // Die Zuständigkeit ist eine interne Information.
     assigneeId: isStaff ? r.assigneeId : null,
     assigneeName: isStaff ? found.assigneeName : null,
+    internalStatus: isStaff ? r.internalStatus : null,
+    confirmedByName: found.confirmedByName,
     comments,
     events,
     transitions: allowedTransitions(r.status, actorOf(user)),
@@ -174,8 +194,8 @@ export async function getRequestDetail(user: Principal, id: string) {
 }
 
 function canEditRequest(user: Principal, status: RequestStatus) {
-  if (isStaffRole(user.role)) return !TERMINAL_STATUSES.has(status)
-  return status === 'new' || status === 'on_hold'
+  if (isStaffRole(user.role)) return OPEN_STATUSES.includes(status)
+  return status === 'submitted' || status === 'on_hold'
 }
 
 export const createRequestSchema = requestInputSchema.extend({
@@ -183,34 +203,37 @@ export const createRequestSchema = requestInputSchema.extend({
 })
 
 export async function createRequest(user: Principal, input: z.infer<typeof createRequestSchema>) {
-  let organisationId: string
-  if (isStaffRole(user.role)) {
-    if (!input.organisationId) throw new Error('Bitte eine Organisation auswählen')
-    organisationId = input.organisationId
-  } else {
-    if (!user.organisationId) throw new Error('Ihr Konto ist keiner Organisation zugeordnet')
-    organisationId = user.organisationId
-  }
-
   return getDb().transaction(async (tx) => {
-    const [org] = await tx
-      .select({ status: organisations.status })
-      .from(organisations)
-      .where(eq(organisations.id, organisationId))
-    if (!org || org.status !== 'active') throw new Error('Die Organisation ist nicht aktiv')
+    const [me] = await tx
+      .select({ billingAddress: users.billingAddress, organisationId: users.organisationId })
+      .from(users)
+      .where(eq(users.id, user.id))
+    // Lastenheft 3.1: Die Rechnungsadresse muss vor dem ersten Auftrag hinterlegt sein.
+    if (!isStaffRole(user.role) && !me?.billingAddress) {
+      throw new Error('Bitte hinterlegen Sie zuerst eine Rechnungsadresse in Ihrem Profil.')
+    }
+    const organisationId = isStaffRole(user.role) ? (input.organisationId ?? null) : (me?.organisationId ?? null)
+    if (organisationId) {
+      const [org] = await tx
+        .select({ status: organisations.status })
+        .from(organisations)
+        .where(eq(organisations.id, organisationId))
+      if (!org || org.status !== 'active') throw new Error('Die Organisation ist nicht aktiv')
+    }
 
     const [created] = await tx
       .insert(requests)
       .values({
         organisationId,
         createdById: user.id,
+        billingAddress: me?.billingAddress ?? null,
         title: input.title,
         description: input.description,
         quantity: input.quantity,
         desiredDate: input.desiredDate,
       })
       .returning({ id: requests.id, number: requests.number })
-    await tx.insert(requestEvents).values({ requestId: created!.id, actorId: user.id, type: 'created', toStatus: 'new' })
+    await tx.insert(requestEvents).values({ requestId: created!.id, actorId: user.id, type: 'created', toStatus: 'submitted' })
     await notifyRequestCreated(tx, user, created!.id)
     return created!
   })
@@ -252,7 +275,6 @@ export const changeStatusSchema = z.object({
   version: z.number().int().positive(),
   to: z.enum(REQUEST_STATUSES),
   note: z.string().trim().max(5000).optional(),
-  quoteAmountCents: z.number().int().nonnegative().max(1_000_000_000).optional(),
 })
 
 export async function changeStatus(user: Principal, input: z.infer<typeof changeStatusSchema>) {
@@ -264,12 +286,14 @@ export async function changeStatus(user: Principal, input: z.infer<typeof change
     if (!canTransition(current.status, input.to, actorOf(user))) {
       throw new Error('Dieser Statuswechsel ist nicht erlaubt')
     }
+    if (input.to === 'on_hold' && !input.note) throw new Error('Bitte die Rückfrage an den Kunden formulieren')
 
     const values: Partial<typeof requests.$inferInsert> = { status: input.to }
-    if (input.to === 'quoted') {
-      if (input.quoteAmountCents === undefined) throw new Error('Bitte einen Angebotspreis angeben')
-      values.quoteAmountCents = input.quoteAmountCents
-      values.quoteNote = input.note || null
+    // Der interne Unterstatus gilt nur, solange der Auftrag bestätigt ist.
+    if (!hasInternalStatus(input.to)) values.internalStatus = null
+    if (input.to === 'confirmed' && !current.confirmedAt) {
+      values.confirmedById = user.id
+      values.confirmedAt = new Date()
     }
 
     const updated = await updateWithVersion(tx, input.id, input.version, values)
@@ -279,19 +303,41 @@ export async function changeStatus(user: Principal, input: z.infer<typeof change
       type: 'status_changed',
       fromStatus: current.status,
       toStatus: input.to,
-      data: input.to === 'quoted' ? { quoteAmountCents: input.quoteAmountCents ?? null } : {},
     })
-    if (input.note && input.to !== 'quoted') {
+    if (input.note) {
       await tx.insert(requestComments).values({ requestId: input.id, authorId: user.id, body: input.note })
     }
-    await notifyStatusChanged(tx, user, {
-      requestId: input.id,
-      from: current.status,
-      to: input.to,
-      note: input.note,
-      quoteAmountCents: values.quoteAmountCents,
-    })
+    await notifyStatusChanged(tx, user, { requestId: input.id, from: current.status, to: input.to, note: input.note })
     return { version: updated.version, status: updated.status }
+  })
+}
+
+export const internalStatusSchema = z.object({
+  id: z.uuid(),
+  version: z.number().int().positive(),
+  internalStatus: z.enum(INTERNAL_STATUSES).nullable(),
+})
+
+/** Interner Unterstatus ("In Bearbeitung", "Problem"). Kunden sehen ihn nie und bekommen keine Mail. */
+export async function setInternalStatus(user: Principal, input: z.infer<typeof internalStatusSchema>) {
+  if (!isStaffRole(user.role)) throw new Error('Keine Berechtigung')
+  return getDb().transaction(async (tx) => {
+    const current = await loadForUpdate(tx, user, input.id)
+    if (current.version !== input.version) throw new Error(CONFLICT_MESSAGE)
+    if (!hasInternalStatus(current.status)) {
+      throw new Error('Einen internen Status gibt es nur bei bestätigten Aufträgen')
+    }
+    const updated = await updateWithVersion(tx, input.id, input.version, { internalStatus: input.internalStatus })
+    if (current.internalStatus !== input.internalStatus) {
+      await tx.insert(requestEvents).values({
+        requestId: input.id,
+        actorId: user.id,
+        type: 'internal_status_changed',
+        internal: true,
+        data: { from: current.internalStatus, to: input.internalStatus },
+      })
+    }
+    return { version: updated.version }
   })
 }
 

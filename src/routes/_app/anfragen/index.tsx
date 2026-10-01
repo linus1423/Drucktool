@@ -3,15 +3,15 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { z } from 'zod'
 import { DataTable, dataColumnHelper } from '~/components/DataTable'
-import { Input, PageHeader, Select, StatusBadge } from '~/components/ui'
+import { Badge, Input, PageHeader, Select, StatusBadge } from '~/components/ui'
 import { formatDate, formatDateTime, formatRequestNumber } from '~/lib/format'
 import { requestListQuery } from '~/lib/queries'
 import { isStaffRole } from '~/lib/roles'
-import { REQUEST_STATUSES, STATUS_LABELS } from '~/lib/status'
+import { INTERNAL_STATUS_LABELS, INTERNAL_STATUS_TONES, REQUEST_STATUSES, STATUS_LABELS } from '~/lib/status'
 
 const searchSchema = z.object({
   status: z.enum(REQUEST_STATUSES).optional().catch(undefined),
-  ansicht: z.enum(['offen', 'alle', 'meine']).optional().catch(undefined),
+  ansicht: z.enum(['offen', 'fertig', 'alle', 'meine']).optional().catch(undefined),
   q: z.string().optional().catch(undefined),
 })
 
@@ -28,6 +28,7 @@ function toFilter(search: z.infer<typeof searchSchema>) {
   return {
     status: search.status,
     open: view === 'offen' && !search.status ? true : undefined,
+    done: view === 'fertig' && !search.status ? true : undefined,
     assignedToMe: view === 'meine' ? true : undefined,
     search: search.q || undefined,
   }
@@ -59,8 +60,34 @@ function RequestListPage() {
           </Link>
         ),
       }),
-      ...(staff ? [col.accessor('organisationName', { header: 'Kunde', sortFn: 'text' })] : []),
-      col.accessor('status', { header: 'Status', cell: (info) => <StatusBadge status={info.getValue()} /> }),
+      ...(staff
+        ? [
+            col.accessor('creatorName', {
+              header: 'Kunde',
+              sortFn: 'text',
+              cell: (info) => (
+                <>
+                  {info.getValue()}
+                  {info.row.original.organisationName ? (
+                    <span className="block text-xs text-slate-500">{info.row.original.organisationName}</span>
+                  ) : null}
+                </>
+              ),
+            }),
+          ]
+        : []),
+      col.accessor('status', {
+        header: 'Status',
+        cell: (info) => {
+          const internal = info.row.original.internalStatus
+          return (
+            <span className="inline-flex flex-wrap gap-1">
+              <StatusBadge status={info.getValue()} />
+              {internal ? <Badge className={INTERNAL_STATUS_TONES[internal]}>{INTERNAL_STATUS_LABELS[internal]}</Badge> : null}
+            </span>
+          )
+        },
+      }),
       col.accessor('quantity', {
         header: 'Auflage',
         cell: (info) => info.getValue()?.toLocaleString('de-DE') ?? '–',
@@ -76,7 +103,7 @@ function RequestListPage() {
     <>
       <PageHeader
         title="Anfragen"
-        description={staff ? 'Alle Anfragen der Kunden' : `Anfragen von ${user.organisationName ?? 'Ihrer Organisation'}`}
+        description={staff ? 'Alle Anfragen der Kunden' : 'Ihre Anfragen'}
         actions={
           <Link
             to="/anfragen/neu"
@@ -113,12 +140,13 @@ function RequestListPage() {
               aria-label="Ansicht"
               value={search.ansicht ?? 'offen'}
               onChange={(e) =>
-                navigate({ search: (prev) => ({ ...prev, ansicht: e.target.value as 'offen' | 'alle' | 'meine' }) })
+                navigate({ search: (prev) => ({ ...prev, ansicht: e.target.value as 'offen' | 'fertig' | 'alle' | 'meine' }) })
               }
               className="w-auto"
             >
-              <option value="offen">Offene Anfragen</option>
-              <option value="alle">Alle Anfragen</option>
+              <option value="offen">{staff ? 'Warteschlange (offen)' : 'Offene Aufträge'}</option>
+              <option value="fertig">Fertige Aufträge</option>
+              <option value="alle">Alle Aufträge</option>
               {staff ? <option value="meine">Mir zugewiesen</option> : null}
             </Select>
             <Select

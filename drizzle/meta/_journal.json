@@ -22,6 +22,27 @@
       "when": 1790797918250,
       "tag": "0002_oidc_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790800380933,
+      "tag": "0003_customer_login",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790800884358,
+      "tag": "0004_status_workflow",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790801210151,
+      "tag": "0005_catalog",
+      "breakpoints": true
     }
   ]
 }

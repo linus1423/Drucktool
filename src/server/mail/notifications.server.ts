@@ -12,6 +12,7 @@ import {
   registrationReceivedMail,
   registrationRejectedMail,
   requestCreatedMail,
+  requestReceivedMail,
   statusChangedMail,
 } from './templates'
 
@@ -35,29 +36,29 @@ async function loadRequest(tx: Tx, requestId: string) {
       id: requests.id,
       number: requests.number,
       title: requests.title,
-      organisationId: requests.organisationId,
+      createdById: requests.createdById,
       assigneeId: requests.assigneeId,
       organisationName: organisations.name,
     })
     .from(requests)
-    .innerJoin(organisations, eq(organisations.id, requests.organisationId))
+    .leftJoin(organisations, eq(organisations.id, requests.organisationId))
     .where(eq(requests.id, requestId))
   if (!row) throw new Error('Anfrage nicht gefunden')
   return row
 }
 
-/** Alle aktiven Kunden der Organisation. */
-async function customerRecipients(tx: Tx, organisationId: string, excludeId: string) {
+/** Der Kunde, der den Auftrag angelegt hat. */
+async function customerRecipients(tx: Tx, createdById: string, excludeId: string | null) {
   const rows = await tx
     .select({ email: users.email })
     .from(users)
     .where(
       and(
-        eq(users.organisationId, organisationId),
+        eq(users.id, createdById),
         eq(users.role, 'customer'),
         eq(users.status, 'active'),
         eq(users.emailNotifications, true),
-        ne(users.id, excludeId),
+        excludeId ? ne(users.id, excludeId) : undefined,
       ),
     )
   return rows.map((r) => r.email)
@@ -81,23 +82,27 @@ async function staffRecipients(tx: Tx, assigneeId: string | null, excludeId: str
 
 export async function notifyRequestCreated(tx: Tx, actor: Actor, requestId: string) {
   const request = await loadRequest(tx, requestId)
-  const content = requestCreatedMail({ ...request, actorName: await actorName(tx, actor.id) })
-  const recipients = isStaff(actor)
-    ? await customerRecipients(tx, request.organisationId, actor.id)
-    : await staffRecipients(tx, request.assigneeId, actor.id)
-  await enqueueMail(tx, recipients, content)
+  await enqueueMail(
+    tx,
+    await staffRecipients(tx, request.assigneeId, actor.id),
+    requestCreatedMail({ ...request, actorName: await actorName(tx, actor.id) }),
+  )
+  // Eingangsbestätigung an den Kunden (Lastenheft 7: "Auftrag eingereicht").
+  if (!isStaff(actor)) {
+    await enqueueMail(tx, await customerRecipients(tx, request.createdById, null), requestReceivedMail(request))
+  }
 }
 
 export async function notifyStatusChanged(
   tx: Tx,
   actor: Actor,
-  input: { requestId: string; from: RequestStatus; to: RequestStatus; note?: string | null; quoteAmountCents?: number | null },
+  input: { requestId: string; from: RequestStatus; to: RequestStatus; note?: string | null },
 ) {
   const request = await loadRequest(tx, input.requestId)
   const content = statusChangedMail({ ...request, ...input, actorName: await actorName(tx, actor.id) })
   // Mitarbeiter informieren den Kunden, Kunden informieren die Druckerei.
   const recipients = isStaff(actor)
-    ? await customerRecipients(tx, request.organisationId, actor.id)
+    ? await customerRecipients(tx, request.createdById, actor.id)
     : await staffRecipients(tx, request.assigneeId, actor.id)
   await enqueueMail(tx, recipients, content)
 }
@@ -110,7 +115,7 @@ export async function notifyComment(tx: Tx, actor: Actor, input: { requestId: st
     // Interne Notizen gehen nur an den Zuständigen, nie an Kunden.
     recipients = request.assigneeId ? await staffRecipients(tx, request.assigneeId, actor.id) : []
   } else if (isStaff(actor)) {
-    recipients = await customerRecipients(tx, request.organisationId, actor.id)
+    recipients = await customerRecipients(tx, request.createdById, actor.id)
   } else {
     recipients = await staffRecipients(tx, request.assigneeId, actor.id)
   }

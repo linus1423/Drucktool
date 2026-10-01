@@ -40,7 +40,7 @@ function NewRequestPage() {
 
   return (
     <div className="max-w-3xl">
-      <PageHeader title="Neue Anfrage" description="Beschreiben Sie Ihren Druckauftrag. Wir melden uns mit einem Angebot." />
+      <PageHeader title="Neue Anfrage" description="Beschreiben Sie Ihren Druckauftrag. Verbindlich wird er, sobald die Druckerei ihn bestätigt." />
       <Card>
         <form
           className="space-y-4"
@@ -51,9 +51,9 @@ function NewRequestPage() {
         >
           {error ? <Alert>{error}</Alert> : null}
           {staff ? (
-            <Field label="Kunde" htmlFor="organisationId">
-              <Select id="organisationId" value={organisationId} onChange={(e) => setOrganisationId(e.target.value)} required>
-                <option value="">Bitte wählen …</option>
+            <Field label="Organisation (optional)" htmlFor="organisationId">
+              <Select id="organisationId" value={organisationId} onChange={(e) => setOrganisationId(e.target.value)}>
+                <option value="">Keine</option>
                 {organisations.data?.map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.name}

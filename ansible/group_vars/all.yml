@@ -10,6 +10,9 @@ drucktool_acme_email: ''
 
 drucktool_superadmin_email: ''
 
+# Neue Kundenkonten per Anmeldelink nur für diese Domains, z. B. ['tum.de']. Leer = alle.
+drucktool_customer_email_domains: []
+
 # Absender für E-Mail-Benachrichtigungen. Die SMTP-Zugangsdaten stehen im Vault.
 drucktool_mail_from: 'Drucktool <noreply@example.com>'
 

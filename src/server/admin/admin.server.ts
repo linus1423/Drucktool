@@ -58,8 +58,6 @@ export async function approveRegistration(actor: Principal, input: z.infer<typeo
       if (!target) throw new Error('Die gewählte Organisation ist nicht aktiv')
       organisationId = target.id
     }
-    if (!organisationId) throw new Error('Der Benutzer ist keiner Organisation zugeordnet')
-
     await tx
       .update(users)
       .set({ status: 'active', organisationId, reviewedById: actor.id, reviewedAt: new Date(), updatedAt: new Date() })
@@ -67,7 +65,7 @@ export async function approveRegistration(actor: Principal, input: z.infer<typeo
 
     if (user.organisationId && user.organisationId !== organisationId) {
       await deleteOrganisationIfUnused(tx, user.organisationId)
-    } else {
+    } else if (organisationId) {
       await tx
         .update(organisations)
         .set({ status: 'active', updatedAt: new Date() })
@@ -237,12 +235,12 @@ const userFields = {
   organisationId: z.uuid().nullable(),
 }
 
-export const createUserSchema = z.object({ ...userFields, password: passwordSchema })
+// Ohne Passwort meldet sich die Person per Anmeldelink oder Single Sign-on an.
+export const createUserSchema = z.object({ ...userFields, password: z.union([z.literal(''), passwordSchema]) })
 
 export async function createUser(actor: Principal, input: z.infer<typeof createUserSchema>) {
   assertMayManageRole(actor, input.role)
   const organisationId = input.role === 'customer' ? input.organisationId : null
-  if (input.role === 'customer' && !organisationId) throw new Error('Kunden brauchen eine Organisation')
   const db = getDb()
   const [taken] = await db
     .select({ id: users.id })
@@ -256,7 +254,7 @@ export async function createUser(actor: Principal, input: z.infer<typeof createU
       email: input.email,
       role: input.role,
       organisationId,
-      passwordHash: await hashPassword(input.password),
+      passwordHash: input.password ? await hashPassword(input.password) : null,
       status: 'active',
       reviewedById: actor.id,
       reviewedAt: new Date(),
@@ -293,7 +291,6 @@ export async function updateUser(actor: Principal, input: z.infer<typeof updateU
     if ((others?.n ?? 0) === 0) throw new Error('Der letzte aktive Superadmin kann nicht entfernt werden')
   }
   const organisationId = input.role === 'customer' ? input.organisationId : null
-  if (input.role === 'customer' && !organisationId) throw new Error('Kunden brauchen eine Organisation')
 
   if (input.email !== current.email.toLowerCase()) {
     const [taken] = await db

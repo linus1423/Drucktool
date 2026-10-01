@@ -11,13 +11,16 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/_app'
+import { Route as AnmeldenRouteImport } from './routes/anmelden'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as RegistrierenRouteImport } from './routes/registrieren'
 import { Route as AppAdminRouteRouteImport } from './routes/_app/admin/route'
 import { Route as AppKontoRouteImport } from './routes/_app/konto'
+import { Route as AppProfilRouteImport } from './routes/_app/profil'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppAdminBenutzerRouteImport } from './routes/_app/admin/benutzer'
 import { Route as AppAdminFreigabenRouteImport } from './routes/_app/admin/freigaben'
+import { Route as AppAdminKatalogRouteImport } from './routes/_app/admin/katalog'
 import { Route as AppAnfragenIndexRouteImport } from './routes/_app/anfragen/index'
 import { Route as AppAnfragenRequestIdRouteImport } from './routes/_app/anfragen/$requestId'
 import { Route as AppAnfragenNeuRouteImport } from './routes/_app/anfragen/neu'
@@ -34,6 +37,11 @@ const IndexRoute = IndexRouteImport.update({
 } as any)
 const AppRoute = AppRouteImport.update({
   id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnmeldenRoute = AnmeldenRouteImport.update({
+  id: '/anmelden',
+  path: '/anmelden',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -56,6 +64,11 @@ const AppKontoRoute = AppKontoRouteImport.update({
   path: '/konto',
   getParentRoute: () => AppRoute,
 } as any)
+const AppProfilRoute = AppProfilRouteImport.update({
+  id: '/profil',
+  path: '/profil',
+  getParentRoute: () => AppRoute,
+} as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
@@ -69,6 +82,11 @@ const AppAdminBenutzerRoute = AppAdminBenutzerRouteImport.update({
 const AppAdminFreigabenRoute = AppAdminFreigabenRouteImport.update({
   id: '/freigaben',
   path: '/freigaben',
+  getParentRoute: () => AppAdminRouteRoute,
+} as any)
+const AppAdminKatalogRoute = AppAdminKatalogRouteImport.update({
+  id: '/katalog',
+  path: '/katalog',
   getParentRoute: () => AppAdminRouteRoute,
 } as any)
 const AppAnfragenIndexRoute = AppAnfragenIndexRouteImport.update({
@@ -117,13 +135,16 @@ const ApiAuthOidcLoginRoute = ApiAuthOidcLoginRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/anmelden': typeof AnmeldenRoute
   '/login': typeof LoginRoute
   '/registrieren': typeof RegistrierenRoute
   '/admin': typeof AppAdminRouteRouteWithChildren
   '/konto': typeof AppKontoRoute
+  '/profil': typeof AppProfilRoute
   '/api/health': typeof ApiHealthRoute
   '/admin/benutzer': typeof AppAdminBenutzerRoute
   '/admin/freigaben': typeof AppAdminFreigabenRoute
+  '/admin/katalog': typeof AppAdminKatalogRoute
   '/anfragen/$requestId': typeof AppAnfragenRequestIdRoute
   '/anfragen/neu': typeof AppAnfragenNeuRoute
   '/anfragen/': typeof AppAnfragenIndexRoute
@@ -135,13 +156,16 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/anmelden': typeof AnmeldenRoute
   '/login': typeof LoginRoute
   '/registrieren': typeof RegistrierenRoute
   '/admin': typeof AppAdminRouteRouteWithChildren
   '/konto': typeof AppKontoRoute
+  '/profil': typeof AppProfilRoute
   '/api/health': typeof ApiHealthRoute
   '/admin/benutzer': typeof AppAdminBenutzerRoute
   '/admin/freigaben': typeof AppAdminFreigabenRoute
+  '/admin/katalog': typeof AppAdminKatalogRoute
   '/anfragen/$requestId': typeof AppAnfragenRequestIdRoute
   '/anfragen/neu': typeof AppAnfragenNeuRoute
   '/anfragen': typeof AppAnfragenIndexRoute
@@ -155,13 +179,16 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
+  '/anmelden': typeof AnmeldenRoute
   '/login': typeof LoginRoute
   '/registrieren': typeof RegistrierenRoute
   '/_app/admin': typeof AppAdminRouteRouteWithChildren
   '/_app/konto': typeof AppKontoRoute
+  '/_app/profil': typeof AppProfilRoute
   '/api/health': typeof ApiHealthRoute
   '/_app/admin/benutzer': typeof AppAdminBenutzerRoute
   '/_app/admin/freigaben': typeof AppAdminFreigabenRoute
+  '/_app/admin/katalog': typeof AppAdminKatalogRoute
   '/_app/anfragen/$requestId': typeof AppAnfragenRequestIdRoute
   '/_app/anfragen/neu': typeof AppAnfragenNeuRoute
   '/_app/anfragen/': typeof AppAnfragenIndexRoute
@@ -175,13 +202,16 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/anmelden'
     | '/login'
     | '/registrieren'
     | '/admin'
     | '/konto'
+    | '/profil'
     | '/api/health'
     | '/admin/benutzer'
     | '/admin/freigaben'
+    | '/admin/katalog'
     | '/anfragen/$requestId'
     | '/anfragen/neu'
     | '/anfragen/'
@@ -193,13 +223,16 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/anmelden'
     | '/login'
     | '/registrieren'
     | '/admin'
     | '/konto'
+    | '/profil'
     | '/api/health'
     | '/admin/benutzer'
     | '/admin/freigaben'
+    | '/admin/katalog'
     | '/anfragen/$requestId'
     | '/anfragen/neu'
     | '/anfragen'
@@ -212,13 +245,16 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_app'
+    | '/anmelden'
     | '/login'
     | '/registrieren'
     | '/_app/admin'
     | '/_app/konto'
+    | '/_app/profil'
     | '/api/health'
     | '/_app/admin/benutzer'
     | '/_app/admin/freigaben'
+    | '/_app/admin/katalog'
     | '/_app/anfragen/$requestId'
     | '/_app/anfragen/neu'
     | '/_app/anfragen/'
@@ -232,6 +268,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
+  AnmeldenRoute: typeof AnmeldenRoute
   LoginRoute: typeof LoginRoute
   RegistrierenRoute: typeof RegistrierenRoute
   ApiHealthRoute: typeof ApiHealthRoute
@@ -253,6 +290,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/anmelden': {
+      id: '/anmelden'
+      path: '/anmelden'
+      fullPath: '/anmelden'
+      preLoaderRoute: typeof AnmeldenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -283,6 +327,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppKontoRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/profil': {
+      id: '/_app/profil'
+      path: '/profil'
+      fullPath: '/profil'
+      preLoaderRoute: typeof AppProfilRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/api/health': {
       id: '/api/health'
       path: '/api/health'
@@ -302,6 +353,13 @@ declare module '@tanstack/react-router' {
       path: '/freigaben'
       fullPath: '/admin/freigaben'
       preLoaderRoute: typeof AppAdminFreigabenRouteImport
+      parentRoute: typeof AppAdminRouteRoute
+    }
+    '/_app/admin/katalog': {
+      id: '/_app/admin/katalog'
+      path: '/katalog'
+      fullPath: '/admin/katalog'
+      preLoaderRoute: typeof AppAdminKatalogRouteImport
       parentRoute: typeof AppAdminRouteRoute
     }
     '/_app/anfragen/': {
@@ -366,6 +424,7 @@ declare module '@tanstack/react-router' {
 interface AppAdminRouteRouteChildren {
   AppAdminBenutzerRoute: typeof AppAdminBenutzerRoute
   AppAdminFreigabenRoute: typeof AppAdminFreigabenRoute
+  AppAdminKatalogRoute: typeof AppAdminKatalogRoute
   AppAdminOrganisationenOrganisationIdRoute: typeof AppAdminOrganisationenOrganisationIdRoute
   AppAdminOrganisationenNeuRoute: typeof AppAdminOrganisationenNeuRoute
   AppAdminOrganisationenIndexRoute: typeof AppAdminOrganisationenIndexRoute
@@ -374,6 +433,7 @@ interface AppAdminRouteRouteChildren {
 const AppAdminRouteRouteChildren: AppAdminRouteRouteChildren = {
   AppAdminBenutzerRoute: AppAdminBenutzerRoute,
   AppAdminFreigabenRoute: AppAdminFreigabenRoute,
+  AppAdminKatalogRoute: AppAdminKatalogRoute,
   AppAdminOrganisationenOrganisationIdRoute:
     AppAdminOrganisationenOrganisationIdRoute,
   AppAdminOrganisationenNeuRoute: AppAdminOrganisationenNeuRoute,
@@ -387,6 +447,7 @@ const AppAdminRouteRouteWithChildren = AppAdminRouteRoute._addFileChildren(
 interface AppRouteChildren {
   AppAdminRouteRoute: typeof AppAdminRouteRouteWithChildren
   AppKontoRoute: typeof AppKontoRoute
+  AppProfilRoute: typeof AppProfilRoute
   AppAnfragenRequestIdRoute: typeof AppAnfragenRequestIdRoute
   AppAnfragenNeuRoute: typeof AppAnfragenNeuRoute
   AppAnfragenIndexRoute: typeof AppAnfragenIndexRoute
@@ -395,6 +456,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppAdminRouteRoute: AppAdminRouteRouteWithChildren,
   AppKontoRoute: AppKontoRoute,
+  AppProfilRoute: AppProfilRoute,
   AppAnfragenRequestIdRoute: AppAnfragenRequestIdRoute,
   AppAnfragenNeuRoute: AppAnfragenNeuRoute,
   AppAnfragenIndexRoute: AppAnfragenIndexRoute,
@@ -405,6 +467,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
+  AnmeldenRoute: AnmeldenRoute,
   LoginRoute: LoginRoute,
   RegistrierenRoute: RegistrierenRoute,
   ApiHealthRoute: ApiHealthRoute,

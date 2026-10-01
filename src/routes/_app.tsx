@@ -52,14 +52,17 @@ function AppLayout() {
                 <Link to="/admin/benutzer" className={navLink} activeProps={navActive}>
                   Benutzer
                 </Link>
+                <Link to="/admin/katalog" className={navLink} activeProps={navActive}>
+                  Katalog und Preise
+                </Link>
               </>
             ) : null}
           </nav>
           <div className="flex items-center gap-3 text-sm">
-            <Link to="/konto" className="text-right leading-tight hover:underline">
+            <Link to="/profil" className="text-right leading-tight hover:underline">
               <div className="font-medium">{user.name}</div>
               <div className="text-xs text-slate-500">
-                {isStaffRole(user.role) ? ROLE_LABELS[user.role] : user.organisationName}
+                {isStaffRole(user.role) ? ROLE_LABELS[user.role] : (user.organisationName ?? user.email)}
               </div>
             </Link>
             <button type="button" onClick={handleLogout} className={navLink}>
