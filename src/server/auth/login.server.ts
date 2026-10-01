@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
 import { getDb, schema } from '../db/client.server'
 import type { User } from '../db/schema'
 import { auditLogin } from '../audit/audit.server'
@@ -48,15 +48,8 @@ export async function authenticateWithPassword(email: string, password: string):
   if (user.status !== 'active') {
     return fail(user.id, 'inactive', 'Ihr Konto ist nicht aktiv. Bitte wenden Sie sich an die Druckerei.')
   }
-  if (user.organisationId) {
-    const [org] = await db
-      .select({ status: schema.organisations.status })
-      .from(schema.organisations)
-      .where(eq(schema.organisations.id, user.organisationId))
-    if (org && org.status !== 'active') {
-      return fail(user.id, 'organisation_inactive', 'Ihre Organisation ist nicht aktiv. Bitte wenden Sie sich an die Druckerei.')
-    }
-  }
+  // Organisationen sind optional (Issue #68): Eine deaktivierte Organisation sperrt nicht das Konto,
+  // sie steht beim Bestellen nur nicht mehr zur Auswahl.
   await auditLogin('succeeded', { userId: user.id, method: 'password' })
   return user
 }

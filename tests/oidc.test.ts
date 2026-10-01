@@ -50,7 +50,7 @@ describe.skipIf(!url)('OpenID Connect: Benutzerzuordnung (Integration)', async (
     const pending = await resolveOidcUser(ISS, { sub: `p-${stamp}`, email: email('neu2'), email_verified: true, name: 'Neu Zwei' }, { policy: 'pending' })
     expect(pending).toEqual({ kind: 'pending' })
     const [p] = await getDb().select().from(schema.users).where(eq(schema.users.email, email('neu2')))
-    expect(p).toMatchObject({ role: 'customer', status: 'pending', name: 'Neu Zwei', organisationId: null, passwordHash: null })
+    expect(p).toMatchObject({ role: 'customer', status: 'pending', name: 'Neu Zwei', passwordHash: null })
 
     const staff = await resolveOidcUser(ISS, { sub: `st-${stamp}`, email: email('neu3'), email_verified: true }, { policy: 'staff' })
     expect(staff.kind).toBe('login')

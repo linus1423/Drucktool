@@ -9,6 +9,8 @@ export const AUDIT_ACTIONS = [
   'user.updated',
   'organisation.created',
   'organisation.updated',
+  'organisation_request.approved',
+  'organisation_request.rejected',
   'user.anonymized',
   'user.exported',
 ] as const
@@ -23,6 +25,8 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   'user.updated': 'Benutzer geändert',
   'organisation.created': 'Organisation angelegt',
   'organisation.updated': 'Organisation geändert',
+  'organisation_request.approved': 'Organisationsanfrage angenommen',
+  'organisation_request.rejected': 'Organisationsanfrage abgelehnt',
   'user.anonymized': 'Benutzer anonymisiert',
   'user.exported': 'Datenauskunft erstellt',
 }
@@ -50,6 +54,7 @@ export const AUDIT_FIELD_LABELS: Record<string, string> = {
   role: 'Rolle',
   status: 'Status',
   organisationId: 'Organisation',
+  organisationIds: 'Organisationen',
   phone: 'Telefon',
   street: 'Straße',
   zip: 'PLZ',

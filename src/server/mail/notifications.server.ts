@@ -12,6 +12,8 @@ import {
   changeProposedMail,
   commentMail,
   mentionMail,
+  organisationRequestDecisionMail,
+  organisationRequestedMail,
   promisedDateMail,
   registrationApprovedMail,
   registrationReceivedMail,
@@ -271,4 +273,23 @@ export async function notifyRegistrationReceived(tx: Tx, user: { name: string; e
 // Freigabe und Ablehnung sind Kontoinformationen und gehen unabhängig von der Einstellung raus.
 export async function notifyRegistrationDecision(tx: Tx, user: { name: string; email: string }, approved: boolean) {
   await enqueueMail(tx, [user.email], approved ? registrationApprovedMail(user) : registrationRejectedMail(user))
+}
+
+/** Neue Organisationsanfrage eines Kunden: an alle Mitarbeiter, die Benachrichtigungen wollen. */
+export async function notifyOrganisationRequested(tx: Tx, actor: Actor, input: { name: string; details: string }) {
+  const [customer] = await tx.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, actor.id))
+  await enqueueMail(
+    tx,
+    await staffRecipients(tx, null, actor.id),
+    organisationRequestedMail({ ...input, customerName: customer?.name ?? 'Ein Kunde', customerEmail: customer?.email ?? '' }),
+  )
+}
+
+// Wie bei der Registrierung eine Kontoinformation, deshalb unabhängig von der Einstellung.
+export async function notifyOrganisationRequestDecision(
+  tx: Tx,
+  user: { name: string; email: string },
+  input: { requested: string; organisation: string | null; note: string | null },
+) {
+  await enqueueMail(tx, [user.email], organisationRequestDecisionMail({ ...input, name: user.name }))
 }

@@ -45,6 +45,11 @@ function AppLayout() {
                 Freigaben
               </Link>
             ) : null}
+            {isStaffRole(user.role) ? (
+              <Link to="/organisationsanfragen" className={navLink} activeProps={navActive}>
+                Organisationsanfragen
+              </Link>
+            ) : null}
             {isAdminRole(user.role) ? (
               <>
                 <Link to="/admin/organisationen" className={navLink} activeProps={navActive}>
@@ -68,7 +73,7 @@ function AppLayout() {
             <Link to="/profil" className="text-right leading-tight hover:underline">
               <div className="font-medium">{user.name}</div>
               <div className="text-xs text-slate-500">
-                {isStaffRole(user.role) ? ROLE_LABELS[user.role] : (user.organisationName ?? user.email)}
+                {isStaffRole(user.role) ? ROLE_LABELS[user.role] : (user.organisations.map((o) => o.name).join(', ') || user.email)}
               </div>
             </Link>
             <button type="button" onClick={handleLogout} className={navLink}>

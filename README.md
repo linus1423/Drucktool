@@ -28,7 +28,11 @@ bearbeiten sie über einen Status-Workflow bis zur Auslieferung.
   Lieferadresse für die Hauspost. Die Rechnungsadresse wird beim Absenden als Kopie am Auftrag gespeichert.
 - **Mitarbeiter und Admins** melden sich über OpenID Connect (z. B. Microsoft Entra ID) oder mit Passwort an, siehe
   unten.
-- Organisationen sind optional. Kunden sehen nur die Aufträge, die sie selbst angelegt haben.
+- Organisationen sind optional. Ein Kunde kann keiner, einer oder mehreren Organisationen angehören und wählt beim
+  Bestellen eine davon (oder keine). Im Profil kann er eine Organisation anfragen; Mitarbeiter und Admins ordnen ihn
+  unter „Organisationsanfragen“ einer bestehenden zu, legen eine neue an oder lehnen ab. Der Kunde bekommt jeweils eine
+  E-Mail. Eine deaktivierte Organisation sperrt kein Konto, sie steht beim Bestellen nur nicht mehr zur Auswahl.
+- Kunden sehen nur die Aufträge, die sie selbst angelegt haben.
 
 Im Profil sieht jeder seine angemeldeten Geräte und kann sie einzeln oder alle anderen abmelden.
 
@@ -192,7 +196,7 @@ Mitarbeiter und Admins nur noch über den Anbieter anmelden.
 ## Datenschutz
 
 - **Anonymisieren statt Löschen:** In der Benutzerverwaltung lässt sich ein Konto anonymisieren. Name wird zu
-  „Gelöschter Nutzer“, E-Mail-Adresse, Passwort, Rechnungs- und Lieferadresse, Organisation, Sitzungen,
+  „Gelöschter Nutzer“, E-Mail-Adresse, Passwort, Rechnungs- und Lieferadresse, Organisationen und -anfragen, Sitzungen,
   OIDC-Verknüpfungen, offene Anmeldelinks, Mails in der Outbox und nicht abgeschickte Uploads werden entfernt, Namen
   und Adresse auch aus dem Audit-Log. Das Konto ist danach gesperrt, die E-Mail-Adresse wieder frei. Aufträge,
   Nachrichten und Dateien an Aufträgen bleiben wegen der Aufbewahrungspflichten erhalten, ebenso die beim Absenden am

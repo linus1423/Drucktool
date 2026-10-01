@@ -79,23 +79,22 @@ describe.skipIf(!url)('Benachrichtigungen (Integration)', async () => {
           name: 'Kunde',
           role: 'customer',
           status: 'active',
-          organisationId: org,
           billingAddress: BILLING,
         },
-        { email: email('kollege'), name: 'Kollege', role: 'customer', status: 'active', organisationId: org },
+        { email: email('kollege'), name: 'Kollege', role: 'customer', status: 'active' },
         {
           email: email('stumm'),
           name: 'Stumm',
           role: 'customer',
           status: 'active',
-          organisationId: org,
           emailNotifications: false,
         },
       ])
       .returning()
-    staff = { id: rows[0]!.id, role: 'staff', organisationId: null }
-    staff2 = { id: rows[1]!.id, role: 'staff', organisationId: null }
-    customer = { id: rows[2]!.id, role: 'customer', organisationId: org }
+    staff = { id: rows[0]!.id, role: 'staff' }
+    staff2 = { id: rows[1]!.id, role: 'staff' }
+    await db.insert(schema.organisationMembers).values(rows.slice(2).map((r) => ({ userId: r.id, organisationId: org })))
+    customer = { id: rows[2]!.id, role: 'customer' }
   })
 
   afterAll(async () => {

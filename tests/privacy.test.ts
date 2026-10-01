@@ -28,7 +28,7 @@ describe.skipIf(!url)('Datenschutz (Integration)', async () => {
       .insert(schema.users)
       .values({ email: email(`${role}-${Math.random()}`), name: `Chef ${role}`, role, status: 'active' })
       .returning()
-    return { id: u!.id, role, organisationId: null }
+    return { id: u!.id, role }
   }
 
   /** Kunde mit allem, was das Tool zu einer Person speichern kann. */
@@ -45,7 +45,6 @@ describe.skipIf(!url)('Datenschutz (Integration)', async () => {
         name: `Erika ${name}`,
         role: 'customer',
         status: 'active',
-        organisationId: org!.id,
         passwordHash: await hashPassword('richtig-12345'),
         billingAddress: BILLING,
         deliveryAddress: { recipient: 'Erika', department: '', building: 'MW', room: '1234', note: '' },
@@ -53,6 +52,8 @@ describe.skipIf(!url)('Datenschutz (Integration)', async () => {
       })
       .returning()
     const id = user!.id
+    await db.insert(schema.organisationMembers).values({ userId: id, organisationId: org!.id })
+    await db.insert(schema.organisationRequests).values({ userId: id, name: 'Lehrstuhl Erika', details: 'Raum 1234' })
     await db
       .insert(schema.sessions)
       .values({
@@ -72,7 +73,7 @@ describe.skipIf(!url)('Datenschutz (Integration)', async () => {
       .values({ title: `Abschlussarbeit ${name}`, createdById: id, billingAddress: BILLING })
       .returning()
     await db.insert(schema.requestComments).values({ requestId: request!.id, authorId: id, body: 'Bitte bis Freitag' })
-    const principal = { id, role: 'customer' as const, organisationId: org!.id }
+    const principal = { id, role: 'customer' as const }
     const attached = await testUpload(principal)
     await db.update(schema.requestFiles).set({ requestId: request!.id }).where(eq(schema.requestFiles.id, attached.id))
     const loose = await testUpload(principal)
@@ -92,12 +93,13 @@ describe.skipIf(!url)('Datenschutz (Integration)', async () => {
       email: `geloescht-${c.id}@anonym.invalid`,
       passwordHash: null,
       status: 'disabled',
-      organisationId: null,
       billingAddress: null,
       deliveryAddress: null,
       lastLoginAt: null,
     })
     expect(user!.anonymizedAt).toBeInstanceOf(Date)
+    expect(await db.select().from(schema.organisationMembers).where(eq(schema.organisationMembers.userId, c.id))).toEqual([])
+    expect(await db.select().from(schema.organisationRequests).where(eq(schema.organisationRequests.userId, c.id))).toEqual([])
     expect(JSON.stringify(user)).not.toMatch(/anna|Erika|Boltzmann/i)
     expect(await db.select().from(schema.sessions).where(eq(schema.sessions.userId, c.id))).toHaveLength(0)
     expect(await db.select().from(schema.oidcAccounts).where(eq(schema.oidcAccounts.userId, c.id))).toHaveLength(0)
@@ -134,7 +136,7 @@ describe.skipIf(!url)('Datenschutz (Integration)', async () => {
     // Auch über die Benutzerverwaltung ist die Adresse frei.
     await db.delete(schema.users).where(eq(schema.users.id, login.userId))
     await expect(
-      createUser(superadmin, { name: 'Bert Neu', email: c.address, role: 'customer', organisationId: null, password: '' }),
+      createUser(superadmin, { name: 'Bert Neu', email: c.address, role: 'customer', organisationIds: [], password: '' }),
     ).resolves.toHaveProperty('id')
   })
 
@@ -155,6 +157,8 @@ describe.skipIf(!url)('Datenschutz (Integration)', async () => {
     expect(data.account).toMatchObject({ email: c.address, name: 'Erika dora', hasPassword: true, billingAddress: BILLING })
     expect(data.sessions[0]).toMatchObject({ ip: '10.9.9.9', userAgent: 'Firefox' })
     expect(data.oidcAccounts).toHaveLength(1)
+    expect(data.organisations.map((o) => o.name)).toEqual([`Org dora ${stamp}`])
+    expect(data.organisationRequests).toMatchObject([{ name: 'Lehrstuhl Erika', details: 'Raum 1234', status: 'open' }])
     expect(data.requests.map((r) => r.title)).toEqual(['Abschlussarbeit dora'])
     expect(data.comments.map((m) => m.body)).toEqual(['Bitte bis Freitag'])
     expect(data.files).toHaveLength(2)
@@ -200,9 +204,9 @@ describe.skipIf(!url)('Datenschutz (Integration)', async () => {
         role: 'customer',
         status: 'rejected',
         reviewedAt: old,
-        organisationId: org!.id,
       })
       .returning()
+    await db.insert(schema.organisationMembers).values({ userId: rejectedOld!.id, organisationId: org!.id })
     const [rejectedNew] = await db
       .insert(schema.users)
       .values({ email: email('neu'), name: 'Neu', role: 'customer', status: 'rejected', reviewedAt: new Date() })

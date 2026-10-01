@@ -10,6 +10,8 @@ import type { Principal } from '../requests/requests.server'
 const {
   users,
   organisations,
+  organisationMembers,
+  organisationRequests,
   sessions,
   oidcAccounts,
   loginTokens,
@@ -59,7 +61,6 @@ export async function anonymizeUser(actor: Principal, userId: string) {
         email: anonymousEmail(user.id),
         passwordHash: null,
         status: 'disabled',
-        organisationId: null,
         billingAddress: null,
         deliveryAddress: null,
         emailNotifications: false,
@@ -71,6 +72,9 @@ export async function anonymizeUser(actor: Principal, userId: string) {
     // Ohne Sitzungen und OIDC-Verknüpfung kommt niemand mehr in dieses Konto.
     await tx.delete(sessions).where(eq(sessions.userId, user.id))
     await tx.delete(oidcAccounts).where(eq(oidcAccounts.userId, user.id))
+    await tx.delete(organisationMembers).where(eq(organisationMembers.userId, user.id))
+    // Anfragen enthalten Freitext des Kunden.
+    await tx.delete(organisationRequests).where(eq(organisationRequests.userId, user.id))
     await tx.delete(loginTokens).where(sql`lower(${loginTokens.email}) = ${email}`)
     await tx.delete(emailOutbox).where(sql`lower(${emailOutbox.to}) = ${email}`)
     await forgetRateLimits(email, tx)
@@ -104,8 +108,6 @@ export async function exportUserData(actor: Principal, userId: string) {
       email: users.email,
       role: users.role,
       status: users.status,
-      organisationId: users.organisationId,
-      organisationName: organisations.name,
       emailNotifications: users.emailNotifications,
       billingAddress: users.billingAddress,
       deliveryAddress: users.deliveryAddress,
@@ -117,12 +119,29 @@ export async function exportUserData(actor: Principal, userId: string) {
       updatedAt: users.updatedAt,
     })
     .from(users)
-    .leftJoin(organisations, eq(organisations.id, users.organisationId))
     .where(eq(users.id, userId))
   if (!user) throw new Error('Benutzer nicht gefunden')
   const email = user.email.toLowerCase()
 
-  const [activeSessions, linkedAccounts, ownRequests, comments, events, files, audit, mails] = await Promise.all([
+  const [orgs, orgRequests, activeSessions, linkedAccounts, ownRequests, comments, events, files, audit, mails] = await Promise.all([
+    db
+      .select({ id: organisations.id, name: organisations.name, since: organisationMembers.createdAt })
+      .from(organisationMembers)
+      .innerJoin(organisations, eq(organisations.id, organisationMembers.organisationId))
+      .where(eq(organisationMembers.userId, userId))
+      .orderBy(asc(organisations.name)),
+    db
+      .select({
+        name: organisationRequests.name,
+        details: organisationRequests.details,
+        status: organisationRequests.status,
+        note: organisationRequests.note,
+        createdAt: organisationRequests.createdAt,
+        reviewedAt: organisationRequests.reviewedAt,
+      })
+      .from(organisationRequests)
+      .where(eq(organisationRequests.userId, userId))
+      .orderBy(asc(organisationRequests.createdAt)),
     db
       .select({
         createdAt: sessions.createdAt,
@@ -230,6 +249,8 @@ export async function exportUserData(actor: Principal, userId: string) {
     hinweis:
       'Datenauskunft nach Art. 15 DSGVO. Passwörter werden nur als Hash gespeichert und sind nicht enthalten; Rate-Limit-Zähler enthalten nur Hashes.',
     account: user,
+    organisations: orgs,
+    organisationRequests: orgRequests,
     sessions: activeSessions,
     oidcAccounts: linkedAccounts,
     requests: ownRequests,

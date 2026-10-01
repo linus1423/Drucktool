@@ -209,6 +209,43 @@ export function registrationReceivedMail(u: { name: string; email: string; organ
   ])
 }
 
+export function organisationRequestedMail(r: {
+  customerName: string
+  customerEmail: string
+  name: string
+  details: string
+}): MailContent {
+  return compose(`Organisation angefragt: ${r.name}`, [
+    { kind: 'p', text: `${r.customerName} <${r.customerEmail}> möchte der Organisation „${r.name}“ zugeordnet werden.` },
+    ...(r.details ? [{ kind: 'quote' as const, text: r.details }] : []),
+    { kind: 'button', label: 'Anfrage bearbeiten', href: appUrl('/organisationsanfragen') },
+  ])
+}
+
+export function organisationRequestDecisionMail(r: {
+  name: string
+  requested: string
+  organisation: string | null
+  note: string | null
+}): MailContent {
+  if (r.organisation) {
+    return compose(`Organisation zugeordnet: ${r.organisation}`, [
+      { kind: 'p', text: `Hallo ${r.name},` },
+      {
+        kind: 'p',
+        text: `Ihre Anfrage zu „${r.requested}“ wurde bearbeitet: Sie gehören jetzt zur Organisation „${r.organisation}“ und können sie bei neuen Aufträgen auswählen.`,
+      },
+      { kind: 'button', label: 'Zum Profil', href: appUrl('/profil') },
+    ])
+  }
+  return compose('Ihre Anfrage zu einer Organisation', [
+    { kind: 'p', text: `Hallo ${r.name},` },
+    { kind: 'p', text: `Ihre Anfrage zu „${r.requested}“ konnten wir leider nicht annehmen.` },
+    ...(r.note ? [{ kind: 'quote' as const, text: r.note }] : []),
+    { kind: 'p', text: 'Aufträge können Sie weiterhin ohne Organisation aufgeben.' },
+  ])
+}
+
 export function registrationApprovedMail(u: { name: string }): MailContent {
   return compose('Ihr Konto wurde freigegeben', [
     { kind: 'p', text: `Hallo ${u.name},` },

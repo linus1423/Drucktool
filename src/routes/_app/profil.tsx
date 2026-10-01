@@ -3,6 +3,7 @@ import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useForm } from '@tanstack/react-form'
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { z } from 'zod'
+import { OrganisationsCard } from '~/components/OrganisationsCard'
 import { Alert, Button, Card, Field, Input, PageHeader, fieldError } from '~/components/ui'
 import { EMPTY_BILLING, EMPTY_DELIVERY } from '~/lib/address'
 import { errorMessage } from '~/lib/errors'
@@ -36,6 +37,7 @@ function ProfilePage() {
         <Alert tone="info">Willkommen! Bitte hinterlegen Sie Ihre Rechnungsadresse, bevor Sie den ersten Auftrag aufgeben.</Alert>
       ) : null}
       <ProfileForm account={account} />
+      {customer ? <OrganisationsCard account={account} /> : null}
       <NotificationsCard initial={account.emailNotifications} customer={customer} />
       <SessionsCard sessions={account.sessions} />
     </div>

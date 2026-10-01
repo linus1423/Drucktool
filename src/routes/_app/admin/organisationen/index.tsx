@@ -36,7 +36,7 @@ function OrganisationsPage() {
     <>
       <PageHeader
         title="Organisationen"
-        description="Kunden der Druckerei. Jeder Kunde gehört zu genau einer Organisation."
+        description="Kunden der Druckerei. Organisationen sind optional; ein Kunde kann keiner, einer oder mehreren angehören."
         actions={
           <Link
             to="/admin/organisationen/neu"

@@ -25,7 +25,7 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
       .insert(schema.users)
       .values({ email: email(`${role}-${Math.random()}`), name: role, role, status: 'active' })
       .returning()
-    return { id: u!.id, role, organisationId: null }
+    return { id: u!.id, role }
   }
 
   async function entriesFor(targetId: string) {
@@ -41,8 +41,9 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
       .returning()
     const [anna] = await db
       .insert(schema.users)
-      .values({ email: email('anna'), name: 'Anna', role: 'customer', status: 'pending', organisationId: org!.id })
+      .values({ email: email('anna'), name: 'Anna', role: 'customer', status: 'pending' })
       .returning()
+    await db.insert(schema.organisationMembers).values({ userId: anna!.id, organisationId: org!.id })
     const [bert] = await db
       .insert(schema.users)
       .values({ email: email('bert'), name: 'Bert', role: 'customer', status: 'pending' })
@@ -69,7 +70,7 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
       name: 'Clara',
       email: email('clara'),
       role: 'staff',
-      organisationId: null,
+      organisationIds: [],
       password: 'geheimes-passwort-1',
     })
     await admin.updateUser(superadmin, {
@@ -78,7 +79,7 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
       email: email('clara'),
       role: 'admin',
       status: 'active',
-      organisationId: null,
+      organisationIds: [],
       password: 'noch-geheimer-2',
     })
     const entries = await entriesFor(created.id)
@@ -98,11 +99,11 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
     const admin1 = await principal('admin')
     // Ein Admin darf keinen Superadmin anlegen: weder Benutzer noch Protokolleintrag entstehen.
     await expect(
-      admin.createUser(admin1, { name: 'X', email: email('verboten'), role: 'superadmin', organisationId: null, password: '' }),
+      admin.createUser(admin1, { name: 'X', email: email('verboten'), role: 'superadmin', organisationIds: [], password: '' }),
     ).rejects.toThrow('Superadmin')
     // Doppelte Adresse: die Transaktion bricht ab, es bleibt kein Eintrag zurück.
     await expect(
-      admin.createUser(admin1, { name: 'Y', email: email('clara'), role: 'staff', organisationId: null, password: '' }),
+      admin.createUser(admin1, { name: 'Y', email: email('clara'), role: 'staff', organisationIds: [], password: '' }),
     ).rejects.toThrow('vergeben')
     const rows = await getDb()
       .select()
@@ -160,7 +161,7 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
       name: 'Dora',
       email: email('dora'),
       role: 'customer',
-      organisationId: org!.id,
+      organisationIds: [org!.id],
       password: '',
     })
 

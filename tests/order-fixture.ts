@@ -25,7 +25,10 @@ export async function testUpload(user: Principal, role: 'main' | 'cover' = 'main
   return file!
 }
 
-export async function orderInput(user: Principal, overrides: { title?: string; notes?: string; spec?: Partial<OrderSpec> } = {}) {
+export async function orderInput(
+  user: Principal,
+  overrides: { title?: string; notes?: string; spec?: Partial<OrderSpec>; organisationId?: string } = {},
+) {
   const { getCatalog } = await import('~/server/catalog/catalog.server')
   const catalog = await getCatalog({ onlyAvailable: true })
   const paper = catalog.papers.find((p) => p.name === 'Standardpapier')!
@@ -58,6 +61,7 @@ export async function orderInput(user: Principal, overrides: { title?: string; n
     deliveryAddress: null,
     acceptTerms: true as const,
     expectedTotalCents: priced.price.totalCents,
+    organisationId: overrides.organisationId,
   }
 }
 

@@ -166,6 +166,7 @@ function label(key: string, value: unknown, orgName: OrgName) {
     return USER_STATUS_LABELS[value as UserStatus] ?? ORG_STATUS[value as keyof typeof ORG_STATUS]?.label ?? value
   }
   if (key === 'organisationId' && typeof value === 'string') return orgName(value)
+  if (key === 'organisationIds' && Array.isArray(value)) return value.length ? value.map((v) => orgName(String(v))).join(', ') : 'keine'
   return String(value)
 }
 
@@ -192,6 +193,8 @@ function describeDetails(e: Entry) {
   if (data.passwordSet === true) parts.push('mit Passwort')
   if (data.sessionsRevoked === true) parts.push('Sitzungen beendet')
   if (data.existingOrganisation === true) parts.push('bestehender Organisation zugeordnet')
+  if (typeof data.requested === 'string') parts.push(`angefragt: „${data.requested}“`)
+  if (data.created === true || data.fromRequest === true) parts.push('neu angelegt aus Anfrage')
   return parts.join(' · ')
 }
 

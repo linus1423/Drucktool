@@ -6,6 +6,7 @@ import { getRequestFn, listAssignableStaffFn, listRequestsFn } from '~/server/re
 import {
   getOrganisationFn,
   listActiveOrganisationsFn,
+  listOrganisationRequestsFn,
   listOrganisationsFn,
   listPendingRegistrationsFn,
   listUsersFn,
@@ -64,6 +65,11 @@ export const organisationsQuery = queryOptions({
 export const activeOrganisationsQuery = queryOptions({
   queryKey: ['organisations', 'active'],
   queryFn: () => listActiveOrganisationsFn(),
+})
+
+export const organisationRequestsQuery = queryOptions({
+  queryKey: ['organisations', 'requests'],
+  queryFn: () => listOrganisationRequestsFn(),
 })
 
 export const organisationQuery = (id: string) =>

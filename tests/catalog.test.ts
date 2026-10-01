@@ -14,7 +14,7 @@ async function admin(): Promise<Principal> {
     .insert(schema.users)
     .values({ email: `admin-${Date.now()}-${Math.random()}@test`, name: 'Admin', role: 'admin', status: 'active' })
     .returning()
-  return { id: u!.id, role: 'admin', organisationId: null }
+  return { id: u!.id, role: 'admin' }
 }
 
 async function changesFor(entityId: string) {

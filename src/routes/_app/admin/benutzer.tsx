@@ -30,7 +30,7 @@ const columns = [
   col.accessor('name', { header: 'Name', sortFn: 'text', cell: (i) => <span className="font-medium">{i.getValue()}</span> }),
   col.accessor('email', { header: 'E-Mail', sortFn: 'text' }),
   col.accessor('role', { header: 'Rolle', cell: (i) => ROLE_LABELS[i.getValue()] }),
-  col.accessor('organisationName', { header: 'Organisation', cell: (i) => i.getValue() ?? '–' }),
+  col.accessor('organisationNames', { header: 'Organisationen', cell: (i) => i.getValue() || '–' }),
   col.accessor('status', {
     header: 'Status',
     cell: (i) => <Badge className={statusTone[i.getValue()]}>{USER_STATUS_LABELS[i.getValue()]}</Badge>,
@@ -79,6 +79,11 @@ function UserForm({ editing, actorRole, onDone }: { editing: Editing; actorRole:
   const [error, setError] = useState<string | null>(null)
   const existing = editing.mode === 'edit' ? editing.user : null
   // Nur Superadmins dürfen Administratoren vergeben.
+  // Aktive Organisationen plus die bisherigen des Benutzers, auch wenn sie inzwischen deaktiviert sind.
+  const organisationOptions = [
+    ...(organisations.data ?? []),
+    ...(existing?.organisations ?? []).filter((o) => !organisations.data?.some((a) => a.id === o.id)),
+  ]
   const roles = USER_ROLES.filter((r) => actorRole === 'superadmin' || (r !== 'admin' && r !== 'superadmin'))
 
   const form = useForm({
@@ -87,7 +92,7 @@ function UserForm({ editing, actorRole, onDone }: { editing: Editing; actorRole:
       email: existing?.email ?? '',
       role: (existing?.role ?? 'staff') as UserRole,
       status: (existing?.status ?? 'active') as UserStatus,
-      organisationId: existing?.organisationId ?? '',
+      organisationIds: existing?.organisations.map((o) => o.id) ?? [],
       password: '',
     },
     onSubmit: async ({ value }) => {
@@ -97,7 +102,7 @@ function UserForm({ editing, actorRole, onDone }: { editing: Editing; actorRole:
           name: value.name,
           email: value.email,
           role: value.role,
-          organisationId: value.role === 'customer' ? value.organisationId || null : null,
+          organisationIds: value.role === 'customer' ? value.organisationIds : [],
         }
         if (existing) {
           await updateUserFn({ data: { ...base, id: existing.id, status: value.status, password: value.password } })
@@ -163,18 +168,28 @@ function UserForm({ editing, actorRole, onDone }: { editing: Editing; actorRole:
         <form.Subscribe selector={(s) => s.values.role}>
           {(role) =>
             role === 'customer' ? (
-              <form.Field name="organisationId">
+              <form.Field name="organisationIds">
                 {(field) => (
-                  <Field label="Organisation (optional)" htmlFor="user-org">
-                    <Select id="user-org" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)}>
-                      <option value="">Keine</option>
-                      {organisations.data?.map((o) => (
-                        <option key={o.id} value={o.id}>
+                  <fieldset className="space-y-1 text-sm">
+                    <legend className="mb-1 font-medium text-slate-700">Organisationen (optional)</legend>
+                    {organisationOptions.length === 0 ? <p className="text-slate-500">Keine Organisationen angelegt.</p> : null}
+                    <div className="max-h-48 space-y-1 overflow-y-auto">
+                      {organisationOptions.map((o) => (
+                        <label key={o.id} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={field.state.value.includes(o.id)}
+                            onChange={(e) =>
+                              field.handleChange(
+                                e.target.checked ? [...field.state.value, o.id] : field.state.value.filter((id) => id !== o.id),
+                              )
+                            }
+                          />
                           {o.name}
-                        </option>
+                        </label>
                       ))}
-                    </Select>
-                  </Field>
+                    </div>
+                  </fieldset>
                 )}
               </form.Field>
             ) : (
