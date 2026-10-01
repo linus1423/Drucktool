@@ -1,5 +1,6 @@
-// Änderungsvorschläge der Druckerei (Issue #50): Mitarbeiter bearbeiten die Optionen eines Auftrags,
-// der Kunde sieht Vorher und Nachher und stimmt zu oder lehnt ab.
+// Änderungsvorschläge der Druckerei (Issue #50, #113): Mitarbeiter bearbeiten die Optionen eines Auftrags,
+// der Kunde sieht Vorher und Nachher und stimmt zu oder lehnt ab. Antwortet er per Mail, tragen Mitarbeiter
+// die Antwort ein.
 import { useState } from 'react'
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { EMPTY_DELIVERY, deliveryAddressSchema, type DeliveryAddress } from '~/lib/address'
@@ -91,9 +92,16 @@ export function ProposalCard({
   onChanged: () => Promise<void>
   onEdit: () => void
 }) {
+  const [note, setNote] = useState('')
   const answer = useMutation({
-    mutationFn: (accept: boolean) => answerChangeFn({ data: { id: request.id, version: request.version, accept } }),
-    onSuccess: onChanged,
+    mutationFn: (accept: boolean) =>
+      answerChangeFn({
+        data: { id: request.id, version: request.version, accept, ...(request.canRecordAnswer ? { note } : {}) },
+      }),
+    onSuccess: async () => {
+      setNote('')
+      await onChanged()
+    },
   })
   const withdraw = useMutation({
     mutationFn: () => withdrawChangeFn({ data: { id: request.id, version: request.version } }),
@@ -126,16 +134,43 @@ export function ProposalCard({
             </div>
           </>
         ) : staff ? (
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm text-slate-500">Wartet auf die Zustimmung des Kunden.</p>
-            <div className="flex gap-2">
-              <Button variant="secondary" disabled={busy} onClick={onEdit}>
-                Vorschlag ändern
-              </Button>
-              <Button variant="secondary" className="text-rose-700" disabled={busy} onClick={() => withdraw.mutate()}>
-                Zurückziehen
-              </Button>
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm text-slate-500">Wartet auf die Zustimmung des Kunden.</p>
+              <div className="flex gap-2">
+                <Button variant="secondary" disabled={busy} onClick={onEdit}>
+                  Vorschlag ändern
+                </Button>
+                <Button variant="secondary" className="text-rose-700" disabled={busy} onClick={() => withdraw.mutate()}>
+                  Zurückziehen
+                </Button>
+              </div>
             </div>
+            {request.canRecordAnswer ? (
+              // Der Kunde hat per Mail oder Telefon geantwortet (Issue #113).
+              <div className="space-y-3 rounded-md bg-slate-50 p-3">
+                <Field
+                  label="Antwort des Kunden eintragen"
+                  htmlFor="proposal-answer-note"
+                  hint="Wenn der Kunde per Mail oder Telefon geantwortet hat. Der Vermerk steht im Verlauf, der Kunde bekommt eine Bestätigung."
+                >
+                  <Input
+                    id="proposal-answer-note"
+                    placeholder="z. B. Zustimmung per Mail vom 01.10."
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                  />
+                </Field>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button variant="secondary" disabled={busy || !note.trim()} onClick={() => answer.mutate(false)}>
+                    Ablehnung eintragen
+                  </Button>
+                  <Button disabled={busy || !note.trim()} onClick={() => answer.mutate(true)}>
+                    Zustimmung eintragen
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -242,7 +277,7 @@ export function ProposeChangeForm({
   const total = priced.ok ? (draft.priceOverride ?? priced.price.totalCents) : null
 
   return (
-    <Card title="Änderung vorschlagen">
+    <Card title="Auftrag ändern">
       <form
         className="space-y-4"
         onSubmit={(e) => {
@@ -251,7 +286,9 @@ export function ProposeChangeForm({
         }}
       >
         <p className="text-sm text-slate-600">
-          Der Auftrag geht auf „Rückfrage“. Die Änderung gilt erst, wenn der Kunde zustimmt; bis dahin bleibt der bisherige Stand.
+          Daraus entsteht ein neues Angebot: Der Kunde bekommt eine Mail und stimmt im Drucktool zu. Antwortet er per Mail, können
+          Sie seine Zustimmung danach selbst eintragen. Bis dahin steht der Auftrag auf „Rückfrage“ und es gilt der bisherige
+          Stand.
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Format" htmlFor="proposal-format">
