@@ -50,6 +50,15 @@
     direction: incoming
   when: hardening_firewall_enabled
 
+# Ubuntu 24.04 startet sshd per Socket-Aktivierung; bis zur ersten Verbindung fehlt das Verzeichnis, und
+# "sshd -t" zur Prüfung der Konfiguration bricht ohne es ab.
+- name: Verzeichnis für die SSH-Konfigurationsprüfung anlegen
+  ansible.builtin.file:
+    path: /run/sshd
+    state: directory
+    mode: '0755'
+  when: hardening_ssh_enabled
+
 - name: SSH nur mit Schlüssel und ohne Root-Login
   ansible.builtin.template:
     src: sshd.conf.j2
