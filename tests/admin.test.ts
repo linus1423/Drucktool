@@ -13,7 +13,7 @@ async function pendingRegistration(name: string) {
   const [org] = await db.insert(schema.organisations).values({ name: `${name} GmbH`, status: 'pending' }).returning()
   const [user] = await db
     .insert(schema.users)
-    .values({ email: `${name}-${Date.now()}@test`, name, role: 'customer', status: 'pending', organisationId: org!.id })
+    .values({ email: `${name}-${Date.now()}@test`, lastName: name, role: 'customer', status: 'pending', organisationId: org!.id })
     .returning()
   return { org: org!, user: user! }
 }
@@ -21,7 +21,7 @@ async function pendingRegistration(name: string) {
 async function principal(role: Principal['role']): Promise<Principal> {
   const [u] = await getDb()
     .insert(schema.users)
-    .values({ email: `${role}-${Date.now()}-${Math.random()}@test`, name: role, role, status: 'active' })
+    .values({ email: `${role}-${Date.now()}-${Math.random()}@test`, lastName: role, role, status: 'active' })
     .returning()
   return { id: u!.id, role, organisationId: null }
 }
@@ -72,7 +72,8 @@ describe.skipIf(!url)('Freigabe von Registrierungen (Integration)', () => {
     await expect(
       updateUser(admin, {
         id: user.id,
-        name: user.name,
+        firstName: user.firstName,
+        lastName: user.lastName,
         email: user.email,
         role: 'customer',
         organisationId: org.id,
@@ -88,7 +89,8 @@ describe.skipIf(!url)('Freigabe von Registrierungen (Integration)', () => {
     await expect(
       updateUser(admin, {
         id: otherAdmin.id,
-        name: 'x',
+        firstName: '',
+        lastName: 'x',
         email: `x-${Date.now()}@test`,
         role: 'staff',
         organisationId: null,

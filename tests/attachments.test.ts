@@ -30,9 +30,9 @@ describe.skipIf(!url)('Anhänge an Nachrichten (Issue #8)', async () => {
     const rows = await getDb()
       .insert(schema.users)
       .values([
-        { email: `${tag}-k@test`, name: 'Kundin', role: 'customer', status: 'active', billingAddress: BILLING },
-        { email: `${tag}-f@test`, name: 'Fremd', role: 'customer', status: 'active', billingAddress: BILLING },
-        { email: `${tag}-s@test`, name: 'Staff', role: 'staff', status: 'active' },
+        { email: `${tag}-k@test`, lastName: 'Kundin', role: 'customer', status: 'active', billingAddress: BILLING },
+        { email: `${tag}-f@test`, lastName: 'Fremd', role: 'customer', status: 'active', billingAddress: BILLING },
+        { email: `${tag}-s@test`, lastName: 'Staff', role: 'staff', status: 'active' },
       ])
       .returning()
     customer = { id: rows[0]!.id, role: 'customer', organisationId: null }

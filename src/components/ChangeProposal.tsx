@@ -8,7 +8,8 @@ import { formatDateTime, formatMoney } from '~/lib/format'
 import {
   DELIVERY_LABELS,
   DELIVERY_METHODS,
-  MAX_COVER_PAGES,
+  COVER_FROM_MAIN_FILE,
+  COVER_FROM_MAIN_FILE_LABELS,
   bindingChoices,
   borderlessChoice,
   coverColorChoices,
@@ -17,6 +18,7 @@ import {
   formatSize,
   paperChoices,
   type DeliveryMethod,
+  type CoverFromMainFile,
   type OrderSpec,
 } from '~/lib/order'
 import { calculatePrice } from '~/lib/pricing'
@@ -188,10 +190,15 @@ export function ProposeChangeForm({
     customHeightMm: format?.kind === 'custom' ? int(draft.customHeight) : null,
     copies: int(draft.copies) ?? 0,
     pages: int(draft.pages) ?? 0,
+    // Ohne Deckblatt-Datei kommt ein Deckblatt aus der Druckdatei (Issue #85).
+    coverFromMainFile:
+      draft.spec.coverPaperId && !hasCoverFile ? (draft.spec.coverFromMainFile ?? 'front') : null,
   }
   const size = format ? formatSize(format, spec) : null
   const binding = catalog.bindings.find((b) => b.id === spec.bindingId)
   const paper = catalog.papers.find((p) => p.id === spec.paperId)
+  const coverPaper = catalog.papers.find((p) => p.id === spec.coverPaperId)
+  const coverColors = coverColorChoices(catalog, binding, coverPaper)
   const duplex = duplexChoice(format, binding)
   const borderless = borderlessChoice(format, binding, paper, size)
   const priced = calculatePrice(catalog, spec)
@@ -322,14 +329,18 @@ export function ProposeChangeForm({
             Randlos
           </label>
         </div>
-        {hasCoverFile && binding?.allowsCover ? (
+        {binding?.allowsCover ? (
           <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Deckblatt" htmlFor="proposal-cover">
               <Select
                 id="proposal-cover"
                 value={spec.coverPaperId ?? ''}
                 onChange={(e) =>
-                  set({ coverPaperId: e.target.value || null, coverPages: e.target.value ? (spec.coverPages ?? 1) : null })
+                  set({
+                    coverPaperId: e.target.value || null,
+                    // Seitenzahl der Deckblatt-Datei, nur zur Info (Issue #87).
+                    coverPages: e.target.value ? start.coverPages : null,
+                  })
                 }
               >
                 <option value="">Kein Deckblatt</option>
@@ -338,18 +349,14 @@ export function ProposeChangeForm({
                   .map((c) => option(c.item.id, `${c.item.name} ${c.item.grammage} g/m²`, true))}
               </Select>
             </Field>
-            {spec.coverPaperId ? (
-              <Field label="Seiten im Deckblatt" htmlFor="proposal-cover-pages">
+            {spec.coverFromMainFile ? (
+              <Field label="Deckblatt aus der Druckdatei" htmlFor="proposal-cover-from-main">
                 <Select
-                  id="proposal-cover-pages"
-                  value={String(spec.coverPages ?? 1)}
-                  onChange={(e) => set({ coverPages: Number(e.target.value) })}
+                  id="proposal-cover-from-main"
+                  value={spec.coverFromMainFile}
+                  onChange={(e) => set({ coverFromMainFile: e.target.value as CoverFromMainFile })}
                 >
-                  {Array.from({ length: MAX_COVER_PAGES }, (_, i) => (
-                    <option key={i + 1} value={i + 1}>
-                      {i === 0 ? 'nur vorne' : 'vorne und hinten'}
-                    </option>
-                  ))}
+                  {COVER_FROM_MAIN_FILE.map((mode) => option(mode, COVER_FROM_MAIN_FILE_LABELS[mode], true))}
                 </Select>
               </Field>
             ) : null}
@@ -364,7 +371,7 @@ export function ProposeChangeForm({
                 onChange={(e) => set({ coverColorId: e.target.value || null })}
               >
                 <option value="">Standard</option>
-                {coverColorChoices(catalog, binding).map((c) => option(c.item.id, c.item.name, c.allowed, c.reason))}
+                {coverColors.map((c) => option(c.item.id, c.item.name, c.allowed, c.reason))}
               </Select>
             </Field>
             {binding.allowsSplitCover ? (
@@ -375,7 +382,7 @@ export function ProposeChangeForm({
                   onChange={(e) => set({ coverBackColorId: e.target.value || null })}
                 >
                   <option value="">wie vorne</option>
-                  {coverColorChoices(catalog, binding).map((c) => option(c.item.id, c.item.name, c.allowed, c.reason))}
+                  {coverColors.map((c) => option(c.item.id, c.item.name, c.allowed, c.reason))}
                 </Select>
               </Field>
             ) : null}
