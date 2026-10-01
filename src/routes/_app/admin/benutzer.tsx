@@ -8,7 +8,7 @@ import { errorMessage } from '~/lib/errors'
 import { formatDateTime } from '~/lib/format'
 import { activeOrganisationsQuery, usersQuery } from '~/lib/queries'
 import { ROLE_LABELS, USER_ROLES, USER_STATUSES, USER_STATUS_LABELS, type UserRole, type UserStatus } from '~/lib/roles'
-import { createUserFn, updateUserFn } from '~/server/admin/admin.functions'
+import { anonymizeUserFn, createUserFn, updateUserFn } from '~/server/admin/admin.functions'
 
 export const Route = createFileRoute('/_app/admin/benutzer')({
   loader: ({ context }) => context.queryClient.ensureQueryData(usersQuery),
@@ -231,6 +231,67 @@ function UserForm({ editing, actorRole, onDone }: { editing: Editing; actorRole:
           </form.Subscribe>
         </div>
       </form>
+      {existing && !existing.anonymizedAt ? <PrivacyActions user={existing} onDone={onDone} /> : null}
     </Card>
+  )
+}
+
+/** Datenauskunft und Anonymisierung (DSGVO). */
+function PrivacyActions({ user, onDone }: { user: Row; onDone: () => void }) {
+  const queryClient = useQueryClient()
+  const [confirming, setConfirming] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function anonymize() {
+    setError(null)
+    setBusy(true)
+    try {
+      await anonymizeUserFn({ data: { id: user.id } })
+      await queryClient.invalidateQueries({ queryKey: ['admin'] })
+      onDone()
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="mt-6 space-y-3 border-t border-slate-200 pt-4 text-sm">
+      <h3 className="font-medium">Datenschutz</h3>
+      {error ? <Alert>{error}</Alert> : null}
+      <div className="flex flex-wrap gap-2">
+        <a
+          href={`/api/admin/datenauskunft/${user.id}`}
+          download
+          className="inline-flex items-center rounded-md bg-white px-3 py-2 font-medium text-slate-900 ring-1 ring-slate-300 hover:bg-slate-100"
+        >
+          Datenauskunft herunterladen (JSON)
+        </a>
+        {confirming ? null : (
+          <Button variant="secondary" className="text-rose-700" onClick={() => setConfirming(true)}>
+            Anonymisieren …
+          </Button>
+        )}
+      </div>
+      {confirming ? (
+        <Alert tone="info">
+          <p>
+            Name, E-Mail-Adresse, Adressen, Sitzungen und Anmeldewege von {user.name} werden endgültig entfernt; das Konto ist
+            danach gesperrt und die E-Mail-Adresse wieder frei. Aufträge und Nachrichten bleiben erhalten und zeigen „Gelöschter
+            Nutzer“. Das lässt sich nicht rückgängig machen.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <Button variant="danger" disabled={busy} onClick={() => void anonymize()}>
+              Endgültig anonymisieren
+            </Button>
+            <Button variant="secondary" disabled={busy} onClick={() => setConfirming(false)}>
+              Abbrechen
+            </Button>
+          </div>
+        </Alert>
+      ) : null}
+    </div>
   )
 }

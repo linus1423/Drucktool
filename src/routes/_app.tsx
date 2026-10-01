@@ -2,6 +2,7 @@ import { createFileRoute, Link, Outlet, redirect, useRouter } from '@tanstack/re
 import { useQueryClient } from '@tanstack/react-query'
 import { ROLE_LABELS, isAdminRole, isStaffRole } from '~/lib/roles'
 import { logout } from '~/server/auth/auth.functions'
+import { LegalLinks } from '~/components/LegalLinks'
 
 export const Route = createFileRoute('/_app')({
   beforeLoad: ({ context, location }) => {
@@ -79,6 +80,7 @@ function AppLayout() {
       <main className="mx-auto max-w-7xl px-4 py-8">
         <Outlet />
       </main>
+      <LegalLinks className="pb-8" />
     </div>
   )
 }
