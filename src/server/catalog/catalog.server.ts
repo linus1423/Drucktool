@@ -15,8 +15,7 @@ import { getDb, schema, type Tx } from '../db/client.server'
 import type { Principal } from '../requests/requests.server'
 import { DEFAULT_DEADLINE_SETTINGS, deadlineSettingsSchema, type DeadlineSettings } from '~/lib/deadlines'
 
-const { formats, bindings, formatBindings, papers, coverColors, paperCoverColors, settings, catalogChanges, users } =
-  schema
+const { formats, bindings, formatBindings, papers, coverColors, paperCoverColors, settings, catalogChanges, users } = schema
 
 type Db = ReturnType<typeof getDb> | Tx
 
@@ -172,19 +171,13 @@ export const paperCoverColorSchema = z.object({ paperId: z.uuid(), coverColorId:
 /** Schaltet eine Coverfarbe für ein Deckblattpapier frei oder nimmt sie weg. */
 export async function setPaperCoverColor(actor: Principal, input: z.infer<typeof paperCoverColorSchema>) {
   await getDb().transaction(async (tx) => {
-    const where = and(
-      eq(paperCoverColors.paperId, input.paperId),
-      eq(paperCoverColors.coverColorId, input.coverColorId),
-    )
+    const where = and(eq(paperCoverColors.paperId, input.paperId), eq(paperCoverColors.coverColorId, input.coverColorId))
     const [existing] = await tx.select().from(paperCoverColors).where(where)
     if (input.allowed === !!existing) return
     if (input.allowed) {
       const [paper] = await tx.select({ id: papers.id }).from(papers).where(eq(papers.id, input.paperId))
       if (!paper) throw new Error('Papier nicht gefunden')
-      const [color] = await tx
-        .select({ id: coverColors.id })
-        .from(coverColors)
-        .where(eq(coverColors.id, input.coverColorId))
+      const [color] = await tx.select({ id: coverColors.id }).from(coverColors).where(eq(coverColors.id, input.coverColorId))
       if (!color) throw new Error('Coverfarbe nicht gefunden')
       await tx.insert(paperCoverColors).values({ paperId: input.paperId, coverColorId: input.coverColorId })
     } else await tx.delete(paperCoverColors).where(where)

@@ -28,6 +28,8 @@ import {
   updateRequest,
   updateRequestSchema,
   setWatchingRequest,
+  setPrintSheet,
+  printSheetSchema,
   markRequestRead,
   markReadSchema,
   watchSchema,
@@ -97,3 +99,7 @@ export const setWatchingFn = createServerFn({ method: 'POST' })
 export const markReadFn = createServerFn({ method: 'POST' })
   .validator(markReadSchema)
   .handler(async ({ data }) => markRequestRead(await requireUser(), data))
+
+export const setPrintSheetFn = createServerFn({ method: 'POST' })
+  .validator(printSheetSchema)
+  .handler(async ({ data }) => setPrintSheet(await requireStaff(), data))

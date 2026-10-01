@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tansta
 import { z } from 'zod'
 import { MoneyInput } from '~/components/MoneyInput'
 import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select, Textarea, cx } from '~/components/ui'
-import { BINDING_UNIT_LABELS, type CatalogTexts, type PaperInput, type Pricing } from '~/lib/catalog'
+import { BINDING_UNIT_LABELS, type CatalogTexts, type PaperInput, type Pricing, type SheetSize } from '~/lib/catalog'
 import type { DeadlineSettings } from '~/lib/deadlines'
 import { errorMessage } from '~/lib/errors'
 import { formatDateTime, formatMoney } from '~/lib/format'
@@ -368,6 +368,7 @@ const EMPTY_PAPER: PaperInput = {
   forInner: true,
   forPlotter: false,
   maxFormatId: 'A3',
+  sheetSizes: [{ label: 'A3', widthMm: 297, heightMm: 420 }],
   available: true,
   helpText: '',
   sortOrder: 100,
@@ -453,6 +454,11 @@ function PaperCard({ paper, formats, onDone }: { paper: PaperInput; formats: Cat
             </Select>
           </Field>
         </div>
+        <SheetSizesEditor
+          id={`${id}-sheets`}
+          value={value.sheetSizes}
+          onChange={(sheetSizes) => setValue({ ...value, sheetSizes })}
+        />
         {value.forPlotter ? (
           <div className="grid gap-3 sm:grid-cols-3">
             {money('priceA0Cents', 'Preis pro Plot A0')}
@@ -519,8 +525,8 @@ function PaperColorsCard({ catalog }: { catalog: Catalog }) {
   return (
     <Card title="Farben je Deckblattpapier">
       <p className="mb-3 text-sm text-slate-600">
-        Kunden sehen bei einem separaten Deckblatt nur die Farben, die es auf dem gewählten Papier gibt. Ohne separates
-        Deckblatt gelten alle verfügbaren Farben der Bindung.
+        Kunden sehen bei einem separaten Deckblatt nur die Farben, die es auf dem gewählten Papier gibt. Ohne separates Deckblatt
+        gelten alle verfügbaren Farben der Bindung.
       </p>
       {toggle.error ? <Alert>{errorMessage(toggle.error)}</Alert> : null}
       {coverPapers.length === 0 ? (
@@ -760,6 +766,7 @@ const FIELD_LABELS: Record<string, string> = {
   forInner: 'Innenteil',
   forPlotter: 'Plotter',
   maxFormatId: 'Größtes Format',
+  sheetSizes: 'Bogengrößen',
   hex: 'Farbe',
   transparent: 'Durchsichtig',
   printA4Cents: 'Druck A4',
@@ -781,8 +788,9 @@ function formatValue(key: string, v: unknown) {
   if (v === null || v === undefined || v === '') return '–'
   if (typeof v === 'number' && /Cents$/.test(key)) return formatMoney(v)
   if (typeof v === 'boolean') return v ? 'ja' : 'nein'
-  if (key === 'priceUnit') return BINDING_UNIT_LABELS[v as keyof typeof BINDING_UNIT_LABELS] ?? String(v)
-  const text = String(v)
+  if (key === 'sheetSizes' && Array.isArray(v)) return v.length ? (v as SheetSize[]).map((s) => s.label).join(', ') : '–'
+  if (key === 'priceUnit' && typeof v === 'string') return BINDING_UNIT_LABELS[v as keyof typeof BINDING_UNIT_LABELS] ?? v
+  const text = typeof v === 'object' ? JSON.stringify(v) : String(v as string | number | bigint)
   return text.length > 60 ? `„${text.slice(0, 57)}…“` : typeof v === 'string' ? `„${text}“` : text
 }
 
@@ -810,8 +818,10 @@ function subject(
     }
     case 'settings':
       return SETTING_LABELS[c.entityId] ?? c.entityId
-    default:
-      return String((c.after ?? c.before)?.name ?? c.entityId)
+    default: {
+      const name = (c.after ?? c.before)?.name
+      return typeof name === 'string' ? name : c.entityId
+    }
   }
 }
 
@@ -847,5 +857,69 @@ function ChangesTab({ catalog }: { catalog: Catalog }) {
         </ul>
       )}
     </Card>
+  )
+}
+
+const SHEET_PRESETS: SheetSize[] = [
+  { label: 'A4', widthMm: 210, heightMm: 297 },
+  { label: 'A3', widthMm: 297, heightMm: 420 },
+  { label: 'SRA3', widthMm: 320, heightMm: 450 },
+]
+
+/** Bogengrößen, in denen ein Papier vorrätig ist (Issue #88). */
+function SheetSizesEditor({ id, value, onChange }: { id: string; value: SheetSize[]; onChange: (v: SheetSize[]) => void }) {
+  const update = (i: number, patch: Partial<SheetSize>) => onChange(value.map((s, j) => (j === i ? { ...s, ...patch } : s)))
+  const missing = SHEET_PRESETS.filter((p) => !value.some((s) => s.label.toLowerCase() === p.label.toLowerCase()))
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-medium text-slate-700">Vorrätige Bogengrößen</legend>
+      <p className="text-xs text-slate-600">
+        Daraus wählen Mitarbeiter am Auftrag, auf welchem Bogen gedruckt wird. Das ändert weder Preis noch Status.
+      </p>
+      {value.length === 0 ? <p className="text-sm text-slate-600">Noch keine Bogengröße hinterlegt.</p> : null}
+      {value.map((s, i) => (
+        <div key={i} className="flex flex-wrap items-end gap-2">
+          <Field label="Bezeichnung" htmlFor={`${id}-${i}-label`}>
+            <Input
+              id={`${id}-${i}-label`}
+              className="w-28"
+              value={s.label}
+              onChange={(e) => update(i, { label: e.target.value })}
+            />
+          </Field>
+          <Field label="Breite (mm)" htmlFor={`${id}-${i}-w`}>
+            <Input
+              id={`${id}-${i}-w`}
+              type="number"
+              className="w-24"
+              value={s.widthMm}
+              onChange={(e) => update(i, { widthMm: Number(e.target.value) })}
+            />
+          </Field>
+          <Field label="Höhe (mm)" htmlFor={`${id}-${i}-h`}>
+            <Input
+              id={`${id}-${i}-h`}
+              type="number"
+              className="w-24"
+              value={s.heightMm}
+              onChange={(e) => update(i, { heightMm: Number(e.target.value) })}
+            />
+          </Field>
+          <Button type="button" variant="secondary" onClick={() => onChange(value.filter((_, j) => j !== i))}>
+            Entfernen<span className="sr-only"> {s.label}</span>
+          </Button>
+        </div>
+      ))}
+      <div className="flex flex-wrap gap-2">
+        {missing.map((p) => (
+          <Button key={p.label} type="button" variant="secondary" onClick={() => onChange([...value, p])}>
+            + {p.label}
+          </Button>
+        ))}
+        <Button type="button" variant="secondary" onClick={() => onChange([...value, { label: '', widthMm: 0, heightMm: 0 }])}>
+          + Andere Größe
+        </Button>
+      </div>
+    </fieldset>
   )
 }

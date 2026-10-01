@@ -48,7 +48,12 @@ type Account = Awaited<ReturnType<typeof getMyAccountFn>>
 const billingFields = [
   { name: 'firstName', label: 'Vorname', autoComplete: 'given-name', span: 'sm:col-span-3' },
   { name: 'lastName', label: 'Nachname', autoComplete: 'family-name', span: 'sm:col-span-3' },
-  { name: 'organisation', label: 'Lehrstuhl, Einrichtung oder Firma (optional)', autoComplete: 'organization', span: 'sm:col-span-6' },
+  {
+    name: 'organisation',
+    label: 'Lehrstuhl, Einrichtung oder Firma (optional)',
+    autoComplete: 'organization',
+    span: 'sm:col-span-6',
+  },
   { name: 'street', label: 'Straße und Hausnummer', autoComplete: 'street-address', span: 'sm:col-span-6' },
   { name: 'zip', label: 'PLZ', autoComplete: 'postal-code', span: 'sm:col-span-2' },
   { name: 'city', label: 'Ort', autoComplete: 'address-level2', span: 'sm:col-span-2' },

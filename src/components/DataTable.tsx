@@ -131,6 +131,8 @@ export function DataTable<TData extends object>({
         ) : (
           <ul className="space-y-2">
             {rows.map((row) => (
+              // Klick auf die ganze Karte ist eine Abkürzung; per Tastatur führt der Link in der Karte zum Ziel, wie in der Tabelle.
+              // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
               <li
                 key={row.id}
                 onClick={onRowClick ? () => onRowClick(row.original) : undefined}
