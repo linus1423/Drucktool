@@ -3,8 +3,10 @@ import {
   borderlessChoice,
   bindingChoices,
   findFormat,
+  formatSize,
   impose,
   orderSpecSchema,
+  paperChoices,
   piecesPerSheet,
   resolveOrder,
   suggestFormat,
@@ -83,6 +85,20 @@ describe('Auswahlregeln', () => {
     expect(errors({ formatId: 'custom', customWidthMm: 320, customHeightMm: 450 })[0]).toContain('Höchstens A3')
     expect(errors({ formatId: 'custom', customWidthMm: 330, customHeightMm: 450 })[0]).toContain('höchstens 320 × 450')
     expect(errors({ formatId: 'custom' })[0]).toContain('Breite und Höhe')
+  })
+
+  it('blendet reine Plotterpapiere bei normalen Formaten ganz aus', () => {
+    const a4 = findFormat(CATALOG, 'A4')!
+    const ids = (purpose: 'inner' | 'cover') => paperChoices(CATALOG, a4, formatSize(a4), purpose).map((c) => c.item.id)
+    expect(ids('inner')).not.toContain(PAPER.plot)
+    expect(ids('cover')).not.toContain(PAPER.plot)
+    const a1 = findFormat(CATALOG, 'A1')!
+    const plot = paperChoices(CATALOG, a1, formatSize(a1), 'inner').find((c) => c.item.id === PAPER.plot)
+    expect(plot?.allowed).toBe(true)
+    expect(errors({ paperId: PAPER.plot })).toEqual(['Plotterpapier: Nur für den Plotter.'])
+    expect(errors({ bindingId: 'glue', coverPaperId: PAPER.plot, coverPages: 1 })).toEqual([
+      'Plotterpapier: Nur für den Plotter.',
+    ])
   })
 
   it('prüft das Deckblatt unabhängig von der Seitenzahl der Datei', () => {
