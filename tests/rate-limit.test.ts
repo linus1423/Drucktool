@@ -60,7 +60,7 @@ describe.skipIf(!url)('Rate-Limits in PostgreSQL (Integration)', async () => {
       .insert(schema.users)
       .values({
         email: address,
-        name: 'Sperre',
+        lastName: 'Sperre',
         role: 'customer',
         status: 'active',
         passwordHash: await hashPassword('richtig-123'),
@@ -91,7 +91,7 @@ describe.skipIf(!url)('Rate-Limits in PostgreSQL (Integration)', async () => {
       .insert(schema.users)
       .values({
         email: address,
-        name: 'Reset',
+        lastName: 'Reset',
         role: 'customer',
         status: 'active',
         passwordHash: await hashPassword('richtig-123'),
@@ -119,7 +119,7 @@ describe.skipIf(!url)('Rate-Limits in PostgreSQL (Integration)', async () => {
     const db = getDb()
     const [user] = await db
       .insert(schema.users)
-      .values({ email: email('aufraeumen'), name: 'Aufräumen', role: 'customer', status: 'active' })
+      .values({ email: email('aufraeumen'), lastName: 'Aufräumen', role: 'customer', status: 'active' })
       .returning()
     await db.insert(schema.sessions).values([
       { id: `alt-${stamp}`, userId: user!.id, expiresAt: new Date(Date.now() - 1000), ip: '10.1.1.1' },

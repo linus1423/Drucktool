@@ -103,9 +103,10 @@ export async function redeemLoginLink(token: string): Promise<LinkLogin> {
       .limit(1)
 
     if (!existing) {
+      // Vor- und Nachnamen tragen Kunden vor dem ersten Auftrag im Profil nach.
       const [created] = await tx
         .insert(users)
-        .values({ email: link.email, name: link.email.split('@')[0]!, role: 'customer', status: 'active' })
+        .values({ email: link.email, lastName: link.email.split('@')[0]!, role: 'customer', status: 'active' })
         .returning({ id: users.id })
       await auditLogin('succeeded', { userId: created!.id, method: 'link' }, tx)
       return { userId: created!.id, redirect: link.redirect, isNew: true }

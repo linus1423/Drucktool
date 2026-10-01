@@ -11,10 +11,16 @@ export const passwordSchema = z
   .min(10, 'Das Passwort muss mindestens 10 Zeichen lang sein')
   .max(200, 'Das Passwort ist zu lang')
 
-const requiredText = (label: string, max = 200) =>
+export const requiredText = (label: string, max = 200) =>
   z.string().trim().min(1, `${label} ist erforderlich`).max(max, `${label} ist zu lang`)
 
 const optionalText = (max = 200) => z.string().trim().max(max)
+
+/** Vor- und Nachname einer Person. Der Vorname darf für Funktionskonten (z. B. „Poststelle“) leer bleiben. */
+export const personNameFields = {
+  firstName: optionalText(),
+  lastName: requiredText('Nachname'),
+}
 
 export const loginSchema = z.object({
   email: emailSchema,

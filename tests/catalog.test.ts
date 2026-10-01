@@ -12,7 +12,7 @@ type Principal = import('~/server/requests/requests.server').Principal
 async function admin(): Promise<Principal> {
   const [u] = await getDb()
     .insert(schema.users)
-    .values({ email: `admin-${Date.now()}-${Math.random()}@test`, name: 'Admin', role: 'admin', status: 'active' })
+    .values({ email: `admin-${Date.now()}-${Math.random()}@test`, lastName: 'Admin', role: 'admin', status: 'active' })
     .returning()
   return { id: u!.id, role: 'admin', organisationId: null }
 }
