@@ -5,6 +5,7 @@ import { assertRateLimit } from '~/server/auth/rate-limit.server'
 import { getSessionUser } from '~/server/auth/session.server'
 import { AttachmentTypeError, EmptyUploadError, createUpload, uploadLimit } from '~/server/files/files.server'
 import { UploadTooLargeError } from '~/server/files/storage.server'
+import { VirusFoundError, VirusScanUnavailableError } from '~/server/files/virus-scan.server'
 
 const json = (body: unknown, status = 200) => Response.json(body, { status })
 
@@ -38,6 +39,8 @@ export const Route = createFileRoute('/api/dateien/')({
         } catch (e) {
           if (e instanceof UploadTooLargeError) return json({ error: e.message }, 413)
           if (e instanceof EmptyUploadError || e instanceof AttachmentTypeError) return json({ error: e.message }, 400)
+          if (e instanceof VirusFoundError) return json({ error: e.message }, 422)
+          if (e instanceof VirusScanUnavailableError) return json({ error: e.message }, 503)
           console.error('Upload fehlgeschlagen', e)
           return json({ error: 'Die Datei konnte nicht gespeichert werden.' }, 500)
         }

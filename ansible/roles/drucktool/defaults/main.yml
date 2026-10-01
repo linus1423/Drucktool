@@ -3,6 +3,9 @@ drucktool_backup_dir: /var/backups/drucktool
 drucktool_backup_keep_days: 14
 drucktool_upload_max_mb: 500
 drucktool_attachment_max_mb: 25
+# Uploads mit ClamAV auf Schadsoftware prüfen (Issue #99). clamd braucht etwa 1,5 GB RAM zusätzlich.
+drucktool_clamav_enabled: true
+drucktool_clamav_image: clamav/clamav:stable
 # Audit-Log: Einträge nach so vielen Tagen löschen (0 = nie)
 drucktool_audit_log_retention_days: 365
 # Löschfristen in Tagen (0 = nie): IP-Adressen an Sitzungen, abgelehnte Registrierungen
