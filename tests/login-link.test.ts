@@ -16,14 +16,20 @@ describe.skipIf(!url)('Anmeldung per E-Mail-Link (Integration)', async () => {
   })
 
   async function userByEmail(address: string) {
-    const [row] = await getDb().select().from(schema.users).where(sql`lower(${schema.users.email}) = ${address}`)
+    const [row] = await getDb()
+      .select()
+      .from(schema.users)
+      .where(sql`lower(${schema.users.email}) = ${address}`)
     return row
   }
 
   it('legt beim ersten Link ein aktives Kundenkonto ohne Organisation an', async () => {
     const token = await issueLoginLink(email('neu'), '/auftraege/neu')
     expect(token).toBeTruthy()
-    const mails = await getDb().select().from(schema.emailOutbox).where(eq(schema.emailOutbox.to, email('neu')))
+    const mails = await getDb()
+      .select()
+      .from(schema.emailOutbox)
+      .where(eq(schema.emailOutbox.to, email('neu')))
     expect(mails).toHaveLength(1)
     expect(mails[0]!.text).toContain(`/anmelden?token=${token}`)
 
@@ -66,7 +72,10 @@ describe.skipIf(!url)('Anmeldung per E-Mail-Link (Integration)', async () => {
 
     // Gesperrte bekommen keinen Link; die Antwort nach außen bleibt dieselbe.
     expect(await issueLoginLink(email('gesperrt'), null)).toBeNull()
-    const mails = await getDb().select().from(schema.emailOutbox).where(eq(schema.emailOutbox.to, email('gesperrt')))
+    const mails = await getDb()
+      .select()
+      .from(schema.emailOutbox)
+      .where(eq(schema.emailOutbox.to, email('gesperrt')))
     expect(mails).toHaveLength(0)
   })
 

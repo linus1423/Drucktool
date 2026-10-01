@@ -12,12 +12,12 @@ bearbeiten sie über einen Status-Workflow bis zur Auslieferung.
 
 ## Rollen
 
-| Rolle       | Rechte                                                                                     |
-| ----------- | ------------------------------------------------------------------------------------------ |
-| Superadmin  | Alles, gibt Registrierungen frei, verwaltet Administratoren, sieht das Protokoll            |
-| Admin       | Organisationen und Benutzer (Mitarbeiter, Kunden) verwalten, Anfragen bearbeiten            |
-| Mitarbeiter | Alle Anfragen bearbeiten, Status wechseln, zuweisen, interne Notizen schreiben             |
-| Kunde       | Eigene Aufträge anlegen, verfolgen und kommentieren                                        |
+| Rolle       | Rechte                                                                           |
+| ----------- | -------------------------------------------------------------------------------- |
+| Superadmin  | Alles, gibt Registrierungen frei, verwaltet Administratoren, sieht das Protokoll |
+| Admin       | Organisationen und Benutzer (Mitarbeiter, Kunden) verwalten, Anfragen bearbeiten |
+| Mitarbeiter | Alle Anfragen bearbeiten, Status wechseln, zuweisen, interne Notizen schreiben   |
+| Kunde       | Eigene Aufträge anlegen, verfolgen und kommentieren                              |
 
 ## Anmeldung
 
@@ -49,7 +49,7 @@ Im Profil sieht jeder seine angemeldeten Geräte und kann sie einzeln oder alle 
   gelöscht (Standard 365, 0 = nie).
 - **Security-Header** setzt die App selbst (Middleware in `src/start.ts`), damit sie auch ohne Caddy gelten:
   Content-Security-Policy mit Nonce pro Antwort für die Inline-Skripte von TanStack Start (`script-src 'self'
-  'nonce-…'`, `frame-ancestors 'none'`, `object-src 'none'`), `X-Content-Type-Options`, `Referrer-Policy`,
+'nonce-…'`, `frame-ancestors 'none'`, `object-src 'none'`), `X-Content-Type-Options`, `Referrer-Policy`,
   `X-Frame-Options`, `Permissions-Policy` und Cross-Origin-Header. `Strict-Transport-Security` nur mit HTTPS (gleiche
   Regel wie `COOKIE_SECURE`). Im Vite-Dev-Server entfällt die CSP.
 - **CSRF:** Schreibende Anfragen (POST-Server-Funktionen, Upload) brauchen `Sec-Fetch-Site: same-origin` bzw. bei
@@ -147,16 +147,16 @@ Kommentare hängen nur an und brauchen deshalb keine Versionsprüfung.
 
 Das Tool verschickt E-Mails bei neuen Anfragen, Statuswechseln, Nachrichten, Zuweisungen und Registrierungen:
 
-| Ereignis                         | Empfänger                                                                  |
-| -------------------------------- | -------------------------------------------------------------------------- |
-| Kunde reicht Auftrag ein         | Alle Mitarbeiter, dazu eine Eingangsbestätigung an den Kunden              |
-| Statuswechsel / Nachricht        | Alle Beobachter des Auftrags; bei Aktionen des Kunden ohne Zuständigen alle Mitarbeiter |
-| Interne Notiz                    | Nur beobachtende Mitarbeiter, nie Kunden                                   |
-| Erwähnung mit `@Name`            | Der erwähnte Mitarbeiter (eigene Mail statt der allgemeinen)                |
-| Zuweisung                        | Der neu zuständige Mitarbeiter                                             |
-| Anmeldelink                      | Die angegebene Adresse (immer, unabhängig von der Einstellung)             |
-| Neue Registrierung über OIDC     | Alle Superadmins (nur bei `OIDC_NEW_USERS=pending`)                        |
-| Freigabe / Ablehnung             | Die registrierte Person (immer, unabhängig von der Einstellung)             |
+| Ereignis                     | Empfänger                                                                               |
+| ---------------------------- | --------------------------------------------------------------------------------------- |
+| Kunde reicht Auftrag ein     | Alle Mitarbeiter, dazu eine Eingangsbestätigung an den Kunden                           |
+| Statuswechsel / Nachricht    | Alle Beobachter des Auftrags; bei Aktionen des Kunden ohne Zuständigen alle Mitarbeiter |
+| Interne Notiz                | Nur beobachtende Mitarbeiter, nie Kunden                                                |
+| Erwähnung mit `@Name`        | Der erwähnte Mitarbeiter (eigene Mail statt der allgemeinen)                            |
+| Zuweisung                    | Der neu zuständige Mitarbeiter                                                          |
+| Anmeldelink                  | Die angegebene Adresse (immer, unabhängig von der Einstellung)                          |
+| Neue Registrierung über OIDC | Alle Superadmins (nur bei `OIDC_NEW_USERS=pending`)                                     |
+| Freigabe / Ablehnung         | Die registrierte Person (immer, unabhängig von der Einstellung)                         |
 
 Wer eine Änderung selbst auslöst, bekommt keine Mail. Im Profil lassen sich Benachrichtigungen abschalten.
 
@@ -303,26 +303,26 @@ Ist das Paket in der GitHub Container Registry privat, `drucktool_registry_usern
 
 ## Umgebungsvariablen
 
-| Variable                                  | Bedeutung                                                              |
-| ----------------------------------------- | ---------------------------------------------------------------------- |
-| `DATABASE_URL`                            | PostgreSQL-Verbindung                                                  |
-| `APP_URL`                                 | Öffentliche URL (für Links in E-Mails)                                 |
-| `COOKIE_SECURE`                           | `false` nur ohne HTTPS; Standard in Produktion ist `true`              |
-| `TRUST_PROXY`                             | `true` hinter einem Reverse Proxy, damit Client-IPs erkannt werden     |
-| `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD` | Legt beim ersten Start den Superadmin an                               |
-| `CUSTOMER_EMAIL_DOMAINS`                  | Optional: neue Kundenkonten nur für diese Domains, z. B. `tum.de`       |
-| `SMTP_URL`                                | SMTP-Server, z. B. `smtps://user:pass@mail.example.com:465`            |
-| `MAIL_FROM`                               | Absender, z. B. `Druckerei Muster <auftraege@example.com>`             |
-| `UPLOAD_DIR`                              | Ablage für Druckdateien, Standard `data/uploads` (im Image `/app/uploads`) |
-| `UPLOAD_MAX_MB`                           | Größte erlaubte Druckdatei in MB, Standard 500                         |
-| `ATTACHMENT_MAX_MB`, `ATTACHMENT_TYPES`   | Anhänge an Nachrichten: Größe in MB (Standard 25), erlaubte Endungen (kommagetrennt) |
-| `AUDIT_LOG_RETENTION_DAYS`                | Aufbewahrung des Audit-Logs in Tagen, Standard 365, `0` = unbegrenzt   |
-| `SESSION_IP_RETENTION_DAYS`               | IP-Adressen an Sitzungen nach so vielen Tagen löschen, Standard 30     |
-| `REJECTED_REGISTRATION_RETENTION_DAYS`    | Abgelehnte Registrierungen nach so vielen Tagen löschen, Standard 30   |
-| `PRIVACY_URL`, `IMPRINT_URL`              | Links auf Datenschutzerklärung und Impressum in der Fußzeile           |
-| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | OpenID Connect, siehe oben                                 |
-| `OIDC_DISPLAY_NAME`, `OIDC_NEW_USERS`, `OIDC_TRUST_EMAIL` | Beschriftung und Verhalten der OIDC-Anmeldung          |
-| `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_ROLES`, `OIDC_STAFF_ROLES`, `OIDC_ENFORCE_FOR_STAFF` | Rollen vom Anbieter, siehe oben |
+| Variable                                                                            | Bedeutung                                                                            |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `DATABASE_URL`                                                                      | PostgreSQL-Verbindung                                                                |
+| `APP_URL`                                                                           | Öffentliche URL (für Links in E-Mails)                                               |
+| `COOKIE_SECURE`                                                                     | `false` nur ohne HTTPS; Standard in Produktion ist `true`                            |
+| `TRUST_PROXY`                                                                       | `true` hinter einem Reverse Proxy, damit Client-IPs erkannt werden                   |
+| `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`                                           | Legt beim ersten Start den Superadmin an                                             |
+| `CUSTOMER_EMAIL_DOMAINS`                                                            | Optional: neue Kundenkonten nur für diese Domains, z. B. `tum.de`                    |
+| `SMTP_URL`                                                                          | SMTP-Server, z. B. `smtps://user:pass@mail.example.com:465`                          |
+| `MAIL_FROM`                                                                         | Absender, z. B. `Druckerei Muster <auftraege@example.com>`                           |
+| `UPLOAD_DIR`                                                                        | Ablage für Druckdateien, Standard `data/uploads` (im Image `/app/uploads`)           |
+| `UPLOAD_MAX_MB`                                                                     | Größte erlaubte Druckdatei in MB, Standard 500                                       |
+| `ATTACHMENT_MAX_MB`, `ATTACHMENT_TYPES`                                             | Anhänge an Nachrichten: Größe in MB (Standard 25), erlaubte Endungen (kommagetrennt) |
+| `AUDIT_LOG_RETENTION_DAYS`                                                          | Aufbewahrung des Audit-Logs in Tagen, Standard 365, `0` = unbegrenzt                 |
+| `SESSION_IP_RETENTION_DAYS`                                                         | IP-Adressen an Sitzungen nach so vielen Tagen löschen, Standard 30                   |
+| `REJECTED_REGISTRATION_RETENTION_DAYS`                                              | Abgelehnte Registrierungen nach so vielen Tagen löschen, Standard 30                 |
+| `PRIVACY_URL`, `IMPRINT_URL`                                                        | Links auf Datenschutzerklärung und Impressum in der Fußzeile                         |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`                               | OpenID Connect, siehe oben                                                           |
+| `OIDC_DISPLAY_NAME`, `OIDC_NEW_USERS`, `OIDC_TRUST_EMAIL`                           | Beschriftung und Verhalten der OIDC-Anmeldung                                        |
+| `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_ROLES`, `OIDC_STAFF_ROLES`, `OIDC_ENFORCE_FOR_STAFF` | Rollen vom Anbieter, siehe oben                                                      |
 
 ## Nächste Schritte
 

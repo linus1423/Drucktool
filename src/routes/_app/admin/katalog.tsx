@@ -519,8 +519,8 @@ function PaperColorsCard({ catalog }: { catalog: Catalog }) {
   return (
     <Card title="Farben je Deckblattpapier">
       <p className="mb-3 text-sm text-slate-600">
-        Kunden sehen bei einem separaten Deckblatt nur die Farben, die es auf dem gewählten Papier gibt. Ohne separates
-        Deckblatt gelten alle verfügbaren Farben der Bindung.
+        Kunden sehen bei einem separaten Deckblatt nur die Farben, die es auf dem gewählten Papier gibt. Ohne separates Deckblatt
+        gelten alle verfügbaren Farben der Bindung.
       </p>
       {toggle.error ? <Alert>{errorMessage(toggle.error)}</Alert> : null}
       {coverPapers.length === 0 ? (
