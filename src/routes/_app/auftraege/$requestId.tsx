@@ -98,7 +98,26 @@ function RequestDetailPage() {
           {request.confirmedAt
             ? ` · bestätigt von ${request.confirmedByName ?? 'der Druckerei'} am ${formatDateTime(request.confirmedAt)}`
             : ''}
+          {request.reorderOf ? (
+            <>
+              {' · Nachbestellung von '}
+              <Link to="/auftraege/$requestId" params={{ requestId: request.reorderOf.id }} className="underline">
+                {formatRequestNumber(request.reorderOf.number)} {request.reorderOf.title}
+              </Link>
+            </>
+          ) : null}
         </p>
+        {request.order && (staff || request.createdById === user.id) ? (
+          <div className="mt-3">
+            <Link
+              to="/auftraege/neu"
+              search={{ vorlage: request.id }}
+              className="inline-flex items-center rounded-md px-3 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100"
+            >
+              Erneut bestellen
+            </Link>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -562,7 +581,9 @@ function Comments({ request, staff }: { request: Detail; staff: boolean }) {
 function describeEvent(e: Detail['events'][number]) {
   switch (e.type) {
     case 'created':
-      return 'hat den Auftrag eingereicht'
+      return typeof e.data.reorderOfNumber === 'number'
+        ? `hat den Auftrag als Nachbestellung von ${formatRequestNumber(e.data.reorderOfNumber)} eingereicht`
+        : 'hat den Auftrag eingereicht'
     case 'updated':
       return 'hat den Auftrag bearbeitet'
     case 'status_changed':

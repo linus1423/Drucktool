@@ -3,7 +3,7 @@ import { isStaffRole } from '~/lib/roles'
 import { getDb, schema, type Tx } from '../db/client.server'
 import type { Principal } from '../requests/requests.server'
 import { analysePdf } from './pdf.server'
-import { removeStored, storagePath, storeStream } from './storage.server'
+import { openStored, removeStored, storagePath, storeStream } from './storage.server'
 
 const { requestFiles, requests } = schema
 
@@ -103,6 +103,25 @@ export async function fileForDownload(user: Principal, id: string) {
  * Ordnet beim Absenden die hochgeladenen Dateien dem Auftrag zu. Nur eigene,
  * noch nicht verwendete Uploads mit passender Rolle werden akzeptiert.
  */
+/**
+ * Kopiert eine Datei eines früheren Auftrags als neuen, noch nicht zugeordneten Upload (Nachbestellung).
+ * Die Kopie liegt getrennt auf der Platte, damit das Löschen eines Auftrags die andere nicht berührt.
+ */
+export async function copyAsUpload(user: Principal, source: typeof requestFiles.$inferSelect) {
+  const stored = await storeStream(openStored(source.storageKey), Number.MAX_SAFE_INTEGER)
+  try {
+    const { id: _id, requestId: _r, ownerId: _o, storageKey: _k, createdAt: _c, ...rest } = source
+    const [row] = await getDb()
+      .insert(requestFiles)
+      .values({ ...rest, ownerId: user.id, storageKey: stored.key, sha256: stored.sha256, sizeBytes: stored.sizeBytes })
+      .returning()
+    return publicFile(row!)
+  } catch (e) {
+    await removeStored(stored.key)
+    throw e
+  }
+}
+
 export async function claimFiles(tx: Tx, user: Principal, requestId: string, ids: { main: string; cover: string | null }) {
   const wanted = [ids.main, ...(ids.cover ? [ids.cover] : [])]
   const rows = await tx

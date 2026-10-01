@@ -12,6 +12,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core'
 import { INTERNAL_STATUSES, REQUEST_STATUSES } from '../../lib/status'
 import { USER_ROLES, USER_STATUSES } from '../../lib/roles'
@@ -129,6 +130,8 @@ export const requests = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'restrict' }),
     assigneeId: uuid('assignee_id').references(() => users.id, { onDelete: 'set null' }),
+    // Nachbestellung: der Auftrag, der als Vorlage diente (Issue #10).
+    reorderOfId: uuid('reorder_of_id').references((): AnyPgColumn => requests.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
     description: text('description').notNull().default(''),
     quantity: integer('quantity'),

@@ -6,6 +6,7 @@ import {
   answerChangeSchema,
   setDates,
   setDatesSchema,
+  prepareReorder,
   proposeChange,
   proposeChangeSchema,
   withdrawChange,
@@ -80,3 +81,7 @@ export const withdrawChangeFn = createServerFn({ method: 'POST' })
 export const setDatesFn = createServerFn({ method: 'POST' })
   .validator(setDatesSchema)
   .handler(async ({ data }) => setDates(await requireStaff(), data))
+
+export const prepareReorderFn = createServerFn({ method: 'POST' })
+  .validator(z.object({ id: z.uuid() }))
+  .handler(async ({ data }) => prepareReorder(await requireUser(), data.id))

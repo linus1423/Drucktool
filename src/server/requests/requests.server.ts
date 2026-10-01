@@ -21,7 +21,7 @@ import { buildSnapshot } from '~/lib/snapshot'
 import { applyPriceOverride, type ChangeProposal } from '~/lib/proposal'
 import { getCatalog, getDeadlineSettings } from '../catalog/catalog.server'
 import { attentionFor, berlinToday } from '~/lib/deadlines'
-import { claimFiles, listRequestFiles } from '../files/files.server'
+import { claimFiles, copyAsUpload, listRequestFiles } from '../files/files.server'
 import { getDb, schema, type Tx } from '../db/client.server'
 import {
   notifyAssigned,
@@ -294,7 +294,16 @@ export async function getRequestDetail(user: Principal, id: string) {
     .orderBy(asc(requestEvents.createdAt))
 
   const r = found.request
-  const [files, deadlines] = await Promise.all([listRequestFiles(id), getDeadlineSettings()])
+  const [files, deadlines, [reorderOf]] = await Promise.all([
+    listRequestFiles(id),
+    getDeadlineSettings(),
+    r.reorderOfId
+      ? db
+          .select({ id: requests.id, number: requests.number, title: requests.title })
+          .from(requests)
+          .where(and(eq(requests.id, r.reorderOfId), visibilityFilter(user)))
+      : Promise.resolve([]),
+  ])
   const internalDueDate = isStaff ? r.internalDueDate : null
   return {
     ...r,
@@ -317,6 +326,7 @@ export async function getRequestDetail(user: Principal, id: string) {
     assigneeName: isStaff ? found.assigneeName : null,
     internalStatus: isStaff ? r.internalStatus : null,
     internalDueDate,
+    reorderOf: reorderOf ?? null,
     attention: attentionFor({ ...r, internalDueDate }, deadlines),
     confirmedByName: found.confirmedByName,
     comments,
@@ -344,6 +354,8 @@ export const createRequestSchema = z.object({
   /** Der Preis, den der Kunde gesehen hat. Weicht der Server ab, wird nicht abgeschickt. */
   expectedTotalCents: z.number().int().min(0),
   organisationId: z.uuid().optional(),
+  /** Auftrag, der als Vorlage diente (Nachbestellung). */
+  reorderOfId: z.uuid().optional(),
 })
 
 export const PRICE_CHANGED_MESSAGE =
@@ -381,6 +393,15 @@ export async function createRequest(user: Principal, input: z.infer<typeof creat
       throw new Error(spec.coverPaperId ? 'Bitte die Datei für das Deckblatt hochladen.' : 'Ein Deckblatt ist nicht ausgewählt.')
     }
 
+    let reorderOf: { id: string; number: number } | null = null
+    if (input.reorderOfId) {
+      const [source] = await tx
+        .select({ id: requests.id, number: requests.number })
+        .from(requests)
+        .where(and(eq(requests.id, input.reorderOfId), visibilityFilter(user)))
+      reorderOf = source ?? notFound()
+    }
+
     // Preis mit dem aktuellen Katalog neu berechnen; der Browser-Wert ist nur die Vorschau.
     const catalog = await getCatalog({ onlyAvailable: true }, tx)
     const priced = calculatePrice(catalog, spec)
@@ -402,6 +423,7 @@ export async function createRequest(user: Principal, input: z.infer<typeof creat
         deliveryAddress: spec.delivery === 'house_post' ? input.deliveryAddress : null,
         termsAcceptedAt: new Date(),
         termsVersion: termsVersion(catalog.texts.terms),
+        reorderOfId: reorderOf?.id ?? null,
       })
       .returning({ id: requests.id, number: requests.number })
 
@@ -418,10 +440,43 @@ export async function createRequest(user: Principal, input: z.infer<typeof creat
       )
     }
 
-    await tx.insert(requestEvents).values({ requestId: created!.id, actorId: user.id, type: 'created', toStatus: 'submitted' })
+    await tx.insert(requestEvents).values({
+      requestId: created!.id,
+      actorId: user.id,
+      type: 'created',
+      toStatus: 'submitted',
+      data: reorderOf ? { reorderOfNumber: reorderOf.number } : {},
+    })
     await notifyRequestCreated(tx, user, created!.id)
     return created!
   })
+}
+
+/**
+ * Vorlage für eine Nachbestellung (Issue #10): Optionen, Titel, Bemerkungen und Lieferadresse des alten
+ * Auftrags, dazu Kopien seiner Dateien als neue Uploads. Preis, Zuständigkeit und Nachrichten werden nicht
+ * übernommen; den Preis rechnet der Wizard mit dem aktuellen Katalog neu.
+ */
+export async function prepareReorder(user: Principal, id: string) {
+  const db = getDb()
+  const [source] = await db
+    .select()
+    .from(requests)
+    .where(and(eq(requests.id, id), visibilityFilter(user)))
+  if (!source) notFound()
+  if (!source.order) throw new Error('Aufträge aus der Zeit vor dem Bestell-Wizard können nicht nachbestellt werden.')
+  const files = await db.select().from(schema.requestFiles).where(eq(schema.requestFiles.requestId, id))
+  const main = files.find((f) => f.role === 'main')
+  const cover = files.find((f) => f.role === 'cover')
+  return {
+    source: { id: source.id, number: source.number },
+    title: source.title,
+    notes: source.description,
+    spec: source.order.spec,
+    deliveryAddress: source.deliveryAddress,
+    mainFile: main ? await copyAsUpload(user, main) : null,
+    coverFile: cover ? await copyAsUpload(user, cover) : null,
+  }
 }
 
 export const updateRequestSchema = z.object({
