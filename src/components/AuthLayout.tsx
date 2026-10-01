@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { LegalLinks } from './LegalLinks'
 
 export function AuthLayout({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
@@ -10,6 +11,7 @@ export function AuthLayout({ title, subtitle, children }: { title: string; subti
           {subtitle ? <p className="mt-1 text-sm text-slate-600">{subtitle}</p> : null}
         </div>
         <div className="rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-200">{children}</div>
+        <LegalLinks className="mt-6" />
       </div>
     </div>
   )

@@ -32,6 +32,7 @@ import { Route as ApiDateienFileIdRouteImport } from './routes/api/dateien/$file
 import { Route as AppAdminOrganisationenIndexRouteImport } from './routes/_app/admin/organisationen/index'
 import { Route as AppAdminOrganisationenOrganisationIdRouteImport } from './routes/_app/admin/organisationen/$organisationId'
 import { Route as AppAdminOrganisationenNeuRouteImport } from './routes/_app/admin/organisationen/neu'
+import { Route as ApiAdminDatenauskunftUserIdRouteImport } from './routes/api/admin/datenauskunft/$userId'
 import { Route as ApiAuthOidcCallbackRouteImport } from './routes/api/auth/oidc/callback'
 import { Route as ApiAuthOidcLoginRouteImport } from './routes/api/auth/oidc/login'
 
@@ -152,6 +153,12 @@ const AppAdminOrganisationenNeuRoute =
     path: '/organisationen/neu',
     getParentRoute: () => AppAdminRouteRoute,
   } as any)
+const ApiAdminDatenauskunftUserIdRoute =
+  ApiAdminDatenauskunftUserIdRouteImport.update({
+    id: '/api/admin/datenauskunft/$userId',
+    path: '/api/admin/datenauskunft/$userId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAuthOidcCallbackRoute = ApiAuthOidcCallbackRouteImport.update({
   id: '/api/auth/oidc/callback',
   path: '/api/auth/oidc/callback',
@@ -185,6 +192,7 @@ export interface FileRoutesByFullPath {
   '/api/dateien/': typeof ApiDateienIndexRoute
   '/admin/organisationen/$organisationId': typeof AppAdminOrganisationenOrganisationIdRoute
   '/admin/organisationen/neu': typeof AppAdminOrganisationenNeuRoute
+  '/api/admin/datenauskunft/$userId': typeof ApiAdminDatenauskunftUserIdRoute
   '/api/auth/oidc/callback': typeof ApiAuthOidcCallbackRoute
   '/api/auth/oidc/login': typeof ApiAuthOidcLoginRoute
   '/admin/organisationen/': typeof AppAdminOrganisationenIndexRoute
@@ -211,6 +219,7 @@ export interface FileRoutesByTo {
   '/api/dateien': typeof ApiDateienIndexRoute
   '/admin/organisationen/$organisationId': typeof AppAdminOrganisationenOrganisationIdRoute
   '/admin/organisationen/neu': typeof AppAdminOrganisationenNeuRoute
+  '/api/admin/datenauskunft/$userId': typeof ApiAdminDatenauskunftUserIdRoute
   '/api/auth/oidc/callback': typeof ApiAuthOidcCallbackRoute
   '/api/auth/oidc/login': typeof ApiAuthOidcLoginRoute
   '/admin/organisationen': typeof AppAdminOrganisationenIndexRoute
@@ -239,6 +248,7 @@ export interface FileRoutesById {
   '/api/dateien/': typeof ApiDateienIndexRoute
   '/_app/admin/organisationen/$organisationId': typeof AppAdminOrganisationenOrganisationIdRoute
   '/_app/admin/organisationen/neu': typeof AppAdminOrganisationenNeuRoute
+  '/api/admin/datenauskunft/$userId': typeof ApiAdminDatenauskunftUserIdRoute
   '/api/auth/oidc/callback': typeof ApiAuthOidcCallbackRoute
   '/api/auth/oidc/login': typeof ApiAuthOidcLoginRoute
   '/_app/admin/organisationen/': typeof AppAdminOrganisationenIndexRoute
@@ -267,6 +277,7 @@ export interface FileRouteTypes {
     | '/api/dateien/'
     | '/admin/organisationen/$organisationId'
     | '/admin/organisationen/neu'
+    | '/api/admin/datenauskunft/$userId'
     | '/api/auth/oidc/callback'
     | '/api/auth/oidc/login'
     | '/admin/organisationen/'
@@ -293,6 +304,7 @@ export interface FileRouteTypes {
     | '/api/dateien'
     | '/admin/organisationen/$organisationId'
     | '/admin/organisationen/neu'
+    | '/api/admin/datenauskunft/$userId'
     | '/api/auth/oidc/callback'
     | '/api/auth/oidc/login'
     | '/admin/organisationen'
@@ -320,6 +332,7 @@ export interface FileRouteTypes {
     | '/api/dateien/'
     | '/_app/admin/organisationen/$organisationId'
     | '/_app/admin/organisationen/neu'
+    | '/api/admin/datenauskunft/$userId'
     | '/api/auth/oidc/callback'
     | '/api/auth/oidc/login'
     | '/_app/admin/organisationen/'
@@ -336,6 +349,7 @@ export interface RootRouteChildren {
   AnfragenIndexRoute: typeof AnfragenIndexRoute
   ApiDateienFileIdRoute: typeof ApiDateienFileIdRoute
   ApiDateienIndexRoute: typeof ApiDateienIndexRoute
+  ApiAdminDatenauskunftUserIdRoute: typeof ApiAdminDatenauskunftUserIdRoute
   ApiAuthOidcCallbackRoute: typeof ApiAuthOidcCallbackRoute
   ApiAuthOidcLoginRoute: typeof ApiAuthOidcLoginRoute
 }
@@ -503,6 +517,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminOrganisationenNeuRouteImport
       parentRoute: typeof AppAdminRouteRoute
     }
+    '/api/admin/datenauskunft/$userId': {
+      id: '/api/admin/datenauskunft/$userId'
+      path: '/api/admin/datenauskunft/$userId'
+      fullPath: '/api/admin/datenauskunft/$userId'
+      preLoaderRoute: typeof ApiAdminDatenauskunftUserIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/oidc/callback': {
       id: '/api/auth/oidc/callback'
       path: '/api/auth/oidc/callback'
@@ -576,6 +597,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnfragenIndexRoute: AnfragenIndexRoute,
   ApiDateienFileIdRoute: ApiDateienFileIdRoute,
   ApiDateienIndexRoute: ApiDateienIndexRoute,
+  ApiAdminDatenauskunftUserIdRoute: ApiAdminDatenauskunftUserIdRoute,
   ApiAuthOidcCallbackRoute: ApiAuthOidcCallbackRoute,
   ApiAuthOidcLoginRoute: ApiAuthOidcLoginRoute,
 }

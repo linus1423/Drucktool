@@ -255,6 +255,7 @@ export async function listUsers() {
       organisationId: users.organisationId,
       organisationName: organisations.name,
       lastLoginAt: users.lastLoginAt,
+      anonymizedAt: users.anonymizedAt,
       createdAt: users.createdAt,
     })
     .from(users)

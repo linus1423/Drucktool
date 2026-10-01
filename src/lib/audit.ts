@@ -9,6 +9,8 @@ export const AUDIT_ACTIONS = [
   'user.updated',
   'organisation.created',
   'organisation.updated',
+  'user.anonymized',
+  'user.exported',
 ] as const
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
 
@@ -21,6 +23,8 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   'user.updated': 'Benutzer geändert',
   'organisation.created': 'Organisation angelegt',
   'organisation.updated': 'Organisation geändert',
+  'user.anonymized': 'Benutzer anonymisiert',
+  'user.exported': 'Datenauskunft erstellt',
 }
 
 export const LOGIN_METHOD_LABELS: Record<string, string> = {
