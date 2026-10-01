@@ -2,8 +2,10 @@ import { and, eq, inArray, isNull, lt, or } from 'drizzle-orm'
 import { isStaffRole } from '~/lib/roles'
 import { getDb, schema, type Tx } from '../db/client.server'
 import type { Principal } from '../requests/requests.server'
+import { writeAudit } from '../audit/audit.server'
 import { analysePdf } from './pdf.server'
 import { maxAttachmentBytes, maxUploadBytes, openStored, removeStored, storagePath, storeStream } from './storage.server'
+import { scanFile, VirusFoundError, VirusScanUnavailableError } from './virus-scan.server'
 
 const { requestFiles, requests, requestComments } = schema
 
@@ -79,6 +81,8 @@ export async function createUpload(
     throw new EmptyUploadError()
   }
   try {
+    // Erst auf Schadsoftware prüfen, dann die PDF auswerten (Issue #99).
+    await assertNoVirus(user, stored.key, input.filename)
     const info = await analysePdf(storagePath(stored.key), stored.sizeBytes)
     const [row] = await getDb()
       .insert(requestFiles)
@@ -102,6 +106,26 @@ export async function createUpload(
     await removeStored(stored.key)
     throw e
   }
+}
+
+async function assertNoVirus(user: Principal, key: string, filename: string) {
+  let result
+  try {
+    result = await scanFile(storagePath(key))
+  } catch (e) {
+    if (e instanceof VirusScanUnavailableError) console.error('Virenprüfung nicht möglich:', e.reason)
+    throw e
+  }
+  if (result.status !== 'infected') return
+  console.warn(`Schadsoftware in Upload von Benutzer ${user.id}: ${result.signature}`)
+  await writeAudit(getDb(), {
+    actorId: user.id,
+    action: 'file.virus_found',
+    targetType: 'user',
+    targetId: user.id,
+    data: { filename: cleanFilename(filename), signature: result.signature },
+  })
+  throw new VirusFoundError(result.signature)
 }
 
 export async function cleanupOrphans(now = Date.now()) {

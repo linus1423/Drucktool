@@ -59,6 +59,12 @@ Im Profil sieht jeder seine angemeldeten Geräte und kann sie einzeln oder alle 
 - **CSRF:** Schreibende Anfragen (POST-Server-Funktionen, Upload) brauchen `Sec-Fetch-Site: same-origin` bzw. bei
   älteren Browsern einen Origin/Referer der App (`APP_URL` oder die Adresse der Anfrage), sonst antwortet die App
   mit 403.
+- **Virenprüfung:** Jede hochgeladene Datei (Druckdatei, Deckblatt, Anhang) geht vor der Auswertung an ClamAV. Die
+  App schickt sie per TCP an clamd (`CLAMAV_HOST`, `CLAMAV_PORT`, Standard 3310). Ein Fund wird abgelehnt, nicht
+  gespeichert und im Protokoll vermerkt („Schadsoftware in Upload gefunden“). Ist clamd eingerichtet, aber nicht
+  erreichbar, werden Uploads abgelehnt statt ungeprüft angenommen. Das Ansible-Playbook startet clamd als eigenen
+  Container (`drucktool_clamav_enabled`, braucht etwa 1,5 GB RAM, die Signaturen aktualisiert er selbst). Lokal:
+  `docker compose --profile virenscanner up -d` und `CLAMAV_HOST=clamav`. Ohne `CLAMAV_HOST` wird nicht geprüft.
 - **Aufräumen:** Der Worker löscht beim Start und dann stündlich abgelaufene Sitzungen, Anmeldelinks,
   Rate-Limit-Zähler und alte Audit-Einträge, dazu die Daten mit Löschfrist (siehe Datenschutz). Die Löschungen sind idempotent, mehrere Worker stören sich nicht.
 - **Server-Härtung (Ansible-Rolle `hardening`):** Firewall `ufw` lässt eingehend nur SSH, HTTP und HTTPS zu. Weil
@@ -467,6 +473,7 @@ holt einen älteren Stand.
 | `APP_ENVIRONMENT`                                                                   | `production`, `staging` (Banner „Testsystem“) oder `development`                     |
 | `UPLOAD_DIR`                                                                        | Ablage für Druckdateien, Standard `data/uploads` (im Image `/app/uploads`)           |
 | `UPLOAD_MAX_MB`                                                                     | Größte erlaubte Druckdatei in MB, Standard 500                                       |
+| `CLAMAV_HOST`, `CLAMAV_PORT`                                                        | Virenprüfung der Uploads mit clamd, leer = keine Prüfung                             |
 | `ATTACHMENT_MAX_MB`, `ATTACHMENT_TYPES`                                             | Anhänge an Nachrichten: Größe in MB (Standard 25), erlaubte Endungen (kommagetrennt) |
 | `AUDIT_LOG_RETENTION_DAYS`                                                          | Aufbewahrung des Audit-Logs in Tagen, Standard 365, `0` = unbegrenzt                 |
 | `SESSION_IP_RETENTION_DAYS`                                                         | IP-Adressen an Sitzungen nach so vielen Tagen löschen, Standard 30                   |

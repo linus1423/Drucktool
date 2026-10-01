@@ -41,6 +41,8 @@ services:
       PRIVACY_URL: ${PRIVACY_URL:-}
       IMPRINT_URL: ${IMPRINT_URL:-}
       APP_ENVIRONMENT: ${APP_ENVIRONMENT:-production}
+      # Mit "docker compose --profile virenscanner up" und CLAMAV_HOST=clamav werden Uploads auf Viren geprüft.
+      CLAMAV_HOST: ${CLAMAV_HOST:-}
     volumes:
       - uploads:/app/uploads
     ports:
@@ -69,6 +71,20 @@ services:
     healthcheck:
       disable: true
 
+  # Virenscanner für Uploads (Issue #99). Lädt beim ersten Start die Signaturen, das dauert einige Minuten.
+  clamav:
+    image: clamav/clamav:stable
+    profiles: [virenscanner]
+    restart: unless-stopped
+    environment:
+      # Ohne diese Grenzen prüft clamd nur die ersten 25 MB bzw. lässt große Dateien ungeprüft durch.
+      CLAMD_CONF_StreamMaxLength: ${UPLOAD_MAX_MB:-500}M
+      CLAMD_CONF_MaxFileSize: ${UPLOAD_MAX_MB:-500}M
+      CLAMD_CONF_MaxScanSize: ${UPLOAD_MAX_MB:-500}M
+    volumes:
+      - clamav-db:/var/lib/clamav
+
 volumes:
   db-data:
   uploads:
+  clamav-db:

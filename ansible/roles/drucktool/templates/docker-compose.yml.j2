@@ -32,6 +32,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+{% if drucktool_clamav_enabled %}
+      # Nur Startreihenfolge: bis clamd seine Signaturen geladen hat, lehnt die App Uploads mit einem Hinweis ab.
+      clamav:
+        condition: service_started
+{% endif %}
     volumes:
       # Hochgeladene Druckdateien, gehört dem Benutzer node (UID 1000) im Container.
       - ./uploads:/app/uploads
@@ -57,6 +62,20 @@ services:
         condition: service_healthy
     healthcheck:
       disable: true
+{% if drucktool_clamav_enabled %}
+
+  # Virenscanner für Uploads (Issue #99). Nicht von außen erreichbar, nur im Compose-Netz.
+  clamav:
+    image: {{ drucktool_clamav_image }}
+    restart: unless-stopped
+    environment:
+      # Ohne diese Grenzen prüft clamd nur die ersten 25 MB bzw. lässt große Dateien ungeprüft durch.
+      CLAMD_CONF_StreamMaxLength: '{{ drucktool_upload_max_mb }}M'
+      CLAMD_CONF_MaxFileSize: '{{ drucktool_upload_max_mb }}M'
+      CLAMD_CONF_MaxScanSize: '{{ drucktool_upload_max_mb }}M'
+    volumes:
+      - clamav-db:/var/lib/clamav
+{% endif %}
 {% if drucktool_domain %}
 
   caddy:
@@ -75,6 +94,9 @@ services:
 
 volumes:
   db-data:
+{% if drucktool_clamav_enabled %}
+  clamav-db:
+{% endif %}
 {% if drucktool_domain %}
   caddy-data:
   caddy-config:
