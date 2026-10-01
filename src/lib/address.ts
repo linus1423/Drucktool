@@ -1,11 +1,13 @@
 import { z } from 'zod'
+import { displayName } from './name'
 
 const required = (label: string, max = 200) =>
   z.string().trim().min(1, `${label} ist erforderlich`).max(max, `${label} ist zu lang`)
 const optional = (max = 200) => z.string().trim().max(max)
 
 export const billingAddressSchema = z.object({
-  name: required('Name'),
+  firstName: required('Vorname'),
+  lastName: required('Nachname'),
   organisation: optional(),
   street: required('Straße und Hausnummer'),
   zip: required('PLZ', 20),
@@ -13,6 +15,18 @@ export const billingAddressSchema = z.object({
   country: optional(100),
 })
 export type BillingAddress = z.infer<typeof billingAddressSchema>
+
+/**
+ * Rechnungsadresse, wie sie an älteren Aufträgen eingefroren ist: vor Migration 0015 gab es nur
+ * ein gemeinsames Feld `name`. Solche Kopien werden nicht umgeschrieben, nur weiterhin angezeigt.
+ */
+export type LegacyBillingAddress = Omit<BillingAddress, 'firstName' | 'lastName'> & { name: string }
+export type StoredBillingAddress = BillingAddress | LegacyBillingAddress
+
+/** Name in der Rechnungsadresse, auch für alte Kopien mit nur einem Namensfeld. */
+export function billingName(a: StoredBillingAddress): string {
+  return 'name' in a ? a.name : displayName(a)
+}
 
 /** Adresse für die Hauspost, z. B. Lehrstuhl, Gebäude und Raum. */
 export const deliveryAddressSchema = z.object({
@@ -24,11 +38,19 @@ export const deliveryAddressSchema = z.object({
 })
 export type DeliveryAddress = z.infer<typeof deliveryAddressSchema>
 
-export const EMPTY_BILLING: BillingAddress = { name: '', organisation: '', street: '', zip: '', city: '', country: '' }
+export const EMPTY_BILLING: BillingAddress = {
+  firstName: '',
+  lastName: '',
+  organisation: '',
+  street: '',
+  zip: '',
+  city: '',
+  country: '',
+}
 export const EMPTY_DELIVERY: DeliveryAddress = { recipient: '', department: '', building: '', room: '', note: '' }
 
-export function formatBillingAddress(a: BillingAddress): string[] {
-  return [a.name, a.organisation, a.street, `${a.zip} ${a.city}`.trim(), a.country].filter((l): l is string => !!l?.trim())
+export function formatBillingAddress(a: StoredBillingAddress): string[] {
+  return [billingName(a), a.organisation, a.street, `${a.zip} ${a.city}`.trim(), a.country].filter((l): l is string => !!l?.trim())
 }
 
 export function formatDeliveryAddress(a: DeliveryAddress): string[] {

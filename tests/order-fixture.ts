@@ -38,6 +38,7 @@ export async function orderInput(user: Principal, overrides: { title?: string; n
     paperId: paper.id,
     coverPaperId: null,
     coverPages: null,
+    coverFromMainFile: false,
     coverColorId: null,
     coverBackColorId: null,
     borderless: false,

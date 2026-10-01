@@ -91,7 +91,12 @@ Admins pflegen unter „Katalog und Preise“ alles, was Kunden im Bestellformul
 - **Bindungspreise**: Preis pro Exemplar oder pro Blatt (Laminieren), einmalige Kosten pro Auftrag (Leimbindung),
   ob ein Deckblatt, eine Coverfarbe oder ein Zuschnitt dazugehört.
 - **Papiere**: Grammatur, Preis pro A3- bzw. SRA3-Bogen oder pro Plot (A0 bis A2), wofür das Papier taugt.
-- **Coverfarben** und **Preise und Texte** (Druck pro Image, Mindestpreis, Hauspost, allgemeine Hilfetexte).
+- **Coverfarben**: die Farben selbst und welche Farbe es auf welchem Deckblattpapier gibt (z. B. 250 g/m² nur
+  Weiß, 160 g/m² auch Blau, Rot und Durchsichtig). Wählt ein Kunde ein separates Deckblatt, zeigt der Wizard nur
+  diese Farben und verwirft eine nicht mehr passende Farbe; der Server prüft dasselbe beim Absenden. Ohne separates
+  Deckblatt gelten alle Farben, die die Bindung erlaubt. Die Migration `0014_cover_colors_per_paper.sql` gibt jedem
+  bestehenden Deckblattpapier zunächst alle Farben, damit sich für Kunden nichts ändert.
+- **Preise und Texte** (Druck pro Image, Mindestpreis, Hauspost, allgemeine Hilfetexte).
 
 Jede Änderung landet mit altem und neuem Stand in `catalog_changes` und ist unter „Änderungen“ sichtbar.
 Die Startwerte kommen aus der Migration `0005_catalog.sql`. Die Druckpreise pro Image und der Mindestpreis sind
@@ -222,6 +227,7 @@ cp .env.example .env
 pnpm install
 pnpm db:migrate   # Schema anlegen
 pnpm db:seed      # ersten Superadmin aus SUPERADMIN_EMAIL/SUPERADMIN_PASSWORD anlegen
+                  # mit SEED_EXAMPLE_CATALOG=true auch Beispiel-Coverfarben je Papier (250 g/m² nur Weiß)
 pnpm dev          # http://localhost:3000
 pnpm mail:worker  # optional, in einem zweiten Terminal: verschickt E-Mails
 ```

@@ -19,7 +19,7 @@ describe.skipIf(!url)('OpenID Connect: Benutzerzuordnung (Integration)', async (
   it('verknüpft ein bestehendes Konto über die bestätigte E-Mail-Adresse', async () => {
     const [user] = await getDb()
       .insert(schema.users)
-      .values({ email: email('Staff'), name: 'Staff', role: 'staff', status: 'active' })
+      .values({ email: email('Staff'), lastName: 'Staff', role: 'staff', status: 'active' })
       .returning()
     const result = await resolveOidcUser(ISS, { sub: `s-${stamp}`, email: email('staff'), email_verified: true }, { policy: 'reject' })
     expect(result).toEqual({ kind: 'login', userId: user!.id })
@@ -29,7 +29,7 @@ describe.skipIf(!url)('OpenID Connect: Benutzerzuordnung (Integration)', async (
   })
 
   it('verknüpft nicht über unbestätigte Adressen', async () => {
-    await getDb().insert(schema.users).values({ email: email('opfer'), name: 'Opfer', role: 'admin', status: 'active' })
+    await getDb().insert(schema.users).values({ email: email('opfer'), lastName: 'Opfer', role: 'admin', status: 'active' })
     const result = await resolveOidcUser(ISS, { sub: `x-${stamp}`, email: email('opfer'), email_verified: false }, { policy: 'staff' })
     expect(result.kind).toBe('denied')
     const links = await getDb().select().from(schema.oidcAccounts).where(eq(schema.oidcAccounts.subject, `x-${stamp}`))
@@ -42,6 +42,20 @@ describe.skipIf(!url)('OpenID Connect: Benutzerzuordnung (Integration)', async (
     expect((await resolveOidcUser(ISS, claims, { policy: 'staff', trustEmail: true })).kind).toBe('login')
   })
 
+  it('übernimmt Vor- und Nachname aus given_name und family_name', async () => {
+    const claims = {
+      sub: `g-${stamp}`,
+      email: email('getrennt'),
+      email_verified: true,
+      name: 'Muster, Anna Maria (TUM)',
+      given_name: 'Anna Maria',
+      family_name: 'Muster',
+    }
+    expect((await resolveOidcUser(ISS, claims, { policy: 'staff' })).kind).toBe('login')
+    const [u] = await getDb().select().from(schema.users).where(eq(schema.users.email, email('getrennt')))
+    expect(u).toMatchObject({ firstName: 'Anna Maria', lastName: 'Muster', name: 'Anna Maria Muster' })
+  })
+
   it('legt unbekannte Benutzer je nach Einstellung an', async () => {
     expect(await resolveOidcUser(ISS, { sub: `r-${stamp}`, email: email('neu1'), email_verified: true }, { policy: 'reject' })).toMatchObject({
       kind: 'denied',
@@ -51,6 +65,8 @@ describe.skipIf(!url)('OpenID Connect: Benutzerzuordnung (Integration)', async (
     expect(pending).toEqual({ kind: 'pending' })
     const [p] = await getDb().select().from(schema.users).where(eq(schema.users.email, email('neu2')))
     expect(p).toMatchObject({ role: 'customer', status: 'pending', name: 'Neu Zwei', organisationId: null, passwordHash: null })
+    // Ohne given_name/family_name wird name am letzten Leerzeichen geteilt.
+    expect(p).toMatchObject({ firstName: 'Neu', lastName: 'Zwei' })
 
     const staff = await resolveOidcUser(ISS, { sub: `st-${stamp}`, email: email('neu3'), email_verified: true }, { policy: 'staff' })
     expect(staff.kind).toBe('login')
@@ -59,7 +75,7 @@ describe.skipIf(!url)('OpenID Connect: Benutzerzuordnung (Integration)', async (
   })
 
   it('lässt deaktivierte Konten nicht herein', async () => {
-    await getDb().insert(schema.users).values({ email: email('weg'), name: 'Weg', role: 'staff', status: 'disabled' })
+    await getDb().insert(schema.users).values({ email: email('weg'), lastName: 'Weg', role: 'staff', status: 'disabled' })
     const result = await resolveOidcUser(ISS, { sub: `d-${stamp}`, email: email('weg'), email_verified: true }, { policy: 'staff' })
     expect(result.kind).toBe('denied')
   })
@@ -100,7 +116,7 @@ describe.skipIf(!url)('OpenID Connect: Benutzerzuordnung (Integration)', async (
     const roles = { claim: 'roles', adminValues: ['Druck.Admin'], staffValues: ['Druck.Staff'] }
     const [su] = await getDb()
       .insert(schema.users)
-      .values({ email: email('super'), name: 'Super', role: 'superadmin', status: 'active' })
+      .values({ email: email('super'), lastName: 'Super', role: 'superadmin', status: 'active' })
       .returning()
     const result = await resolveOidcUser(ISS, { sub: `su-${stamp}`, email: email('super'), email_verified: true }, { policy: 'reject', roles })
     expect(result).toEqual({ kind: 'login', userId: su!.id })

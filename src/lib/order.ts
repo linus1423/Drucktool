@@ -54,6 +54,8 @@ export type OrderCatalog = {
   formatBindings: { formatId: string; bindingId: string }[]
   papers: CatalogPaper[]
   coverColors: CatalogCoverColor[]
+  /** Welche Coverfarben es auf welchem Deckblattpapier gibt. */
+  paperCoverColors: { paperId: string; coverColorId: string }[]
   pricing: Pricing
   texts: CatalogTexts
 }
@@ -71,6 +73,30 @@ export const CUSTOM_MIN_MM = 20
 /** Ein Deckblatt besteht aus höchstens zwei Seiten: vorne und hinten. */
 export const MAX_COVER_PAGES = 2
 
+/**
+ * Seiten der Druckdatei, die bei einem Deckblatt aus der Druckdatei je Deckblatt
+ * genutzt werden: doppelseitig Außen- und Innenseite, einseitig nur die Außenseite.
+ */
+export function coverPagesPerSheet(duplex: boolean) {
+  return duplex ? 2 : 1
+}
+
+/**
+ * Welche Seiten der Druckdatei auf das Deckblattpapier kommen, oder null, wenn das
+ * Deckblatt eine eigene Datei hat. Für Hinweise im Wizard und auf der Detailseite.
+ */
+export function coverPagesFromMainFile(spec: Pick<OrderSpec, 'coverPages' | 'coverFromMainFile' | 'duplex' | 'pages'>) {
+  if (!spec.coverFromMainFile || !spec.coverPages) return null
+  const perSheet = coverPagesPerSheet(spec.duplex)
+  const range = (from: number, to: number) => (from === to ? `Seite ${from}` : `Seiten ${from}–${to}`)
+  return {
+    /** Seiten, die damit nicht mehr im Innenteil gedruckt werden */
+    taken: perSheet * spec.coverPages,
+    front: range(1, perSheet),
+    back: spec.coverPages === 2 ? range(spec.pages - perSheet + 1, spec.pages) : null,
+  }
+}
+
 export const orderSpecSchema = z.object({
   formatId: z.string().min(1, 'Bitte ein Format wählen').max(50),
   customWidthMm: z.number().int().min(CUSTOM_MIN_MM).max(CUSTOM_MAX_MM.long).nullable(),
@@ -78,9 +104,15 @@ export const orderSpecSchema = z.object({
   bindingId: z.string().min(1, 'Bitte eine Bindung wählen').max(50),
   duplex: z.boolean(),
   paperId: z.uuid('Bitte ein Papier wählen'),
-  /** Separates Deckblatt mit eigener Datei und eigenem Papier. */
+  /** Separates Deckblatt auf eigenem Papier. */
   coverPaperId: z.uuid().nullable(),
+  /** Deckblätter: 1 = nur vorne, 2 = vorne und hinten. Mit eigener Datei deren Seitenzahl. */
   coverPages: z.number().int().min(1).max(MAX_COVER_PAGES).nullable(),
+  /**
+   * Ohne eigene Deckblatt-Datei (Issue #85) kommt das Deckblatt aus der Druckdatei:
+   * die ersten Seiten für vorne, ggf. die letzten für hinten. Fehlt in älteren Aufträgen.
+   */
+  coverFromMainFile: z.boolean().default(false),
   coverColorId: z.uuid().nullable(),
   coverBackColorId: z.uuid().nullable(),
   borderless: z.boolean(),
@@ -227,13 +259,25 @@ function plotPrice(paper: CatalogPaper, formatId: string): number | null {
   return null
 }
 
+/** Papier, das nur auf dem Plotter gedruckt werden kann (weder Innenteil noch Deckblatt am normalen Drucker). */
+export function isPlotterOnly(paper: CatalogPaper): boolean {
+  if (!paper.forPlotter) return false
+  const forPrinter = paper.forInner || paper.forCover
+  return !forPrinter || (paper.priceA3Cents == null && paper.priceSra3Cents == null)
+}
+
+/**
+ * Papierauswahl für Innenteil oder Deckblatt. Reine Plotterpapiere fehlen bei normalen Formaten
+ * ganz, statt ausgegraut zu erscheinen.
+ */
 export function paperChoices(
   catalog: OrderCatalog,
   format: CatalogFormat | undefined,
   size: Size | null,
   purpose: 'inner' | 'cover',
 ): Choice<CatalogPaper>[] {
-  return catalog.papers.map((paper) => {
+  const papers = format && format.kind !== 'plot' ? catalog.papers.filter((p) => !isPlotterOnly(p)) : catalog.papers
+  return papers.map((paper) => {
     if (!format) return { item: paper, allowed: false, reason: 'Bitte zuerst ein Format wählen.' }
     if (format.kind === 'plot') {
       if (purpose === 'cover') return { item: paper, allowed: false, reason: 'Plots haben kein Deckblatt.' }
@@ -241,7 +285,9 @@ export function paperChoices(
       if (plotPrice(paper, format.id) == null) return { item: paper, allowed: false, reason: `Nicht in ${format.label}.` }
       return { item: paper, allowed: true }
     }
-    if (purpose === 'inner' && !paper.forInner) return { item: paper, allowed: false, reason: 'Nur für Deckblätter.' }
+    if (purpose === 'inner' && !paper.forInner) {
+      return { item: paper, allowed: false, reason: paper.forCover ? 'Nur für Deckblätter.' : 'Nicht für den Innenteil.' }
+    }
     if (purpose === 'cover' && !paper.forCover) return { item: paper, allowed: false, reason: 'Nicht für Deckblätter geeignet.' }
     if (paper.priceA3Cents == null && paper.priceSra3Cents == null) {
       return { item: paper, allowed: false, reason: 'Nicht für den normalen Drucker.' }
@@ -283,11 +329,23 @@ export function borderlessChoice(
   }
 }
 
-export function coverColorChoices(catalog: OrderCatalog, binding: CatalogBinding | undefined): Choice<CatalogCoverColor>[] {
+/**
+ * Coverfarben zur Bindung und zum Deckblattpapier. Mit separatem Deckblatt gibt es nur
+ * die Farben, die am Papier gepflegt sind; ohne gilt die Auswahl der Bindung.
+ */
+export function coverColorChoices(
+  catalog: OrderCatalog,
+  binding: CatalogBinding | undefined,
+  coverPaper?: CatalogPaper,
+): Choice<CatalogCoverColor>[] {
   return catalog.coverColors.map((color) => {
     if (!binding?.allowsCover) return { item: color, allowed: false, reason: 'Bei dieser Bindung gibt es keine Coverfarbe.' }
     if (color.transparent && !binding.allowsSplitCover) {
       return { item: color, allowed: false, reason: `Durchsichtig gibt es bei ${binding.label} nicht.` }
+    }
+    if (coverPaper && !catalog.paperCoverColors.some((pc) => pc.paperId === coverPaper.id && pc.coverColorId === color.id)) {
+      const paper = `${coverPaper.name} ${coverPaper.grammage} g/m²`
+      return { item: color, allowed: false, reason: `${color.name} gibt es nicht auf ${paper}.` }
     }
     return { item: color, allowed: true }
   })
@@ -305,6 +363,11 @@ export type ResolvedOrder = {
   coverPaper: CatalogPaper | null
   coverColor: CatalogCoverColor | null
   coverBackColor: CatalogCoverColor | null
+}
+
+/** Grund für Papiere, die paperChoices gar nicht erst anbietet (nur reine Plotterpapiere). */
+function plotterOnlyReason(paper: CatalogPaper): string {
+  return isPlotterOnly(paper) ? 'Nur für den Plotter.' : 'nicht wählbar'
 }
 
 /** Prüft eine Bestellung gegen den Katalog. Liefert Fehler in Kundensprache. */
@@ -336,7 +399,7 @@ export function resolveOrder(
   const paper = catalog.papers.find((p) => p.id === spec.paperId && p.available)
   if (!paper) return fail('Das gewählte Papier ist nicht verfügbar.')
   const paperOk = paperChoices(catalog, format, size, 'inner').find((c) => c.item.id === paper.id)
-  if (!paperOk?.allowed) errors.push(`${paper.name}: ${paperOk?.reason ?? 'nicht wählbar'}`)
+  if (!paperOk?.allowed) errors.push(`${paper.name}: ${paperOk?.reason ?? plotterOnlyReason(paper)}`)
 
   let coverPaper: CatalogPaper | null = null
   if (spec.coverPaperId) {
@@ -345,14 +408,30 @@ export function resolveOrder(
     if (!coverPaper) errors.push('Das Deckblattpapier ist nicht verfügbar.')
     else {
       const ok = paperChoices(catalog, format, size, 'cover').find((c) => c.item.id === coverPaper!.id)
-      if (!ok?.allowed) errors.push(`${coverPaper.name}: ${ok?.reason ?? 'nicht als Deckblatt wählbar'}`)
+      if (!ok?.allowed) errors.push(`${coverPaper.name}: ${ok?.reason ?? plotterOnlyReason(coverPaper)}`)
     }
-    if (!spec.coverPages) errors.push('Bitte die Datei für das Deckblatt hochladen.')
+    if (!spec.coverPages) {
+      errors.push(
+        spec.coverFromMainFile
+          ? 'Bitte angeben, ob das Deckblatt nur vorne oder vorne und hinten ist.'
+          : 'Bitte die Datei für das Deckblatt hochladen.',
+      )
+    }
+    const fromMain = coverPagesFromMainFile(spec)
+    if (fromMain && fromMain.taken >= spec.pages) {
+      errors.push(
+        `Für ein Deckblatt aus der Druckdatei braucht die Datei mehr als ${fromMain.taken} Seiten. Bitte eine eigene Deckblatt-Datei hochladen.`,
+      )
+    }
+  } else if (spec.coverFromMainFile) {
+    errors.push('Ein Deckblatt ist nicht ausgewählt.')
   }
 
   const colorFor = (id: string | null, label: string) => {
     if (!id) return null
-    const choice = coverColorChoices(catalog, binding).find((c) => c.item.id === id && c.item.available)
+    const choice = coverColorChoices(catalog, binding, coverPaper ?? undefined).find(
+      (c) => c.item.id === id && c.item.available,
+    )
     if (!choice) {
       errors.push(`Die Coverfarbe ${label} ist nicht verfügbar.`)
       return null
