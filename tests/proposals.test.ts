@@ -27,10 +27,10 @@ describe.skipIf(!url)('Änderungsvorschläge der Druckerei (Issue #50)', () => {
     const rows = await getDb()
       .insert(schema.users)
       .values([
-        { email: `p-kunde-${stamp}@test`, name: 'Kundin', role: 'customer', status: 'active', billingAddress: BILLING },
-        { email: `p-fremd-${stamp}@test`, name: 'Fremd', role: 'customer', status: 'active', billingAddress: BILLING },
-        { email: `p-staff-${stamp}@test`, name: 'Staff', role: 'staff', status: 'active' },
-        { email: `p-staff2-${stamp}@test`, name: 'Staff Zwei', role: 'staff', status: 'active' },
+        { email: `p-kunde-${stamp}@test`, lastName: 'Kundin', role: 'customer', status: 'active', billingAddress: BILLING },
+        { email: `p-fremd-${stamp}@test`, lastName: 'Fremd', role: 'customer', status: 'active', billingAddress: BILLING },
+        { email: `p-staff-${stamp}@test`, lastName: 'Staff', role: 'staff', status: 'active' },
+        { email: `p-staff2-${stamp}@test`, firstName: 'Staff', lastName: 'Zwei', role: 'staff', status: 'active' },
       ])
       .returning()
     customer = { id: rows[0]!.id, role: 'customer' }

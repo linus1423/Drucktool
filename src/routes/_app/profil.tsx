@@ -46,13 +46,20 @@ function ProfilePage() {
 
 type Account = Awaited<ReturnType<typeof getMyAccountFn>>
 
+// span: Breite im sechsspaltigen Raster.
 const billingFields = [
-  { name: 'name', label: 'Name', autoComplete: 'name', span: true },
-  { name: 'organisation', label: 'Lehrstuhl, Einrichtung oder Firma (optional)', autoComplete: 'organization', span: true },
-  { name: 'street', label: 'Straße und Hausnummer', autoComplete: 'street-address', span: true },
-  { name: 'zip', label: 'PLZ', autoComplete: 'postal-code', span: false },
-  { name: 'city', label: 'Ort', autoComplete: 'address-level2', span: false },
-  { name: 'country', label: 'Land (optional)', autoComplete: 'country-name', span: false },
+  { name: 'firstName', label: 'Vorname', autoComplete: 'given-name', span: 'sm:col-span-3' },
+  { name: 'lastName', label: 'Nachname', autoComplete: 'family-name', span: 'sm:col-span-3' },
+  { name: 'organisation', label: 'Lehrstuhl, Einrichtung oder Firma (optional)', autoComplete: 'organization', span: 'sm:col-span-6' },
+  { name: 'street', label: 'Straße und Hausnummer', autoComplete: 'street-address', span: 'sm:col-span-6' },
+  { name: 'zip', label: 'PLZ', autoComplete: 'postal-code', span: 'sm:col-span-2' },
+  { name: 'city', label: 'Ort', autoComplete: 'address-level2', span: 'sm:col-span-2' },
+  { name: 'country', label: 'Land (optional)', autoComplete: 'country-name', span: 'sm:col-span-2' },
+] as const
+
+const nameFields = [
+  { name: 'firstName', label: 'Vorname', autoComplete: 'given-name' },
+  { name: 'lastName', label: 'Nachname', autoComplete: 'family-name' },
 ] as const
 
 const deliveryFields = [
@@ -72,8 +79,9 @@ function ProfileForm({ account }: { account: Account }) {
 
   const form = useForm({
     defaultValues: {
-      name: account.name,
-      billingAddress: account.billingAddress ?? { ...EMPTY_BILLING, name: account.name },
+      firstName: account.firstName,
+      lastName: account.lastName,
+      billingAddress: account.billingAddress ?? { ...EMPTY_BILLING, firstName: account.firstName, lastName: account.lastName },
       deliveryAddress: account.deliveryAddress ?? { ...EMPTY_DELIVERY, recipient: account.name },
     },
     validators: {
@@ -110,26 +118,30 @@ function ProfileForm({ account }: { account: Account }) {
       }}
     >
       <Card title="Name">
-        <form.Field name="name">
-          {(field) => (
-            <Field label="Anzeigename" htmlFor="name" error={fieldError(field.state.meta.errors)}>
-              <Input
-                id="name"
-                autoComplete="name"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
-              />
-            </Field>
-          )}
-        </form.Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {nameFields.map((f) => (
+            <form.Field key={f.name} name={f.name}>
+              {(field) => (
+                <Field label={f.label} htmlFor={f.name} error={fieldError(field.state.meta.errors)}>
+                  <Input
+                    id={f.name}
+                    autoComplete={f.autoComplete}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                  />
+                </Field>
+              )}
+            </form.Field>
+          ))}
+        </div>
       </Card>
       <Card title="Rechnungsadresse">
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-6">
           {billingFields.map((f) => (
             <form.Field key={f.name} name={`billingAddress.${f.name}`}>
               {(field) => (
-                <div className={f.span ? 'sm:col-span-3' : undefined}>
+                <div className={f.span}>
                   <Field label={f.label} htmlFor={`billing-${f.name}`} error={fieldError(field.state.meta.errors)}>
                     <Input
                       id={`billing-${f.name}`}

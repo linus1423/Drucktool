@@ -50,6 +50,8 @@ export const LOGIN_FAILURE_LABELS: Record<string, string> = {
 
 export const AUDIT_FIELD_LABELS: Record<string, string> = {
   name: 'Name',
+  firstName: 'Vorname',
+  lastName: 'Nachname',
   email: 'E-Mail',
   role: 'Rolle',
   status: 'Status',

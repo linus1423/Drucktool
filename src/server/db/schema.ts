@@ -18,7 +18,7 @@ import {
 import { INTERNAL_STATUSES, REQUEST_STATUSES } from '../../lib/status'
 import { USER_ROLES, USER_STATUSES } from '../../lib/roles'
 import type { JsonObject } from '../../lib/json'
-import type { BillingAddress, DeliveryAddress } from '../../lib/address'
+import type { BillingAddress, DeliveryAddress, StoredBillingAddress } from '../../lib/address'
 import { DELIVERY_METHODS } from '../../lib/order'
 import type { OrderSnapshot } from '../../lib/snapshot'
 import type { ChangeProposal } from '../../lib/proposal'
@@ -54,7 +54,12 @@ export const users = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     email: text('email').notNull(),
-    name: text('name').notNull(),
+    firstName: text('first_name').notNull().default(''),
+    lastName: text('last_name').notNull().default(''),
+    /** Anzeigename „Vorname Nachname“, von der Datenbank berechnet (siehe displayName in lib/name.ts). */
+    name: text('name')
+      .notNull()
+      .generatedAlwaysAs(sql`btrim(first_name || ' ' || last_name)`),
     passwordHash: text('password_hash'),
     role: userRole('role').notNull().default('customer'),
     status: userStatus('status').notNull().default('pending'),
@@ -201,7 +206,8 @@ export const requests = pgTable(
     order: jsonb('order').$type<OrderSnapshot>(),
     totalCents: integer('total_cents'),
     // Kopie der Rechnungsadresse beim Absenden; spätere Profiländerungen wirken nicht zurück.
-    billingAddress: jsonb('billing_address').$type<BillingAddress>(),
+    // Kopie zum Zeitpunkt des Absendens; ältere Aufträge haben noch ein gemeinsames Namensfeld.
+    billingAddress: jsonb('billing_address').$type<StoredBillingAddress>(),
     deliveryMethod: deliveryMethod('delivery_method').notNull().default('pickup'),
     deliveryAddress: jsonb('delivery_address').$type<DeliveryAddress>(),
     // Zustimmung zu den Auftragsbedingungen beim verbindlichen Absenden (Lastenheft Schritt 8).

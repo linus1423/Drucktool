@@ -88,7 +88,8 @@ function UserForm({ editing, actorRole, onDone }: { editing: Editing; actorRole:
 
   const form = useForm({
     defaultValues: {
-      name: existing?.name ?? '',
+      firstName: existing?.firstName ?? '',
+      lastName: existing?.lastName ?? '',
       email: existing?.email ?? '',
       role: (existing?.role ?? 'staff') as UserRole,
       status: (existing?.status ?? 'active') as UserStatus,
@@ -99,7 +100,8 @@ function UserForm({ editing, actorRole, onDone }: { editing: Editing; actorRole:
       setError(null)
       try {
         const base = {
-          name: value.name,
+          firstName: value.firstName,
+          lastName: value.lastName,
           email: value.email,
           role: value.role,
           organisationIds: value.role === 'customer' ? value.organisationIds : [],
@@ -132,10 +134,17 @@ function UserForm({ editing, actorRole, onDone }: { editing: Editing; actorRole:
             <Alert>{error}</Alert>
           </div>
         ) : null}
-        <form.Field name="name">
+        <form.Field name="firstName">
           {(field) => (
-            <Field label="Name" htmlFor="user-name" error={fieldError(field.state.meta.errors)}>
-              <Input id="user-name" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} required />
+            <Field label="Vorname" htmlFor="user-first-name" error={fieldError(field.state.meta.errors)}>
+              <Input id="user-first-name" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} />
+            </Field>
+          )}
+        </form.Field>
+        <form.Field name="lastName">
+          {(field) => (
+            <Field label="Nachname" htmlFor="user-last-name" error={fieldError(field.state.meta.errors)}>
+              <Input id="user-last-name" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} required />
             </Field>
           )}
         </form.Field>

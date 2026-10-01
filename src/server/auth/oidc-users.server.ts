@@ -1,4 +1,5 @@
 import { and, eq, sql } from 'drizzle-orm'
+import { displayName, splitName, type PersonName } from '~/lib/name'
 import { getDb, schema } from '../db/client.server'
 import { notifyRegistrationReceived } from '../mail/notifications.server'
 import type { NewUserPolicy, RoleMapping } from './oidc.server'
@@ -31,10 +32,18 @@ const { users, organisationMembers, oidcAccounts, sessions } = schema
 const INACTIVE = 'Ihr Konto ist nicht aktiv. Bitte wenden Sie sich an die Druckerei.'
 const NO_ROLE = 'Ihr Firmenkonto ist nicht (mehr) für das Drucktool freigeschaltet. Bitte wenden Sie sich an die IT.'
 
-function displayName(claims: OidcClaims, email: string) {
-  if (typeof claims.name === 'string' && claims.name.trim()) return claims.name.trim()
-  const parts = [claims.given_name, claims.family_name].filter((p): p is string => typeof p === 'string' && !!p.trim())
-  return parts.length ? parts.join(' ') : email
+const claimText = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
+
+/**
+ * Vor- und Nachname aus den Claims: bevorzugt given_name/family_name, sonst wird name am letzten
+ * Leerzeichen geteilt, notfalls steht die E-Mail-Adresse im Nachnamen.
+ */
+export function nameFromClaims(claims: OidcClaims, email: string): PersonName {
+  const firstName = claimText(claims.given_name)
+  const lastName = claimText(claims.family_name)
+  if (firstName || lastName) return { firstName, lastName }
+  const name = claimText(claims.name)
+  return name ? splitName(name) : { firstName: '', lastName: email }
 }
 
 /** Liefert "admin" oder "staff", wenn der Claim einen der konfigurierten Werte enthält. */
@@ -123,17 +132,17 @@ export async function resolveOidcUser(issuer: string, claims: OidcClaims, option
 
   const role = mapped ?? (options.policy === 'staff' ? 'staff' : 'customer')
   const status = role === 'customer' ? 'pending' : 'active'
-  const name = displayName(claims, email)
+  const personName = nameFromClaims(claims, email)
   const created = await db.transaction(async (tx) => {
     const [user] = await tx
       .insert(users)
-      .values({ email, name, role, status })
+      .values({ email, ...personName, role, status })
       .onConflictDoNothing()
       .returning({ id: users.id })
     if (!user) return null
     await tx.insert(oidcAccounts).values({ userId: user.id, issuer, subject: claims.sub })
     if (status === 'pending') {
-      await notifyRegistrationReceived(tx, { name, email, organisationName: 'ohne Organisation (Anmeldung über OIDC)' })
+      await notifyRegistrationReceived(tx, { name: displayName(personName), email, organisationName: 'ohne Organisation (Anmeldung über OIDC)' })
     }
     return user
   })

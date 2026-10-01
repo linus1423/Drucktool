@@ -26,7 +26,7 @@ describe.skipIf(!url)('Datenschutz (Integration)', async () => {
   async function principal(role: Principal['role']): Promise<Principal> {
     const [u] = await db
       .insert(schema.users)
-      .values({ email: email(`${role}-${Math.random()}`), name: `Chef ${role}`, role, status: 'active' })
+      .values({ email: email(`${role}-${Math.random()}`), lastName: `Chef ${role}`, role, status: 'active' })
       .returning()
     return { id: u!.id, role }
   }
@@ -42,7 +42,7 @@ describe.skipIf(!url)('Datenschutz (Integration)', async () => {
       .insert(schema.users)
       .values({
         email: address,
-        name: `Erika ${name}`,
+        lastName: `Erika ${name}`,
         role: 'customer',
         status: 'active',
         passwordHash: await hashPassword('richtig-12345'),
@@ -136,7 +136,7 @@ describe.skipIf(!url)('Datenschutz (Integration)', async () => {
     // Auch über die Benutzerverwaltung ist die Adresse frei.
     await db.delete(schema.users).where(eq(schema.users.id, login.userId))
     await expect(
-      createUser(superadmin, { name: 'Bert Neu', email: c.address, role: 'customer', organisationIds: [], password: '' }),
+      createUser(superadmin, { firstName: 'Bert', lastName: 'Neu', email: c.address, role: 'customer', organisationIds: [], password: '' }),
     ).resolves.toHaveProperty('id')
   })
 
@@ -200,7 +200,7 @@ describe.skipIf(!url)('Datenschutz (Integration)', async () => {
       .insert(schema.users)
       .values({
         email: email('alt'),
-        name: 'Alt',
+        lastName: 'Alt',
         role: 'customer',
         status: 'rejected',
         reviewedAt: old,
@@ -209,11 +209,11 @@ describe.skipIf(!url)('Datenschutz (Integration)', async () => {
     await db.insert(schema.organisationMembers).values({ userId: rejectedOld!.id, organisationId: org!.id })
     const [rejectedNew] = await db
       .insert(schema.users)
-      .values({ email: email('neu'), name: 'Neu', role: 'customer', status: 'rejected', reviewedAt: new Date() })
+      .values({ email: email('neu'), lastName: 'Neu', role: 'customer', status: 'rejected', reviewedAt: new Date() })
       .returning()
     const [withRequest] = await db
       .insert(schema.users)
-      .values({ email: email('auftrag'), name: 'Auftrag', role: 'customer', status: 'rejected', reviewedAt: old })
+      .values({ email: email('auftrag'), lastName: 'Auftrag', role: 'customer', status: 'rejected', reviewedAt: old })
       .returning()
     await db.insert(schema.requests).values({ title: 'Alt', createdById: withRequest!.id })
     await db.insert(schema.auditLog).values({

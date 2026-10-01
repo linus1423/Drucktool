@@ -39,9 +39,9 @@ describe.skipIf(!url)('Aufträge aus dem Wizard (Integration)', () => {
     const rows = await getDb()
       .insert(schema.users)
       .values([
-        { email: `w-kunde-${stamp}@test`, name: 'Kundin', role: 'customer', status: 'active', billingAddress: BILLING },
-        { email: `w-fremd-${stamp}@test`, name: 'Fremd', role: 'customer', status: 'active', billingAddress: BILLING },
-        { email: `w-staff-${stamp}@test`, name: 'Staff', role: 'staff', status: 'active' },
+        { email: `w-kunde-${stamp}@test`, lastName: 'Kundin', role: 'customer', status: 'active', billingAddress: BILLING },
+        { email: `w-fremd-${stamp}@test`, lastName: 'Fremd', role: 'customer', status: 'active', billingAddress: BILLING },
+        { email: `w-staff-${stamp}@test`, lastName: 'Staff', role: 'staff', status: 'active' },
       ])
       .returning()
     customer = { id: rows[0]!.id, role: 'customer' }

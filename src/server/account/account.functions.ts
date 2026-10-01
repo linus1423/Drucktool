@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, desc, eq, gt, ne } from 'drizzle-orm'
 import { z } from 'zod'
 import { billingAddressSchema, deliveryAddressSchema } from '~/lib/address'
+import { requiredText } from '~/lib/validation'
 import { requireUser } from '../auth/guards.server'
 import { currentSessionId, destroyCurrentSession } from '../auth/session.server'
 import { getDb, schema } from '../db/client.server'
@@ -20,6 +21,8 @@ export const getMyAccountFn = createServerFn({ method: 'GET' }).handler(async ()
   const db = getDb()
   const [row] = await db
     .select({
+      firstName: users.firstName,
+      lastName: users.lastName,
       emailNotifications: users.emailNotifications,
       billingAddress: users.billingAddress,
       deliveryAddress: users.deliveryAddress,
@@ -38,6 +41,8 @@ export const getMyAccountFn = createServerFn({ method: 'GET' }).handler(async ()
     : [[], []]
   return {
     ...user,
+    firstName: row?.firstName ?? '',
+    lastName: row?.lastName ?? user.name,
     emailNotifications: row?.emailNotifications ?? true,
     billingAddress: row?.billingAddress ?? null,
     deliveryAddress: row?.deliveryAddress ?? null,
@@ -61,7 +66,8 @@ export const updateMyNotificationsFn = createServerFn({ method: 'POST' })
   })
 
 export const profileSchema = z.object({
-  name: z.string().trim().min(1, 'Name ist erforderlich').max(200),
+  firstName: requiredText('Vorname'),
+  lastName: requiredText('Nachname'),
   billingAddress: billingAddressSchema,
   deliveryAddress: deliveryAddressSchema.nullable(),
 })
@@ -73,7 +79,8 @@ export const updateMyProfileFn = createServerFn({ method: 'POST' })
     await getDb()
       .update(users)
       .set({
-        name: data.name,
+        firstName: data.firstName,
+        lastName: data.lastName,
         billingAddress: data.billingAddress,
         deliveryAddress: data.deliveryAddress,
         updatedAt: new Date(),

@@ -57,7 +57,9 @@ export async function anonymizeUser(actor: Principal, userId: string) {
     await tx
       .update(users)
       .set({
-        name: ANONYMOUS_NAME,
+        // Der Anzeigename (users.name) ergibt sich daraus von selbst.
+        firstName: '',
+        lastName: ANONYMOUS_NAME,
         email: anonymousEmail(user.id),
         passwordHash: null,
         status: 'disabled',
@@ -105,6 +107,8 @@ export async function exportUserData(actor: Principal, userId: string) {
     .select({
       id: users.id,
       name: users.name,
+      firstName: users.firstName,
+      lastName: users.lastName,
       email: users.email,
       role: users.role,
       status: users.status,

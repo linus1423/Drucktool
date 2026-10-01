@@ -23,7 +23,7 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
   async function principal(role: Principal['role']): Promise<Principal> {
     const [u] = await getDb()
       .insert(schema.users)
-      .values({ email: email(`${role}-${Math.random()}`), name: role, role, status: 'active' })
+      .values({ email: email(`${role}-${Math.random()}`), lastName: role, role, status: 'active' })
       .returning()
     return { id: u!.id, role }
   }
@@ -41,12 +41,12 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
       .returning()
     const [anna] = await db
       .insert(schema.users)
-      .values({ email: email('anna'), name: 'Anna', role: 'customer', status: 'pending' })
+      .values({ email: email('anna'), lastName: 'Anna', role: 'customer', status: 'pending' })
       .returning()
     await db.insert(schema.organisationMembers).values({ userId: anna!.id, organisationId: org!.id })
     const [bert] = await db
       .insert(schema.users)
-      .values({ email: email('bert'), name: 'Bert', role: 'customer', status: 'pending' })
+      .values({ email: email('bert'), lastName: 'Bert', role: 'customer', status: 'pending' })
       .returning()
 
     await admin.approveRegistration(superadmin, { userId: anna!.id, existingOrganisationId: null })
@@ -67,7 +67,8 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
   it('protokolliert Benutzer ohne Passwörter oder Hashes', async () => {
     const superadmin = await principal('superadmin')
     const created = await admin.createUser(superadmin, {
-      name: 'Clara',
+      firstName: '',
+      lastName: 'Clara',
       email: email('clara'),
       role: 'staff',
       organisationIds: [],
@@ -75,7 +76,8 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
     })
     await admin.updateUser(superadmin, {
       id: created.id,
-      name: 'Clara Neu',
+      firstName: 'Clara',
+      lastName: 'Neu',
       email: email('clara'),
       role: 'admin',
       status: 'active',
@@ -85,8 +87,8 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
     const entries = await entriesFor(created.id)
     expect(entries.map((e) => e.action)).toEqual(['user.created', 'user.updated'])
     expect(entries[1]).toMatchObject({
-      before: { name: 'Clara', role: 'staff' },
-      after: { name: 'Clara Neu', role: 'admin' },
+      before: { firstName: '', lastName: 'Clara', role: 'staff' },
+      after: { firstName: 'Clara', lastName: 'Neu', role: 'admin' },
       data: { passwordChanged: true, sessionsRevoked: true },
     })
     const raw = JSON.stringify(entries)
@@ -99,11 +101,11 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
     const admin1 = await principal('admin')
     // Ein Admin darf keinen Superadmin anlegen: weder Benutzer noch Protokolleintrag entstehen.
     await expect(
-      admin.createUser(admin1, { name: 'X', email: email('verboten'), role: 'superadmin', organisationIds: [], password: '' }),
+      admin.createUser(admin1, { firstName: '', lastName: 'X', email: email('verboten'), role: 'superadmin', organisationIds: [], password: '' }),
     ).rejects.toThrow('Superadmin')
     // Doppelte Adresse: die Transaktion bricht ab, es bleibt kein Eintrag zurück.
     await expect(
-      admin.createUser(admin1, { name: 'Y', email: email('clara'), role: 'staff', organisationIds: [], password: '' }),
+      admin.createUser(admin1, { firstName: '', lastName: 'Y', email: email('clara'), role: 'staff', organisationIds: [], password: '' }),
     ).rejects.toThrow('vergeben')
     const rows = await getDb()
       .select()
@@ -128,7 +130,7 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
       .insert(schema.users)
       .values({
         email: address,
-        name: 'Login',
+        lastName: 'Login',
         role: 'customer',
         status: 'active',
         passwordHash: await hashPassword('richtig-123'),
@@ -158,7 +160,8 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
       .values({ name: `Filter ${stamp}`, status: 'active' })
       .returning()
     const created = await admin.createUser(superadmin, {
-      name: 'Dora',
+      firstName: '',
+      lastName: 'Dora',
       email: email('dora'),
       role: 'customer',
       organisationIds: [org!.id],

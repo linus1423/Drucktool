@@ -20,7 +20,7 @@ describe.skipIf(!url)('Organisationen und Organisationsanfragen (Issue #68)', ()
   async function user(name: string, role: Principal['role']): Promise<Principal> {
     const [u] = await getDb()
       .insert(schema.users)
-      .values({ email: email(name), name, role, status: 'active' })
+      .values({ email: email(name), lastName: name, role, status: 'active' })
       .returning()
     return { id: u!.id, role }
   }
@@ -54,7 +54,7 @@ describe.skipIf(!url)('Organisationen und Organisationsanfragen (Issue #68)', ()
       ])
       .returning()
     const created = await createUser(admin, {
-      name: 'Mehrfach',
+      firstName: '', lastName: 'Mehrfach',
       email: email('mehrfach'),
       role: 'customer',
       organisationIds: [a!.id, b!.id],
@@ -66,7 +66,7 @@ describe.skipIf(!url)('Organisationen und Organisationsanfragen (Issue #68)', ()
     expect((await getOrganisation(a!.id)).members.map((m) => m.id)).toEqual([created.id])
     expect((await listOrganisations()).find((o) => o.id === b!.id)?.memberCount).toBe(1)
 
-    const base = { id: created.id, name: 'Mehrfach', email: email('mehrfach'), status: 'active' as const, password: '' }
+    const base = { id: created.id, firstName: '', lastName: 'Mehrfach', email: email('mehrfach'), status: 'active' as const, password: '' }
     await updateUser(admin, { ...base, role: 'customer', organisationIds: [b!.id] })
     expect(await membershipsOf(created.id)).toEqual([b!.name])
     await updateUser(admin, { ...base, role: 'customer', organisationIds: [] })

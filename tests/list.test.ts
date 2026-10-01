@@ -36,9 +36,9 @@ describe.skipIf(!url)('Auftragsliste (Integration)', async () => {
     const rows = await getDb()
       .insert(schema.users)
       .values([
-        { email: `${tag}-k@test`, name: 'Listenkundin', role: 'customer', status: 'active', billingAddress: BILLING },
-        { email: `${tag}-f@test`, name: 'Fremd', role: 'customer', status: 'active', billingAddress: BILLING },
-        { email: `${tag}-s@test`, name: 'Listenstaff', role: 'staff', status: 'active' },
+        { email: `${tag}-k@test`, lastName: 'Listenkundin', role: 'customer', status: 'active', billingAddress: BILLING },
+        { email: `${tag}-f@test`, lastName: 'Fremd', role: 'customer', status: 'active', billingAddress: BILLING },
+        { email: `${tag}-s@test`, lastName: 'Listenstaff', role: 'staff', status: 'active' },
       ])
       .returning()
     customer = { id: rows[0]!.id, role: 'customer' }
