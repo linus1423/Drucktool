@@ -26,3 +26,31 @@ drucktool_oidc_role_claim: roles
 drucktool_oidc_admin_roles: []
 drucktool_oidc_staff_roles: []
 drucktool_oidc_enforce_for_staff: false
+
+# production oder staging (zeigt das Banner „Testsystem“). Wird in group_vars/production.yml bzw. staging.yml gesetzt.
+drucktool_environment: production
+# Testsystem: alle E-Mails an diese Adresse statt an die echten Empfänger
+drucktool_mail_redirect_to: ''
+
+# Holt regelmäßig das neueste Image (für Staging mit Tag "latest"), mit Backup vor jedem Update.
+drucktool_auto_update: false
+drucktool_auto_update_minute: '*/30'
+
+# Optionaler Ping an einen Überwachungsdienst (z. B. https://hc-ping.com/<uuid>) nach jedem täglichen Backup.
+# Beim Start wird <url>/start aufgerufen, bei Fehlern <url>/fail.
+drucktool_backup_healthcheck_url: ''
+
+# Verschlüsselte Kopie außer Haus mit restic (S3, Hetzner Storage Box per SFTP, …). Standardmäßig aus.
+drucktool_offsite_backup_enabled: false
+# z. B. s3:https://s3.eu-central-1.amazonaws.com/bucket/drucktool oder sftp:u12345@u12345.your-storagebox.de:drucktool
+drucktool_restic_repository: ''
+# Im Vault: drucktool_restic_password und ggf. drucktool_restic_env (z. B. AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY).
+drucktool_restic_password: ''
+drucktool_restic_env: {}
+drucktool_restic_keep_daily: 14
+drucktool_restic_keep_weekly: 8
+drucktool_restic_keep_monthly: 12
+
+# Monatlich das neueste Backup (außer Haus, falls eingerichtet) in eine Wegwerf-Datenbank einspielen und prüfen.
+drucktool_restore_test_enabled: true
+drucktool_restore_test_healthcheck_url: ''

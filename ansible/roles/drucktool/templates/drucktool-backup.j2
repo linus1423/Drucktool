@@ -1,0 +1,51 @@
+#!/bin/bash
+# Verwaltet von Ansible. Sichert Datenbank und Druckdateien und löscht alte Datenbank-Backups.
+{% if drucktool_offsite_backup_enabled %}
+# Zusätzlich verschlüsselte Kopie außer Haus mit restic ({{ drucktool_restic_repository }}).
+{% endif %}
+#
+# Aufruf: drucktool-backup [anlass]   z. B. "vor-update"; ohne Angabe das tägliche Backup
+set -euo pipefail
+
+anlass="${1:-}"
+dir="{{ drucktool_dir }}"
+backup_dir="{{ drucktool_backup_dir }}"
+ping_url="{{ drucktool_backup_healthcheck_url }}"
+
+ping() {
+  # Nur das tägliche Backup meldet sich beim Überwachungsdienst.
+  if [ -n "$ping_url" ] && [ -z "$anlass" ]; then
+    curl -fsS -m 10 --retry 3 -o /dev/null "${ping_url}$1" || true
+  fi
+}
+fertig() {
+  status=$?
+  if [ "$status" -eq 0 ]; then ping ''; else ping /fail; echo "Backup fehlgeschlagen (Status $status)" >&2; fi
+}
+ping /start
+trap fertig EXIT
+
+name="drucktool-$(date +%Y%m%d-%H%M%S)${anlass:+-$anlass}.sql.gz"
+target="$backup_dir/$name"
+# Erst in eine temporäre Datei, damit ein abgebrochener Dump nie wie ein gültiges Backup aussieht.
+docker compose --project-directory "$dir" exec -T db pg_dump -U drucktool drucktool | gzip --rsyncable > "$target.tmp"
+chmod 600 "$target.tmp"
+mv "$target.tmp" "$target"
+echo "$(date -Is) Datenbank gesichert: $target"
+
+find "$backup_dir" -maxdepth 1 -name 'drucktool-*.sql.gz' -mtime +{{ drucktool_backup_keep_days }} -delete
+# Druckdateien werden gespiegelt; gelöschte Dateien verschwinden auch aus der Sicherung.
+rsync -a --delete "$dir/uploads/" "$backup_dir/uploads/"
+
+{% if drucktool_offsite_backup_enabled %}
+set -a
+. /etc/drucktool/restic.env
+set +a
+restic backup --quiet --host drucktool --tag drucktool ${anlass:+--tag "$anlass"} "$target" "$dir/uploads"
+# Jeder Tag hat einen anderen Dateinamen, daher alle Snapshots als eine Gruppe behandeln.
+restic forget --quiet --host drucktool --tag drucktool --group-by host --prune \
+  --keep-daily {{ drucktool_restic_keep_daily }} \
+  --keep-weekly {{ drucktool_restic_keep_weekly }} \
+  --keep-monthly {{ drucktool_restic_keep_monthly }}
+echo "$(date -Is) Kopie außer Haus gespeichert"
+{% endif %}

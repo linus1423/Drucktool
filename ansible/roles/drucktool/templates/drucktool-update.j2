@@ -1,0 +1,39 @@
+#!/bin/bash
+# Verwaltet von Ansible. Holt das Image {{ drucktool_image }}:{{ drucktool_image_tag }} und startet die Anwendung neu,
+# wenn es sich geändert hat. Vorher wird die Datenbank gesichert, weil die App beim Start Migrationen einspielt.
+#
+# Aufruf: drucktool-update                       Image holen, bei Änderung sichern und neu starten
+#         drucktool-update --backup-falls-noetig  nur sichern, falls das laufende Image veraltet ist (für Ansible)
+set -euo pipefail
+
+cd "{{ drucktool_dir }}"
+image="{{ drucktool_image }}:{{ drucktool_image_tag }}"
+
+# true, wenn die App mit einem anderen Image läuft als dem konfigurierten (also gleich migriert wird).
+veraltet() {
+  container=$(docker compose ps -q app 2>/dev/null || true)
+  # Erster Start: es gibt noch nichts zu sichern.
+  [ -n "$container" ] || return 1
+  laufend=$(docker inspect -f {% raw %}'{{.Image}}'{% endraw %} "$container")
+  neu=$(docker image inspect -f {% raw %}'{{.Id}}'{% endraw %} "$image" 2>/dev/null || echo fehlt)
+  [ "$laufend" != "$neu" ]
+}
+
+db_laeuft() {
+  docker compose ps --status running --services 2>/dev/null | grep -qx db
+}
+
+if [ "${1:-}" = --backup-falls-noetig ]; then
+  if db_laeuft && veraltet; then
+    /usr/local/bin/drucktool-backup vor-update
+    echo 'Backup vor dem Update angelegt'
+  fi
+  exit 0
+fi
+
+docker compose pull --quiet app worker
+if veraltet; then
+  if db_laeuft; then /usr/local/bin/drucktool-backup vor-update; fi
+  docker compose up -d --remove-orphans
+  echo "$(date -Is) Aktualisiert auf $image"
+fi

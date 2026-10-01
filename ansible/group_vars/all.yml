@@ -1,8 +1,13 @@
-# Öffentliche Einstellungen. Geheimnisse gehören in group_vars/vault.yml (ansible-vault).
+# Gemeinsame Einstellungen beider Umgebungen. Was je Umgebung abweicht (Version, Domain, Mail-Umleitung), steht in
+# group_vars/production.yml bzw. staging.yml. Geheimnisse gehören in vault/production.yml bzw. vault/staging.yml.
 
 # Image aus der GitHub Container Registry (wird von der CI gebaut).
 drucktool_image: ghcr.io/linus1423/drucktool
+# Produktion: feste Version, siehe group_vars/production.yml. Staging: "latest" (jeder Stand von main).
 drucktool_image_tag: latest
+
+# production oder staging; wird in group_vars/production.yml bzw. staging.yml je Gruppe gesetzt.
+drucktool_environment: production
 
 # Domain für HTTPS über Caddy (Let's Encrypt). Leer lassen, um nur Port 3000 freizugeben.
 drucktool_domain: ''
@@ -34,3 +39,12 @@ drucktool_oidc_admin_roles: []
 drucktool_oidc_staff_roles: []
 # true: Mitarbeiter und Admins melden sich nur noch über den Anbieter an
 drucktool_oidc_enforce_for_staff: false
+
+# Backups: täglich um 2:15 Uhr nach /var/backups/drucktool (Datenbank 14 Tage, Druckdateien als Spiegel), dazu vor
+# jedem Update. Optional: Ping an einen Überwachungsdienst wie https://healthchecks.io, der Alarm schlägt, wenn das
+# Backup ausbleibt oder fehlschlägt. Dasselbe für den monatlichen Restore-Test.
+drucktool_backup_healthcheck_url: ''
+drucktool_restore_test_healthcheck_url: ''
+# Verschlüsselte Kopie außer Haus mit restic. Passwort und Zugangsdaten im Vault (siehe vault.example.yml).
+drucktool_offsite_backup_enabled: false
+drucktool_restic_repository: ''

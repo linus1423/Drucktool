@@ -32,6 +32,7 @@ services:
       UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-500}
       PRIVACY_URL: ${PRIVACY_URL:-}
       IMPRINT_URL: ${IMPRINT_URL:-}
+      APP_ENVIRONMENT: ${APP_ENVIRONMENT:-production}
     volumes:
       - uploads:/app/uploads
     ports:
@@ -53,6 +54,7 @@ services:
       AUDIT_LOG_RETENTION_DAYS: ${AUDIT_LOG_RETENTION_DAYS:-365}
       SESSION_IP_RETENTION_DAYS: ${SESSION_IP_RETENTION_DAYS:-30}
       REJECTED_REGISTRATION_RETENTION_DAYS: ${REJECTED_REGISTRATION_RETENTION_DAYS:-30}
+      MAIL_REDIRECT_TO: ${MAIL_REDIRECT_TO:-}
     healthcheck:
       disable: true
 

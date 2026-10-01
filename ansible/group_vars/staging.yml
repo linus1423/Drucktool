@@ -1,0 +1,13 @@
+# Testsystem, z. B. test.druck.fsmb.de. Gilt für die Gruppe "staging" im Inventory. Geheimnisse in vault/staging.yml.
+# Zeigt in der Anwendung das Banner „Testsystem“.
+drucktool_environment: staging
+
+# Jeder Stand von main: alle 30 Minuten sieht der Server nach einem neuen Image und aktualisiert sich (mit Backup vorher).
+drucktool_image_tag: latest
+drucktool_auto_update: true
+
+drucktool_domain: ''
+drucktool_acme_email: ''
+
+# Alle E-Mails gehen an diese Adresse statt an die echten Empfänger. Pflicht, sobald SMTP eingerichtet ist.
+drucktool_mail_redirect_to: ''
