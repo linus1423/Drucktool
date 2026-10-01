@@ -131,6 +131,23 @@ describe.skipIf(!url)('Aufträge aus dem Wizard (Integration)', () => {
     expect(detail.files.map((f) => f.role).sort()).toEqual(['cover', 'main'])
   })
 
+  it('nimmt das Deckblatt ohne eigene Datei aus der Druckdatei', async () => {
+    const card = (await getDb().select().from(schema.papers)).find((p) => p.name === 'Karton')!
+    const input = await orderInput(customer, {
+      spec: { bindingId: 'plastic_comb', pages: 4, coverPaperId: card.id, coverPages: 2, coverFromMainFile: true },
+    })
+    const cover = await testUpload(customer, 'cover', 2)
+    await expect(createRequest(customer, { ...input, coverFileId: cover.id })).rejects.toThrow('nicht aus der Druckdatei')
+    const created = await createRequest(customer, input)
+    const detail = await getRequestDetail(staff, created.id)
+    expect(detail.files.map((f) => f.role)).toEqual(['main'])
+    const { describeOrder } = await import('~/lib/snapshot')
+    expect(describeOrder(detail.order!)).toContainEqual([
+      'Deckblatt-Datei',
+      'keine separate Datei, aus der Druckdatei: vorne Seite 1, hinten Seite 4',
+    ])
+  })
+
   it('liefert Dateien nur an Berechtigte aus', async () => {
     const pending = await testUpload(customer)
     expect(await fileForDownload(customer, pending.id)).toBeTruthy()

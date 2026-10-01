@@ -37,6 +37,7 @@ export const PAPER = {
 export const COLOR = {
   white: '00000000-0000-4000-9000-000000000001',
   clear: '00000000-0000-4000-9000-000000000002',
+  blue: '00000000-0000-4000-9000-000000000003',
 }
 
 const paper = (id: string, name: string, grammage: number, extra: Partial<OrderCatalog['papers'][number]>) => ({
@@ -106,6 +107,12 @@ export const CATALOG: OrderCatalog = {
   coverColors: [
     { id: COLOR.white, name: 'Weiß', hex: '#ffffff', transparent: false, available: true },
     { id: COLOR.clear, name: 'Durchsichtig', hex: null, transparent: true, available: true },
+    { id: COLOR.blue, name: 'Dunkelblau', hex: '#1e3a8a', transparent: false, available: true },
+  ],
+  // Wie im Beispiel aus Issue #83: dickes Papier in allen Farben, Karton nur in Weiß.
+  paperCoverColors: [
+    ...[COLOR.white, COLOR.clear, COLOR.blue].map((coverColorId) => ({ paperId: PAPER.thick, coverColorId })),
+    { paperId: PAPER.card, coverColorId: COLOR.white },
   ],
   pricing: { printA4Cents: 10, printA3Cents: 20, minimumOrderCents: 100, housePostCents: 0, housePostPlotCents: 200 },
   texts: { turnaround: '', plots: '', terms: '' },
@@ -121,6 +128,7 @@ export function spec(overrides: Partial<OrderSpec> = {}): OrderSpec {
     paperId: PAPER.standard,
     coverPaperId: null,
     coverPages: null,
+    coverFromMainFile: false,
     coverColorId: null,
     coverBackColorId: null,
     borderless: false,
