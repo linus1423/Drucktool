@@ -33,6 +33,7 @@ const paper = (overrides: Partial<PaperInput> = {}): PaperInput => ({
   forInner: true,
   forPlotter: false,
   maxFormatId: null,
+  sheetSizes: [],
   available: true,
   helpText: '',
   sortOrder: 50,

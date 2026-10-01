@@ -1,6 +1,6 @@
 {
-  "id": "a4d7849c-c0f4-4214-b731-3fd69462a4d3",
-  "prevId": "b621880e-b615-45fd-ba21-12dd9f5cdcf3",
+  "id": "155bd691-fe21-4c25-a5e2-76408d0030a8",
+  "prevId": "4c28541a-e147-4acb-be8a-2f30b42e7d35",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -736,6 +736,79 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.mail_templates": {
+      "name": "mail_templates",
+      "schema": "",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "subject": {
+          "name": "subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'blocks'"
+        },
+        "blocks": {
+          "name": "blocks",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "html": {
+          "name": "html",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "updated_by_id": {
+          "name": "updated_by_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "mail_templates_updated_by_id_users_id_fk": {
+          "name": "mail_templates_updated_by_id_users_id_fk",
+          "tableFrom": "mail_templates",
+          "tableTo": "users",
+          "columnsFrom": [
+            "updated_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.oidc_accounts": {
       "name": "oidc_accounts",
       "schema": "",
@@ -1076,6 +1149,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "sheet_sizes": {
+          "name": "sheet_sizes",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
         },
         "available": {
           "name": "available",
@@ -1942,6 +2022,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "print_sheet": {
+          "name": "print_sheet",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cover_print_sheet": {
+          "name": "cover_print_sheet",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "internal_due_date": {
           "name": "internal_due_date",
           "type": "date",
@@ -2510,7 +2602,8 @@
         "change_accepted",
         "change_rejected",
         "change_withdrawn",
-        "dates_changed"
+        "dates_changed",
+        "print_sheet_changed"
       ]
     },
     "public.request_status": {

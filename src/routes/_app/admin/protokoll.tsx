@@ -11,6 +11,7 @@ import {
   type AuditAction,
 } from '~/lib/audit'
 import { formatDateTime } from '~/lib/format'
+import { MAIL_TEMPLATES, type MailTemplateKey } from '~/lib/mail-templates'
 import { auditLogQuery, organisationsQuery, usersQuery } from '~/lib/queries'
 import { ROLE_LABELS, USER_STATUS_LABELS, ORG_STATUS, type UserRole, type UserStatus } from '~/lib/roles'
 
@@ -205,8 +206,13 @@ function AuditRow({ entry: e, orgName }: { entry: Entry; orgName: OrgName }) {
       ? (e.targetUserName ?? (e.targetId ? 'Gelöschter Benutzer' : null))
       : e.targetType === 'organisation'
         ? (e.organisationName ?? 'Gelöschte Organisation')
-        : null
-  const changes = describeChanges(e.before, e.after, orgName)
+        : e.targetType === 'mail_template'
+          ? e.targetId
+            ? (MAIL_TEMPLATES[e.targetId as MailTemplateKey]?.label ?? e.targetId)
+            : 'Absender, Signatur und Fußzeile'
+          : null
+  // Vorlagen bestehen aus Bausteinen; den Inhalt zeigt die Seite „E-Mails“, hier nur, dass sich etwas geändert hat.
+  const changes = e.targetType === 'mail_template' ? null : describeChanges(e.before, e.after, orgName)
   const details = describeDetails(e)
   const failed = e.action === 'login.failed'
   return (

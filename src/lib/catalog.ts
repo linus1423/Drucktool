@@ -52,6 +52,16 @@ export const bindingUpdateSchema = z.object({
   sortOrder: z.number().int(),
 })
 
+/** Bogengröße, in der ein Papier vorrätig ist, z. B. SRA3 320 × 450 mm (Issue #88). */
+export const sheetSizeSchema = z.object({
+  label: z.string().trim().min(1, 'Bezeichnung fehlt').max(30),
+  widthMm: z.number().int().min(50, 'Mindestens 50 mm').max(5000),
+  heightMm: z.number().int().min(50, 'Mindestens 50 mm').max(5000),
+})
+export type SheetSize = z.infer<typeof sheetSizeSchema>
+
+export const formatSheetSize = (s: SheetSize) => `${s.label} (${s.widthMm} × ${s.heightMm} mm)`
+
 export const paperSchema = z.object({
   id: z.uuid().optional(),
   name: label,
@@ -65,6 +75,10 @@ export const paperSchema = z.object({
   forInner: z.boolean(),
   forPlotter: z.boolean(),
   maxFormatId: z.string().max(50).nullable(),
+  sheetSizes: z
+    .array(sheetSizeSchema)
+    .max(20)
+    .refine((list) => new Set(list.map((s) => s.label.toLowerCase())).size === list.length, 'Bogengrößen doppelt benannt'),
   available: z.boolean(),
   helpText,
   sortOrder: z.number().int(),

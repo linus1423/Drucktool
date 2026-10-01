@@ -33,10 +33,13 @@ function AppLayout() {
     <div className="min-h-screen">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-4 py-3">
-          <Link to="/auftraege" className="mr-4 text-lg font-semibold tracking-tight">
+          <Link to="/uebersicht" className="mr-4 text-lg font-semibold tracking-tight">
             Drucktool
           </Link>
           <nav className="flex flex-1 flex-wrap gap-1">
+            <Link to="/uebersicht" className={navLink} activeProps={navActive}>
+              Übersicht
+            </Link>
             <Link to="/auftraege" className={navLink} activeProps={navActive}>
               Aufträge
             </Link>
@@ -60,6 +63,9 @@ function AppLayout() {
                 </Link>
                 <Link to="/admin/katalog" className={navLink} activeProps={navActive}>
                   Katalog und Preise
+                </Link>
+                <Link to="/admin/emails" className={navLink} activeProps={navActive}>
+                  E-Mails
                 </Link>
               </>
             ) : null}

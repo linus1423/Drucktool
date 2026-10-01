@@ -1,6 +1,6 @@
 {
-  "id": "a4d7849c-c0f4-4214-b731-3fd69462a4d3",
-  "prevId": "b621880e-b615-45fd-ba21-12dd9f5cdcf3",
+  "id": "4c28541a-e147-4acb-be8a-2f30b42e7d35",
+  "prevId": "a4d7849c-c0f4-4214-b731-3fd69462a4d3",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1077,6 +1077,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "sheet_sizes": {
+          "name": "sheet_sizes",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
         "available": {
           "name": "available",
           "type": "boolean",
@@ -1942,6 +1949,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "print_sheet": {
+          "name": "print_sheet",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cover_print_sheet": {
+          "name": "cover_print_sheet",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "internal_due_date": {
           "name": "internal_due_date",
           "type": "date",
@@ -2510,7 +2529,8 @@
         "change_accepted",
         "change_rejected",
         "change_withdrawn",
-        "dates_changed"
+        "dates_changed",
+        "print_sheet_changed"
       ]
     },
     "public.request_status": {

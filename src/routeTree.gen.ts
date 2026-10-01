@@ -18,10 +18,12 @@ import { Route as AppAdminRouteRouteImport } from './routes/_app/admin/route'
 import { Route as AppKontoRouteImport } from './routes/_app/konto'
 import { Route as AppOrganisationsanfragenRouteImport } from './routes/_app/organisationsanfragen'
 import { Route as AppProfilRouteImport } from './routes/_app/profil'
+import { Route as AppUebersichtRouteImport } from './routes/_app/uebersicht'
 import { Route as AnfragenIndexRouteImport } from './routes/anfragen/index'
 import { Route as AnfragenSplatRouteImport } from './routes/anfragen/$'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppAdminBenutzerRouteImport } from './routes/_app/admin/benutzer'
+import { Route as AppAdminEmailsRouteImport } from './routes/_app/admin/emails'
 import { Route as AppAdminFreigabenRouteImport } from './routes/_app/admin/freigaben'
 import { Route as AppAdminKatalogRouteImport } from './routes/_app/admin/katalog'
 import { Route as AppAdminProtokollRouteImport } from './routes/_app/admin/protokoll'
@@ -83,6 +85,11 @@ const AppProfilRoute = AppProfilRouteImport.update({
   path: '/profil',
   getParentRoute: () => AppRoute,
 } as any)
+const AppUebersichtRoute = AppUebersichtRouteImport.update({
+  id: '/uebersicht',
+  path: '/uebersicht',
+  getParentRoute: () => AppRoute,
+} as any)
 const AnfragenIndexRoute = AnfragenIndexRouteImport.update({
   id: '/anfragen/',
   path: '/anfragen/',
@@ -101,6 +108,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
 const AppAdminBenutzerRoute = AppAdminBenutzerRouteImport.update({
   id: '/benutzer',
   path: '/benutzer',
+  getParentRoute: () => AppAdminRouteRoute,
+} as any)
+const AppAdminEmailsRoute = AppAdminEmailsRouteImport.update({
+  id: '/emails',
+  path: '/emails',
   getParentRoute: () => AppAdminRouteRoute,
 } as any)
 const AppAdminFreigabenRoute = AppAdminFreigabenRouteImport.update({
@@ -192,10 +204,12 @@ export interface FileRoutesByFullPath {
   '/konto': typeof AppKontoRoute
   '/organisationsanfragen': typeof AppOrganisationsanfragenRoute
   '/profil': typeof AppProfilRoute
+  '/uebersicht': typeof AppUebersichtRoute
   '/anfragen/$': typeof AnfragenSplatRoute
   '/api/health': typeof ApiHealthRoute
   '/anfragen/': typeof AnfragenIndexRoute
   '/admin/benutzer': typeof AppAdminBenutzerRoute
+  '/admin/emails': typeof AppAdminEmailsRoute
   '/admin/freigaben': typeof AppAdminFreigabenRoute
   '/admin/katalog': typeof AppAdminKatalogRoute
   '/admin/protokoll': typeof AppAdminProtokollRoute
@@ -221,10 +235,12 @@ export interface FileRoutesByTo {
   '/konto': typeof AppKontoRoute
   '/organisationsanfragen': typeof AppOrganisationsanfragenRoute
   '/profil': typeof AppProfilRoute
+  '/uebersicht': typeof AppUebersichtRoute
   '/anfragen/$': typeof AnfragenSplatRoute
   '/api/health': typeof ApiHealthRoute
   '/anfragen': typeof AnfragenIndexRoute
   '/admin/benutzer': typeof AppAdminBenutzerRoute
+  '/admin/emails': typeof AppAdminEmailsRoute
   '/admin/freigaben': typeof AppAdminFreigabenRoute
   '/admin/katalog': typeof AppAdminKatalogRoute
   '/admin/protokoll': typeof AppAdminProtokollRoute
@@ -252,10 +268,12 @@ export interface FileRoutesById {
   '/_app/konto': typeof AppKontoRoute
   '/_app/organisationsanfragen': typeof AppOrganisationsanfragenRoute
   '/_app/profil': typeof AppProfilRoute
+  '/_app/uebersicht': typeof AppUebersichtRoute
   '/anfragen/$': typeof AnfragenSplatRoute
   '/api/health': typeof ApiHealthRoute
   '/anfragen/': typeof AnfragenIndexRoute
   '/_app/admin/benutzer': typeof AppAdminBenutzerRoute
+  '/_app/admin/emails': typeof AppAdminEmailsRoute
   '/_app/admin/freigaben': typeof AppAdminFreigabenRoute
   '/_app/admin/katalog': typeof AppAdminKatalogRoute
   '/_app/admin/protokoll': typeof AppAdminProtokollRoute
@@ -283,10 +301,12 @@ export interface FileRouteTypes {
     | '/konto'
     | '/organisationsanfragen'
     | '/profil'
+    | '/uebersicht'
     | '/anfragen/$'
     | '/api/health'
     | '/anfragen/'
     | '/admin/benutzer'
+    | '/admin/emails'
     | '/admin/freigaben'
     | '/admin/katalog'
     | '/admin/protokoll'
@@ -312,10 +332,12 @@ export interface FileRouteTypes {
     | '/konto'
     | '/organisationsanfragen'
     | '/profil'
+    | '/uebersicht'
     | '/anfragen/$'
     | '/api/health'
     | '/anfragen'
     | '/admin/benutzer'
+    | '/admin/emails'
     | '/admin/freigaben'
     | '/admin/katalog'
     | '/admin/protokoll'
@@ -342,10 +364,12 @@ export interface FileRouteTypes {
     | '/_app/konto'
     | '/_app/organisationsanfragen'
     | '/_app/profil'
+    | '/_app/uebersicht'
     | '/anfragen/$'
     | '/api/health'
     | '/anfragen/'
     | '/_app/admin/benutzer'
+    | '/_app/admin/emails'
     | '/_app/admin/freigaben'
     | '/_app/admin/katalog'
     | '/_app/admin/protokoll'
@@ -445,6 +469,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProfilRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/uebersicht': {
+      id: '/_app/uebersicht'
+      path: '/uebersicht'
+      fullPath: '/uebersicht'
+      preLoaderRoute: typeof AppUebersichtRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/anfragen/': {
       id: '/anfragen/'
       path: '/anfragen'
@@ -471,6 +502,13 @@ declare module '@tanstack/react-router' {
       path: '/benutzer'
       fullPath: '/admin/benutzer'
       preLoaderRoute: typeof AppAdminBenutzerRouteImport
+      parentRoute: typeof AppAdminRouteRoute
+    }
+    '/_app/admin/emails': {
+      id: '/_app/admin/emails'
+      path: '/emails'
+      fullPath: '/admin/emails'
+      preLoaderRoute: typeof AppAdminEmailsRouteImport
       parentRoute: typeof AppAdminRouteRoute
     }
     '/_app/admin/freigaben': {
@@ -583,6 +621,7 @@ declare module '@tanstack/react-router' {
 
 interface AppAdminRouteRouteChildren {
   AppAdminBenutzerRoute: typeof AppAdminBenutzerRoute
+  AppAdminEmailsRoute: typeof AppAdminEmailsRoute
   AppAdminFreigabenRoute: typeof AppAdminFreigabenRoute
   AppAdminKatalogRoute: typeof AppAdminKatalogRoute
   AppAdminProtokollRoute: typeof AppAdminProtokollRoute
@@ -593,6 +632,7 @@ interface AppAdminRouteRouteChildren {
 
 const AppAdminRouteRouteChildren: AppAdminRouteRouteChildren = {
   AppAdminBenutzerRoute: AppAdminBenutzerRoute,
+  AppAdminEmailsRoute: AppAdminEmailsRoute,
   AppAdminFreigabenRoute: AppAdminFreigabenRoute,
   AppAdminKatalogRoute: AppAdminKatalogRoute,
   AppAdminProtokollRoute: AppAdminProtokollRoute,
@@ -611,6 +651,7 @@ interface AppRouteChildren {
   AppKontoRoute: typeof AppKontoRoute
   AppOrganisationsanfragenRoute: typeof AppOrganisationsanfragenRoute
   AppProfilRoute: typeof AppProfilRoute
+  AppUebersichtRoute: typeof AppUebersichtRoute
   AppAuftraegeRequestIdRoute: typeof AppAuftraegeRequestIdRoute
   AppAuftraegeNeuRoute: typeof AppAuftraegeNeuRoute
   AppAuftraegeIndexRoute: typeof AppAuftraegeIndexRoute
@@ -621,6 +662,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppKontoRoute: AppKontoRoute,
   AppOrganisationsanfragenRoute: AppOrganisationsanfragenRoute,
   AppProfilRoute: AppProfilRoute,
+  AppUebersichtRoute: AppUebersichtRoute,
   AppAuftraegeRequestIdRoute: AppAuftraegeRequestIdRoute,
   AppAuftraegeNeuRoute: AppAuftraegeNeuRoute,
   AppAuftraegeIndexRoute: AppAuftraegeIndexRoute,

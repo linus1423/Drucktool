@@ -11,7 +11,9 @@ import {
   listPendingRegistrationsFn,
   listUsersFn,
 } from '~/server/admin/admin.functions'
+import { getDashboardFn } from '~/server/requests/dashboard.functions'
 import { listAuditLogFn } from '~/server/audit/audit.functions'
+import { listMailTemplatesFn } from '~/server/mail/mail-templates.functions'
 import type { AuditFilter } from '~/server/audit/audit.server'
 import type { RequestStatus } from './status'
 
@@ -39,6 +41,12 @@ export const requestListQuery = (filter: RequestListFilter) =>
     queryKey: ['requests', 'list', filter],
     queryFn: () => listRequestsFn({ data: filter }),
   })
+
+// Unter 'requests', damit Statuswechsel die Kennzahlen mit auffrischen.
+export const dashboardQuery = queryOptions({
+  queryKey: ['requests', 'dashboard'],
+  queryFn: () => getDashboardFn(),
+})
 
 export const requestDetailQuery = (id: string) =>
   queryOptions({
@@ -106,3 +114,8 @@ export const auditLogQuery = (filter: AuditFilter) =>
     queryKey: ['admin', 'audit', filter],
     queryFn: () => listAuditLogFn({ data: filter }),
   })
+
+export const mailTemplatesQuery = queryOptions({
+  queryKey: ['admin', 'mail-templates'],
+  queryFn: () => listMailTemplatesFn(),
+})
