@@ -1,0 +1,8 @@
+# Ergänzt docker-compose.yml für den Smoke-Test (scripts/smoke/smoke-test.sh).
+services:
+  app:
+    image: ${APP_IMAGE:-drucktool:local}
+    ports: !override
+      - '127.0.0.1:${APP_PORT:-3200}:3000'
+  worker:
+    image: ${APP_IMAGE:-drucktool:local}

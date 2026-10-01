@@ -32,6 +32,18 @@ bearbeiten sie über einen Status-Workflow bis zur Auslieferung.
 
 Im Profil sieht jeder seine angemeldeten Geräte und kann sie einzeln oder alle anderen abmelden.
 
+## Sicherheit
+
+- **Rate-Limits** stehen in PostgreSQL (Tabelle `rate_limits`) und gelten damit über Neustarts und mehrere Instanzen
+  hinweg. Pro IP: 10 Passwort-Logins pro Minute, 10 Anmeldelinks pro 10 Minuten (3 pro Adresse). Gespeichert wird nur
+  ein Hash von IP bzw. E-Mail-Adresse.
+- **Kontosperre:** Nach 5 falschen Passwörtern innerhalb von 15 Minuten wird die Anmeldung für diese E-Mail-Adresse
+  gesperrt, unabhängig von der IP: erst 1 Minute, bei jedem weiteren Fehlversuch doppelt so lange, höchstens eine
+  Stunde. Eine erfolgreiche Anmeldung setzt den Zähler zurück. Unbekannte Adressen werden genauso gezählt, damit die
+  Sperre nichts über vorhandene Konten verrät.
+- **Aufräumen:** Der Worker löscht beim Start und dann stündlich abgelaufene Sitzungen, Anmeldelinks und
+  Rate-Limit-Zähler. Die Löschungen sind idempotent, mehrere Worker stören sich nicht.
+
 ## Status eines Auftrags
 
 ```
@@ -135,7 +147,8 @@ beobachteten Aufträge.
 
 Die Mails werden in derselben Transaktion wie die Änderung in die Tabelle `email_outbox` geschrieben und von einem
 eigenen Worker-Prozess verschickt (`pnpm mail:worker`, im Container `worker`). Scheitert der Versand, versucht der
-Worker es mit wachsendem Abstand bis zu acht Mal erneut. Ohne `SMTP_URL` werden Mails nur ins Log geschrieben.
+Worker es mit wachsendem Abstand bis zu acht Mal erneut. Ohne `SMTP_URL` werden Mails nur ins Log geschrieben. Derselbe
+Worker räumt stündlich abgelaufene Daten auf (siehe Sicherheit).
 
 ## Anmeldung über OpenID Connect
 
@@ -195,9 +208,29 @@ Der Container spielt beim Start die Migrationen ein und legt den Superadmin an, 
 (`RUN_MIGRATIONS=false` schaltet das ab). Healthcheck: `GET /api/health`. Der Dienst `worker` nutzt dasselbe Image
 und verschickt die E-Mails. Druckdateien liegen im Volume `uploads`.
 
+## CI
+
+`.github/workflows/ci.yml` läuft bei jedem Pull Request und jedem Push auf `main`:
+
+- **Typecheck, Tests, Migrationen**: `pnpm typecheck`, `pnpm test` (mit Datenbank), `pnpm build`. Danach prüft
+  `drizzle-kit`, dass `src/server/db/schema.ts` keine Änderungen ohne Migration enthält, und die neuen Migrationen
+  werden auf eine Datenbank mit dem Schema des vorherigen Stands (Basis des PRs) eingespielt.
+- **Ansible prüfen**: `ansible-lint` und `ansible-playbook --syntax-check`.
+- **Docker-Smoke-Test**: baut das Image, startet es mit `docker compose`, wartet auf `/api/health` und meldet sich in
+  einem echten Browser (Playwright) mit dem Superadmin an. Lokal: `docker compose build && scripts/smoke/smoke-test.sh`
+  (nutzt Port 3200, änderbar mit `SMOKE_PORT`).
+- **Docker-Image veröffentlichen** (nur bei Push auf `main` oder Tag `v*`, und nur wenn alle Prüfungen grün sind):
+  scannt das Image mit Trivy (bricht bei behebbaren kritischen Lücken ab) und veröffentlicht es mit SBOM und
+  Provenance-Nachweis. Tags: `latest` (main), `sha-<commit>`, bei Releases `v1.2.0` und `1.2.0`.
+
+Dependabot (`.github/dependabot.yml`) schlägt montags gruppierte Updates für npm-Pakete, GitHub Actions und
+Docker-Images vor. Patch-Updates können automatisch gemergt werden, wenn die CI grün ist: dazu die Repository-Variable
+`DEPENDABOT_AUTOMERGE=true` setzen, „Allow auto-merge“ aktivieren und `main` mit Pflicht-Checks schützen.
+
 ## Ausrollen mit Ansible
 
-Die CI baut bei jedem Push auf `main` ein Image nach `ghcr.io/linus1423/drucktool`. Das Playbook installiert
+Die CI veröffentlicht bei jedem Push auf `main` und bei jedem Tag `v*` ein Image nach `ghcr.io/linus1423/drucktool`
+(siehe [CI](#ci)). Das Playbook installiert
 Docker auf einem Debian/Ubuntu-Server, schreibt Compose-Datei und Umgebung nach `/opt/drucktool`, startet die
 Anwendung, richtet optional HTTPS über Caddy ein und legt ein tägliches Backup an: einen Dump der Datenbank und
 einen Spiegel der Druckdateien aus `/opt/drucktool/uploads` nach `/var/backups/drucktool/uploads`.
