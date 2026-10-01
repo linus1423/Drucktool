@@ -1,0 +1,60 @@
+name: Fehler melden
+description: Etwas funktioniert nicht oder anders als erwartet.
+title: 'Fehler: '
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke für die Meldung! Bitte in eigenen Worten beschreiben, Fachbegriffe sind nicht nötig.
+        **Keine Passwörter, Kundendaten oder Kundendateien hier eintragen.** Ist das Drucktool ganz ausgefallen,
+        bitte zusätzlich die FSMB-IT direkt anrufen oder anschreiben.
+  - type: textarea
+    id: was
+    attributes:
+      label: Was ist passiert?
+      description: Was haben Sie gesehen? Gab es eine Fehlermeldung? Wenn dort eine Fehlernummer steht, bitte mit angeben.
+      placeholder: 'Beim Speichern des Auftrags kam „Es ist ein unerwarteter Fehler aufgetreten (Fehlernummer 3f9a1c2b7e04)“.'
+    validations:
+      required: true
+  - type: textarea
+    id: erwartet
+    attributes:
+      label: Was hätten Sie erwartet?
+      placeholder: Der Auftrag sollte gespeichert und in der Liste angezeigt werden.
+    validations:
+      required: true
+  - type: textarea
+    id: schritte
+    attributes:
+      label: Wie kann man das nachstellen?
+      description: Welche Seite, welche Knöpfe, in welcher Reihenfolge? Wenn bekannt, die Auftragsnummer.
+      placeholder: |
+        1. Auftrag 26100012 öffnen
+        2. „Änderung vorschlagen“ klicken
+        3. Preis ändern und speichern
+  - type: dropdown
+    id: rolle
+    attributes:
+      label: Angemeldet als
+      options:
+        - Kunde
+        - Mitarbeiter
+        - Admin
+        - Weiß ich nicht
+  - type: input
+    id: geraet
+    attributes:
+      label: Gerät und Browser
+      placeholder: z. B. Windows-PC mit Firefox, iPhone mit Safari
+  - type: input
+    id: wann
+    attributes:
+      label: Wann ist es passiert?
+      description: Datum und ungefähre Uhrzeit helfen, den Fehler im Log zu finden.
+      placeholder: 01.10.2026 gegen 14:30
+  - type: textarea
+    id: bilder
+    attributes:
+      label: Bildschirmfotos
+      description: Einfach hier hineinziehen oder einfügen. Kundendaten vorher bitte schwärzen.

@@ -445,6 +445,8 @@ holt einen älteren Stand.
 | `OIDC_DISPLAY_NAME`, `OIDC_NEW_USERS`, `OIDC_TRUST_EMAIL`                           | Beschriftung und Verhalten der OIDC-Anmeldung                                        |
 | `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_ROLES`, `OIDC_STAFF_ROLES`, `OIDC_ENFORCE_FOR_STAFF` | Rollen vom Anbieter, siehe oben                                                      |
 
-## Nächste Schritte
+## Mitwirken und Betrieb
 
-- Weitere offene Punkte stehen als Issues im Repository.
+- Fehler melden, Wünsche äußern und Code beitragen: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Wartung und Notfall-Ablauf für die FSMB-IT: [docs/BETRIEB.md](docs/BETRIEB.md)
+- Offene Punkte stehen als Issues im Repository.
