@@ -1,7 +1,19 @@
-# Kopieren nach inventory.yml und anpassen.
-all:
+# Kopieren nach inventory.yml und anpassen. Die Gruppe bestimmt die Umgebung:
+# Einstellungen in group_vars/production.yml bzw. staging.yml, Geheimnisse in vault/production.yml bzw. vault/staging.yml.
+#
+#   ansible-playbook playbook.yml --ask-vault-pass                                  # beide Umgebungen
+#   ansible-playbook playbook.yml --ask-vault-pass -l staging                       # nur das Testsystem
+#   ansible-playbook playbook.yml --ask-vault-pass -l production -e drucktool_image_tag=v1.2.0
+production:
   hosts:
-    drucktool:
-      ansible_host: drucktool.example.com
+    druck:
+      ansible_host: druck.example.com
+      ansible_user: deploy
+      ansible_become: true
+
+staging:
+  hosts:
+    druck-test:
+      ansible_host: test.druck.example.com
       ansible_user: deploy
       ansible_become: true

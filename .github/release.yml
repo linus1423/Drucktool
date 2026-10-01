@@ -1,0 +1,13 @@
+# Gliederung der automatisch erzeugten Release Notes (Workflow release.yml).
+changelog:
+  exclude:
+    authors: [dependabot]
+  categories:
+    - title: Neue Funktionen
+      labels: [enhancement]
+    - title: Fehlerbehebungen
+      labels: [bug]
+    - title: Betrieb
+      labels: ['bereich: betrieb']
+    - title: Sonstiges
+      labels: ['*']

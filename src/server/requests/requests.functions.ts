@@ -28,6 +28,8 @@ import {
   updateRequest,
   updateRequestSchema,
   setWatchingRequest,
+  boardFilterSchema,
+  listBoard,
   setPrintSheet,
   printSheetSchema,
   markRequestRead,
@@ -96,6 +98,9 @@ export const setWatchingFn = createServerFn({ method: 'POST' })
   .validator(watchSchema)
   .handler(async ({ data }) => setWatchingRequest(await requireUser(), data))
 
+export const listBoardFn = createServerFn({ method: 'GET' })
+  .validator(boardFilterSchema)
+  .handler(async ({ data }) => listBoard(await requireStaff(), data))
 export const markReadFn = createServerFn({ method: 'POST' })
   .validator(markReadSchema)
   .handler(async ({ data }) => markRequestRead(await requireUser(), data))

@@ -16,11 +16,30 @@ export type MailTransport = {
   dryRun: boolean
 }
 
+type Mail = Parameters<MailTransport['send']>[0]
+
+/**
+ * Auf dem Testsystem (MAIL_REDIRECT_TO gesetzt) gehen alle Mails an diese Adresse statt an die echten Empfänger.
+ * Der eigentliche Empfänger steht im Betreff.
+ */
+export function redirectMail(mail: Mail, redirectTo: string | undefined): Mail {
+  const target = redirectTo?.trim()
+  if (!target) return mail
+  return { ...mail, to: target, subject: `[Test, an ${mail.to}] ${mail.subject}` }
+}
+
+/** Transport mit Mail-Umleitung aus MAIL_REDIRECT_TO (siehe redirectMail). */
+export function createMailTransport(): MailTransport {
+  const transport = createSmtpTransport()
+  const redirectTo = process.env.MAIL_REDIRECT_TO
+  return { ...transport, send: (mail) => transport.send(redirectMail(mail, redirectTo)) }
+}
+
 /**
  * SMTP_URL z. B. smtps://user:pass@mail.example.com:465 oder smtp://user:pass@host:587.
  * Ohne SMTP_URL werden E-Mails nur ins Log geschrieben (Entwicklung).
  */
-export function createMailTransport(): MailTransport {
+function createSmtpTransport(): MailTransport {
   const url = process.env.SMTP_URL
   const from = process.env.MAIL_FROM ?? 'Drucktool <noreply@localhost>'
   if (!url) {

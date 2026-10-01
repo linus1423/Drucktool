@@ -30,8 +30,8 @@ describe.skipIf(!url)('Ungelesen-Markierung', async () => {
         { email: `${tag}-s@test`, lastName: 'Staff', role: 'staff', status: 'active' },
       ])
       .returning()
-    customer = { id: rows[0]!.id, role: 'customer', organisationId: null }
-    staff = { id: rows[1]!.id, role: 'staff', organisationId: null }
+    customer = { id: rows[0]!.id, role: 'customer' }
+    staff = { id: rows[1]!.id, role: 'staff' }
   })
 
   afterAll(async () => {

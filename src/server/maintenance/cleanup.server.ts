@@ -5,7 +5,7 @@ import { and, eq, inArray, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-o
 import { schema, type getDb, type Tx } from '../db/client.server'
 
 type Db = ReturnType<typeof getDb>
-const { sessions, loginTokens, rateLimits, auditLog, users, organisations } = schema
+const { sessions, loginTokens, rateLimits, auditLog, users, organisations, organisationMembers } = schema
 
 /** Frist in Tagen aus einer Umgebungsvariable; 0 oder ungültig = nie löschen. */
 function retentionDays(name: string, fallback: number) {
@@ -69,8 +69,9 @@ export async function purgeSessionIps(db: Db, days = sessionIpRetentionDays()) {
 export async function purgeRejectedRegistrations(db: Db, days = rejectedRetentionDays()) {
   if (days <= 0) return 0
   return db.transaction(async (tx) => {
-    const deleted = await tx
-      .delete(users)
+    const candidates = await tx
+      .select({ id: users.id })
+      .from(users)
       .where(
         and(
           eq(users.status, 'rejected'),
@@ -80,9 +81,15 @@ export async function purgeRejectedRegistrations(db: Db, days = rejectedRetentio
           sql`not exists (select 1 from request_files f where f.owner_id = ${users.id})`,
         ),
       )
-      .returning({ id: users.id, email: users.email, organisationId: users.organisationId })
-    if (deleted.length === 0) return 0
-    const orgIds = deleted.map((u) => u.organisationId).filter((id): id is string => !!id)
+    if (candidates.length === 0) return 0
+    const ids = candidates.map((u) => u.id)
+    // Die Mitgliedschaften verschwinden mit dem Benutzer, deshalb die Organisationen vorher merken.
+    const memberships = await tx
+      .select({ organisationId: organisationMembers.organisationId })
+      .from(organisationMembers)
+      .where(inArray(organisationMembers.userId, ids))
+    const deleted = await tx.delete(users).where(inArray(users.id, ids)).returning({ id: users.id, email: users.email })
+    const orgIds = [...new Set(memberships.map((m) => m.organisationId))]
     if (orgIds.length) {
       await tx
         .delete(organisations)
@@ -90,7 +97,7 @@ export async function purgeRejectedRegistrations(db: Db, days = rejectedRetentio
           and(
             inArray(organisations.id, orgIds),
             sql`${organisations.status} <> 'active'`,
-            sql`not exists (select 1 from users u where u.organisation_id = ${organisations.id})`,
+            sql`not exists (select 1 from organisation_members m where m.organisation_id = ${organisations.id})`,
             sql`not exists (select 1 from requests r where r.organisation_id = ${organisations.id})`,
           ),
         )

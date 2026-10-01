@@ -93,7 +93,7 @@ describe.skipIf(!url)('OpenID Connect: Benutzerzuordnung (Integration)', async (
       .select()
       .from(schema.users)
       .where(eq(schema.users.email, email('neu2')))
-    expect(p).toMatchObject({ role: 'customer', status: 'pending', name: 'Neu Zwei', organisationId: null, passwordHash: null })
+    expect(p).toMatchObject({ role: 'customer', status: 'pending', name: 'Neu Zwei', passwordHash: null })
     // Ohne given_name/family_name wird name am letzten Leerzeichen geteilt.
     expect(p).toMatchObject({ firstName: 'Neu', lastName: 'Zwei' })
 

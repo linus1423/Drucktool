@@ -40,9 +40,9 @@ describe.skipIf(!url)('Übersicht (Integration)', async () => {
         { email: `${tag}-s@test`, lastName: 'Dashstaff', role: 'staff', status: 'active' },
       ])
       .returning()
-    customer = { id: rows[0]!.id, role: 'customer', organisationId: null }
-    other = { id: rows[1]!.id, role: 'customer', organisationId: null }
-    staff = { id: rows[2]!.id, role: 'staff', organisationId: null }
+    customer = { id: rows[0]!.id, role: 'customer' }
+    other = { id: rows[1]!.id, role: 'customer' }
+    staff = { id: rows[2]!.id, role: 'staff' }
     for (const name of ['offen', 'frage', 'fertig']) ids[name] = (await placeOrder(customer, { title: `${tag} ${name}` })).id
     ids.fremd = (await placeOrder(other, { title: `${tag} fremd` })).id
     await changeStatus(staff, { id: ids.frage!, version: await version(ids.frage!), to: 'on_hold', note: 'Welches Papier?' })

@@ -55,10 +55,10 @@ describe.skipIf(!url)('Beobachter (Integration)', async () => {
         { email: mail('other'), lastName: `Kim ${tag}`, role: 'customer', status: 'active', billingAddress: BILLING },
       ])
       .returning()
-    customer = { id: rows[0]!.id, role: 'customer', organisationId: null }
-    anna = { id: rows[1]!.id, role: 'staff', organisationId: null }
-    bernd = { id: rows[2]!.id, role: 'staff', organisationId: null }
-    other = { id: rows[3]!.id, role: 'customer', organisationId: null }
+    customer = { id: rows[0]!.id, role: 'customer' }
+    anna = { id: rows[1]!.id, role: 'staff' }
+    bernd = { id: rows[2]!.id, role: 'staff' }
+    other = { id: rows[3]!.id, role: 'customer' }
   })
 
   afterAll(async () => {

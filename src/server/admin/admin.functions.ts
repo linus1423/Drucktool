@@ -18,6 +18,11 @@ import {
   updateUserSchema,
 } from './admin.server'
 import { anonymizeUser } from '../privacy/privacy.server'
+import {
+  listOpenOrganisationRequests,
+  resolveOrganisationRequest,
+  resolveOrganisationRequestSchema,
+} from '../organisations/organisations.server'
 
 export const listPendingRegistrationsFn = createServerFn({ method: 'GET' }).handler(async () => {
   await requireSuperadmin()
@@ -74,3 +79,13 @@ export const anonymizeUserFn = createServerFn({ method: 'POST' })
     await anonymizeUser(await requireAdmin(), data.id)
     return { ok: true as const }
   })
+
+/** Offene Organisationsanfragen von Kunden; Mitarbeiter und Admins bearbeiten sie. */
+export const listOrganisationRequestsFn = createServerFn({ method: 'GET' }).handler(async () => {
+  await requireStaff()
+  return listOpenOrganisationRequests()
+})
+
+export const resolveOrganisationRequestFn = createServerFn({ method: 'POST' })
+  .validator(resolveOrganisationRequestSchema)
+  .handler(async ({ data }) => resolveOrganisationRequest(await requireStaff(), data))

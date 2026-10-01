@@ -38,7 +38,6 @@ describe.skipIf(!url)('Anmeldung per E-Mail-Link (Integration)', async () => {
     expect(await userByEmail(email('neu'))).toMatchObject({
       role: 'customer',
       status: 'active',
-      organisationId: null,
       passwordHash: null,
     })
   })

@@ -24,7 +24,7 @@ describe.skipIf(!url)('Auftragsnummer JJMMxxxx (Integration)', async () => {
         billingAddress: BILLING,
       })
       .returning()
-    customer = { id: row!.id, role: 'customer', organisationId: null }
+    customer = { id: row!.id, role: 'customer' }
   })
 
   afterAll(async () => {

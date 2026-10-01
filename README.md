@@ -28,7 +28,11 @@ bearbeiten sie über einen Status-Workflow bis zur Auslieferung.
   Lieferadresse für die Hauspost. Die Rechnungsadresse wird beim Absenden als Kopie am Auftrag gespeichert.
 - **Mitarbeiter und Admins** melden sich über OpenID Connect (z. B. Microsoft Entra ID) oder mit Passwort an, siehe
   unten.
-- Organisationen sind optional. Kunden sehen nur die Aufträge, die sie selbst angelegt haben.
+- Organisationen sind optional. Ein Kunde kann keiner, einer oder mehreren Organisationen angehören und wählt beim
+  Bestellen eine davon (oder keine). Im Profil kann er eine Organisation anfragen; Mitarbeiter und Admins ordnen ihn
+  unter „Organisationsanfragen“ einer bestehenden zu, legen eine neue an oder lehnen ab. Der Kunde bekommt jeweils eine
+  E-Mail. Eine deaktivierte Organisation sperrt kein Konto, sie steht beim Bestellen nur nicht mehr zur Auswahl.
+- Kunden sehen nur die Aufträge, die sie selbst angelegt haben.
 
 Im Profil sieht jeder seine angemeldeten Geräte und kann sie einzeln oder alle anderen abmelden.
 
@@ -76,6 +80,11 @@ Abgelehnt / Storniert
 
 Die Übersicht zeigt Mitarbeitern standardmäßig die Warteschlange aller offenen Aufträge, daneben die fertigen.
 Die erlaubten Übergänge je Rolle stehen in `src/lib/status.ts`.
+
+Unter „Als Board“ (`/auftraege/board`) sehen Mitarbeiter die offenen Aufträge in Spalten nach Status, dazu die in den
+letzten 14 Tagen fertig gewordenen. Karten lassen sich in eine erlaubte Spalte ziehen oder per Tastatur über das Menü
+„Status …“ an der Karte verschieben. Eine Rückfrage fragt dabei nach dem Text an den Kunden. Ablehnen und Stornieren
+gehen weiter über die Detailseite. Hat jemand den Auftrag inzwischen geändert, lädt das Board neu und meldet das.
 
 ## Übersicht
 
@@ -235,7 +244,7 @@ Mitarbeiter und Admins nur noch über den Anbieter anmelden.
 ## Datenschutz
 
 - **Anonymisieren statt Löschen:** In der Benutzerverwaltung lässt sich ein Konto anonymisieren. Name wird zu
-  „Gelöschter Nutzer“, E-Mail-Adresse, Passwort, Rechnungs- und Lieferadresse, Organisation, Sitzungen,
+  „Gelöschter Nutzer“, E-Mail-Adresse, Passwort, Rechnungs- und Lieferadresse, Organisationen und -anfragen, Sitzungen,
   OIDC-Verknüpfungen, offene Anmeldelinks, Mails in der Outbox und nicht abgeschickte Uploads werden entfernt, Namen
   und Adresse auch aus dem Audit-Log. Das Konto ist danach gesperrt, die E-Mail-Adresse wieder frei. Aufträge,
   Nachrichten und Dateien an Aufträgen bleiben wegen der Aufbewahrungspflichten erhalten, ebenso die beim Absenden am
@@ -320,23 +329,96 @@ Docker-Images vor. Patch-Updates können automatisch gemergt werden, wenn die CI
 ## Ausrollen mit Ansible
 
 Die CI veröffentlicht bei jedem Push auf `main` und bei jedem Tag `v*` ein Image nach `ghcr.io/linus1423/drucktool`
-(siehe [CI](#ci)). Das Playbook installiert
-Docker auf einem Debian/Ubuntu-Server, schreibt Compose-Datei und Umgebung nach `/opt/drucktool`, startet die
-Anwendung, richtet optional HTTPS über Caddy ein und legt ein tägliches Backup an: einen Dump der Datenbank und
-einen Spiegel der Druckdateien aus `/opt/drucktool/uploads` nach `/var/backups/drucktool/uploads`.
+(siehe [CI](#ci)). Das Playbook installiert Docker auf einem Debian/Ubuntu-Server, schreibt Compose-Datei und Umgebung
+nach `/opt/drucktool`, startet die Anwendung, richtet optional HTTPS über Caddy ein und legt Backups an.
 
 ```sh
 cd ansible
 ansible-galaxy collection install -r requirements.yml
-cp inventory.example.yml inventory.yml               # Server eintragen
-cp group_vars/vault.example.yml group_vars/vault.yml # Passwörter setzen
-ansible-vault encrypt group_vars/vault.yml
-# group_vars/all.yml: drucktool_domain für HTTPS setzen
-ansible-playbook playbook.yml --ask-vault-pass
+cp inventory.example.yml inventory.yml                       # Server je Umgebung eintragen
+cp group_vars/vault.example.yml vault/production.yml         # Passwörter setzen, je Umgebung eigene
+cp group_vars/vault.example.yml vault/staging.yml
+ansible-vault encrypt vault/production.yml vault/staging.yml
+# group_vars/production.yml und staging.yml: Domain und (Produktion) Version eintragen
+ansible-playbook playbook.yml --ask-vault-pass               # beide Umgebungen
+ansible-playbook playbook.yml --ask-vault-pass -l staging    # nur das Testsystem
 ```
 
 Ist das Paket in der GitHub Container Registry privat, `drucktool_registry_username` und
-`drucktool_registry_password` (Token mit `read:packages`) im Vault setzen.
+`drucktool_registry_password` (Token mit `read:packages`) im Vault setzen. Bestehende Installationen mit
+`group_vars/vault.yml` laufen weiter, der Vault wird als Rückfall gelesen.
+
+### Produktion und Testsystem
+
+Die Gruppe im Inventory bestimmt die Umgebung:
+
+- **Produktion** (`production`, z. B. `druck.fsmb.de`) läuft nur mit einer festen Version. Ohne
+  `drucktool_image_tag` (oder mit `latest`) bricht das Playbook ab.
+- **Testsystem** (`staging`) holt alle 30 Minuten das neueste Image von `main` und aktualisiert sich, vorher wird die
+  Datenbank gesichert. Oben auf jeder Seite steht das Banner „Testsystem“. Alle Mails gehen an
+  `drucktool_mail_redirect_to` statt an die echten Empfänger, der eigentliche Empfänger steht im Betreff. Ist SMTP
+  eingerichtet, ist diese Adresse Pflicht.
+
+Testdaten aus der Produktion: auf dem Produktionsserver `drucktool-backup` ausführen, die Datei aus
+`/var/backups/drucktool` auf das Testsystem kopieren und dort `drucktool-restore <datei> --anonymisieren` aufrufen.
+Das löscht Sitzungen, Anmeldelinks, Outbox und Protokoll, ersetzt Namen, Adressen und Nachrichten und entfernt alle
+Passwörter außer denen der Superadmins.
+
+### Versionen und Rollback
+
+Ein Release entsteht mit einem Git-Tag:
+
+```sh
+git tag v1.2.0 && git push origin v1.2.0
+```
+
+Die CI baut daraufhin das Image `v1.2.0`, der Workflow `release.yml` legt ein GitHub-Release mit Changelog aus den
+gemergten Pull Requests an. Danach `drucktool_image_tag: v1.2.0` in `group_vars/production.yml` eintragen, committen
+und das Playbook für `production` laufen lassen. Welche Version läuft, zeigt `/api/health` (`version`, `commit`,
+`environment`) und für Admins die Fußzeile.
+
+Vor jedem Update, bei dem sich das Image ändert, legt das Playbook ein Backup `drucktool-…-vor-update.sql.gz` an,
+denn die Anwendung spielt beim Start Migrationen ein, die sich nicht zurückdrehen lassen. **Rollback:**
+
+```sh
+ansible-playbook playbook.yml --ask-vault-pass -l production -e drucktool_image_tag=v1.1.0
+# auf dem Server, nur wenn das neue Release Migrationen enthielt:
+drucktool-restore --liste
+drucktool-restore /var/backups/drucktool/drucktool-<zeitpunkt>-vor-update.sql.gz
+```
+
+Danach die Version in `group_vars/production.yml` zurücksetzen. Alles, was seit dem Update eingegeben wurde, ist mit
+dem Restore verloren; ohne neue Migrationen reicht das ältere Image allein.
+
+### Backup und Wiederherstellung
+
+Jede Nacht um 2:15 Uhr sichert `drucktool-backup` die Datenbank nach `/var/backups/drucktool` (14 Tage) und spiegelt
+die Druckdateien nach `/var/backups/drucktool/uploads`. Optional, und für die Produktion dringend empfohlen:
+
+- **Kopie außer Haus:** `drucktool_offsite_backup_enabled: true`, `drucktool_restic_repository` (z. B. S3 oder eine
+  Hetzner Storage Box per SFTP) und im Vault `drucktool_restic_password` sowie ggf. `drucktool_restic_env` mit den
+  Zugangsdaten. Datenbank und Druckdateien landen dann verschlüsselt mit restic beim Ziel (14 tägliche, 8 wöchentliche,
+  12 monatliche Stände). Das restic-Passwort zusätzlich außerhalb des Servers aufbewahren, ohne es sind die Backups
+  wertlos.
+- **Alarm bei Fehlern:** `drucktool_backup_healthcheck_url`, z. B. ein Check bei https://healthchecks.io. Bleibt der
+  tägliche Ping aus oder meldet das Skript einen Fehler, schlägt der Dienst Alarm.
+- **Restore-Test:** Am Ersten jedes Monats spielt `drucktool-restore --test` das neueste Backup (außer Haus, falls
+  eingerichtet) in eine Wegwerf-Datenbank ein und prüft, ob Benutzer und Migrationen da sind. Ergebnis im Log
+  `/var/log/drucktool-backup.log`, optional Ping an `drucktool_restore_test_healthcheck_url`.
+
+**Wiederherstellung auf einem frischen Server** (etwa 15 bis 30 Minuten):
+
+1. Server ins Inventory eintragen und das Playbook laufen lassen. Es startet eine leere Anwendung und richtet die
+   Skripte ein.
+2. Backup einspielen, Datenbank und Druckdateien:
+   - mit Kopie außer Haus: `drucktool-restore --offsite --mit-dateien`
+   - sonst die Datei und den Ordner `uploads` vom alten Server oder aus einer anderen Kopie nach `/var/backups/drucktool`
+     legen und `drucktool-restore --neuestes --mit-dateien` aufrufen
+3. Die Anwendung startet neu und spielt fehlende Migrationen ein. Anmelden und einen Auftrag mit Datei öffnen.
+
+`drucktool-restore` sichert vor dem Einspielen den aktuellen Stand und fragt nach (`--ja` überspringt die Frage).
+`drucktool-restore --liste` zeigt alle lokalen Backups und Stände außer Haus, `drucktool-restore --offsite <snapshot>`
+holt einen älteren Stand.
 
 ## Umgebungsvariablen
 
@@ -350,6 +432,8 @@ Ist das Paket in der GitHub Container Registry privat, `drucktool_registry_usern
 | `CUSTOMER_EMAIL_DOMAINS`                                                            | Optional: neue Kundenkonten nur für diese Domains, z. B. `tum.de`                    |
 | `SMTP_URL`                                                                          | SMTP-Server, z. B. `smtps://user:pass@mail.example.com:465`                          |
 | `MAIL_FROM`                                                                         | Absender, z. B. `Druckerei Muster <auftraege@example.com>`                           |
+| `MAIL_REDIRECT_TO`                                                                  | Testsystem: alle Mails an diese Adresse, Empfänger steht im Betreff                  |
+| `APP_ENVIRONMENT`                                                                   | `production`, `staging` (Banner „Testsystem“) oder `development`                     |
 | `UPLOAD_DIR`                                                                        | Ablage für Druckdateien, Standard `data/uploads` (im Image `/app/uploads`)           |
 | `UPLOAD_MAX_MB`                                                                     | Größte erlaubte Druckdatei in MB, Standard 500                                       |
 | `ATTACHMENT_MAX_MB`, `ATTACHMENT_TYPES`                                             | Anhänge an Nachrichten: Größe in MB (Standard 25), erlaubte Endungen (kommagetrennt) |

@@ -16,6 +16,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as RegistrierenRouteImport } from './routes/registrieren'
 import { Route as AppAdminRouteRouteImport } from './routes/_app/admin/route'
 import { Route as AppKontoRouteImport } from './routes/_app/konto'
+import { Route as AppOrganisationsanfragenRouteImport } from './routes/_app/organisationsanfragen'
 import { Route as AppProfilRouteImport } from './routes/_app/profil'
 import { Route as AppUebersichtRouteImport } from './routes/_app/uebersicht'
 import { Route as AnfragenIndexRouteImport } from './routes/anfragen/index'
@@ -28,6 +29,7 @@ import { Route as AppAdminKatalogRouteImport } from './routes/_app/admin/katalog
 import { Route as AppAdminProtokollRouteImport } from './routes/_app/admin/protokoll'
 import { Route as AppAuftraegeIndexRouteImport } from './routes/_app/auftraege/index'
 import { Route as AppAuftraegeRequestIdRouteImport } from './routes/_app/auftraege/$requestId'
+import { Route as AppAuftraegeBoardRouteImport } from './routes/_app/auftraege/board'
 import { Route as AppAuftraegeNeuRouteImport } from './routes/_app/auftraege/neu'
 import { Route as ApiAuftraegeExportRouteImport } from './routes/api/auftraege/export'
 import { Route as ApiDateienIndexRouteImport } from './routes/api/dateien/index'
@@ -73,6 +75,12 @@ const AppKontoRoute = AppKontoRouteImport.update({
   path: '/konto',
   getParentRoute: () => AppRoute,
 } as any)
+const AppOrganisationsanfragenRoute =
+  AppOrganisationsanfragenRouteImport.update({
+    id: '/organisationsanfragen',
+    path: '/organisationsanfragen',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppProfilRoute = AppProfilRouteImport.update({
   id: '/profil',
   path: '/profil',
@@ -131,6 +139,11 @@ const AppAuftraegeIndexRoute = AppAuftraegeIndexRouteImport.update({
 const AppAuftraegeRequestIdRoute = AppAuftraegeRequestIdRouteImport.update({
   id: '/auftraege/$requestId',
   path: '/auftraege/$requestId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAuftraegeBoardRoute = AppAuftraegeBoardRouteImport.update({
+  id: '/auftraege/board',
+  path: '/auftraege/board',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAuftraegeNeuRoute = AppAuftraegeNeuRouteImport.update({
@@ -195,6 +208,7 @@ export interface FileRoutesByFullPath {
   '/registrieren': typeof RegistrierenRoute
   '/admin': typeof AppAdminRouteRouteWithChildren
   '/konto': typeof AppKontoRoute
+  '/organisationsanfragen': typeof AppOrganisationsanfragenRoute
   '/profil': typeof AppProfilRoute
   '/uebersicht': typeof AppUebersichtRoute
   '/anfragen/$': typeof AnfragenSplatRoute
@@ -206,6 +220,7 @@ export interface FileRoutesByFullPath {
   '/admin/katalog': typeof AppAdminKatalogRoute
   '/admin/protokoll': typeof AppAdminProtokollRoute
   '/auftraege/$requestId': typeof AppAuftraegeRequestIdRoute
+  '/auftraege/board': typeof AppAuftraegeBoardRoute
   '/auftraege/neu': typeof AppAuftraegeNeuRoute
   '/api/auftraege/export': typeof ApiAuftraegeExportRoute
   '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
@@ -225,6 +240,7 @@ export interface FileRoutesByTo {
   '/registrieren': typeof RegistrierenRoute
   '/admin': typeof AppAdminRouteRouteWithChildren
   '/konto': typeof AppKontoRoute
+  '/organisationsanfragen': typeof AppOrganisationsanfragenRoute
   '/profil': typeof AppProfilRoute
   '/uebersicht': typeof AppUebersichtRoute
   '/anfragen/$': typeof AnfragenSplatRoute
@@ -236,6 +252,7 @@ export interface FileRoutesByTo {
   '/admin/katalog': typeof AppAdminKatalogRoute
   '/admin/protokoll': typeof AppAdminProtokollRoute
   '/auftraege/$requestId': typeof AppAuftraegeRequestIdRoute
+  '/auftraege/board': typeof AppAuftraegeBoardRoute
   '/auftraege/neu': typeof AppAuftraegeNeuRoute
   '/api/auftraege/export': typeof ApiAuftraegeExportRoute
   '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
@@ -257,6 +274,7 @@ export interface FileRoutesById {
   '/registrieren': typeof RegistrierenRoute
   '/_app/admin': typeof AppAdminRouteRouteWithChildren
   '/_app/konto': typeof AppKontoRoute
+  '/_app/organisationsanfragen': typeof AppOrganisationsanfragenRoute
   '/_app/profil': typeof AppProfilRoute
   '/_app/uebersicht': typeof AppUebersichtRoute
   '/anfragen/$': typeof AnfragenSplatRoute
@@ -268,6 +286,7 @@ export interface FileRoutesById {
   '/_app/admin/katalog': typeof AppAdminKatalogRoute
   '/_app/admin/protokoll': typeof AppAdminProtokollRoute
   '/_app/auftraege/$requestId': typeof AppAuftraegeRequestIdRoute
+  '/_app/auftraege/board': typeof AppAuftraegeBoardRoute
   '/_app/auftraege/neu': typeof AppAuftraegeNeuRoute
   '/api/auftraege/export': typeof ApiAuftraegeExportRoute
   '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
@@ -289,6 +308,7 @@ export interface FileRouteTypes {
     | '/registrieren'
     | '/admin'
     | '/konto'
+    | '/organisationsanfragen'
     | '/profil'
     | '/uebersicht'
     | '/anfragen/$'
@@ -300,6 +320,7 @@ export interface FileRouteTypes {
     | '/admin/katalog'
     | '/admin/protokoll'
     | '/auftraege/$requestId'
+    | '/auftraege/board'
     | '/auftraege/neu'
     | '/api/auftraege/export'
     | '/api/dateien/$fileId'
@@ -319,6 +340,7 @@ export interface FileRouteTypes {
     | '/registrieren'
     | '/admin'
     | '/konto'
+    | '/organisationsanfragen'
     | '/profil'
     | '/uebersicht'
     | '/anfragen/$'
@@ -330,6 +352,7 @@ export interface FileRouteTypes {
     | '/admin/katalog'
     | '/admin/protokoll'
     | '/auftraege/$requestId'
+    | '/auftraege/board'
     | '/auftraege/neu'
     | '/api/auftraege/export'
     | '/api/dateien/$fileId'
@@ -350,6 +373,7 @@ export interface FileRouteTypes {
     | '/registrieren'
     | '/_app/admin'
     | '/_app/konto'
+    | '/_app/organisationsanfragen'
     | '/_app/profil'
     | '/_app/uebersicht'
     | '/anfragen/$'
@@ -361,6 +385,7 @@ export interface FileRouteTypes {
     | '/_app/admin/katalog'
     | '/_app/admin/protokoll'
     | '/_app/auftraege/$requestId'
+    | '/_app/auftraege/board'
     | '/_app/auftraege/neu'
     | '/api/auftraege/export'
     | '/api/dateien/$fileId'
@@ -440,6 +465,13 @@ declare module '@tanstack/react-router' {
       path: '/konto'
       fullPath: '/konto'
       preLoaderRoute: typeof AppKontoRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/organisationsanfragen': {
+      id: '/_app/organisationsanfragen'
+      path: '/organisationsanfragen'
+      fullPath: '/organisationsanfragen'
+      preLoaderRoute: typeof AppOrganisationsanfragenRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/profil': {
@@ -524,6 +556,13 @@ declare module '@tanstack/react-router' {
       path: '/auftraege/$requestId'
       fullPath: '/auftraege/$requestId'
       preLoaderRoute: typeof AppAuftraegeRequestIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/auftraege/board': {
+      id: '/_app/auftraege/board'
+      path: '/auftraege/board'
+      fullPath: '/auftraege/board'
+      preLoaderRoute: typeof AppAuftraegeBoardRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/auftraege/neu': {
@@ -629,9 +668,11 @@ const AppAdminRouteRouteWithChildren = AppAdminRouteRoute._addFileChildren(
 interface AppRouteChildren {
   AppAdminRouteRoute: typeof AppAdminRouteRouteWithChildren
   AppKontoRoute: typeof AppKontoRoute
+  AppOrganisationsanfragenRoute: typeof AppOrganisationsanfragenRoute
   AppProfilRoute: typeof AppProfilRoute
   AppUebersichtRoute: typeof AppUebersichtRoute
   AppAuftraegeRequestIdRoute: typeof AppAuftraegeRequestIdRoute
+  AppAuftraegeBoardRoute: typeof AppAuftraegeBoardRoute
   AppAuftraegeNeuRoute: typeof AppAuftraegeNeuRoute
   AppAuftraegeIndexRoute: typeof AppAuftraegeIndexRoute
 }
@@ -639,9 +680,11 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppAdminRouteRoute: AppAdminRouteRouteWithChildren,
   AppKontoRoute: AppKontoRoute,
+  AppOrganisationsanfragenRoute: AppOrganisationsanfragenRoute,
   AppProfilRoute: AppProfilRoute,
   AppUebersichtRoute: AppUebersichtRoute,
   AppAuftraegeRequestIdRoute: AppAuftraegeRequestIdRoute,
+  AppAuftraegeBoardRoute: AppAuftraegeBoardRoute,
   AppAuftraegeNeuRoute: AppAuftraegeNeuRoute,
   AppAuftraegeIndexRoute: AppAuftraegeIndexRoute,
 }

@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { and, eq, gt } from 'drizzle-orm'
 import { getCookie, getRequestHeader, getRequestIP, setCookie, deleteCookie } from '@tanstack/react-start/server'
 import { getDb, schema } from '../db/client.server'
+import { listMemberships } from '../organisations/organisations.server'
 import type { UserRole, UserStatus } from '~/lib/roles'
 
 const COOKIE_NAME = 'drucktool_session'
@@ -14,8 +15,8 @@ export type SessionUser = {
   name: string
   role: UserRole
   status: UserStatus
-  organisationId: string | null
-  organisationName: string | null
+  /** Aktive Organisationen des Kunden, für die er bestellen kann; leer, wenn er keiner angehört. */
+  organisations: { id: string; name: string }[]
 }
 
 function hashToken(token: string) {
@@ -80,12 +81,9 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       name: schema.users.name,
       role: schema.users.role,
       status: schema.users.status,
-      organisationId: schema.users.organisationId,
-      organisationName: schema.organisations.name,
     })
     .from(schema.sessions)
     .innerJoin(schema.users, eq(schema.users.id, schema.sessions.userId))
-    .leftJoin(schema.organisations, eq(schema.organisations.id, schema.users.organisationId))
     .where(and(eq(schema.sessions.id, id), gt(schema.sessions.expiresAt, new Date())))
     .limit(1)
 
@@ -99,7 +97,11 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   }
 
   const { sessionExpiresAt: _, ...user } = row
-  return user
+  const organisations =
+    user.role === 'customer'
+      ? (await listMemberships(db, user.id, { onlyActive: true })).map(({ id, name }) => ({ id, name }))
+      : []
+  return { ...user, organisations }
 }
 
 /** Kennung der Sitzung dieses Requests (Hash des Cookies), oder null. */

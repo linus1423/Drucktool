@@ -47,6 +47,11 @@ function AppLayout() {
           Freigaben
         </Link>
       ) : null}
+      {isStaffRole(user.role) ? (
+        <Link to="/organisationsanfragen" className={navLink} activeProps={navActive}>
+          Organisationsanfragen
+        </Link>
+      ) : null}
       {isAdminRole(user.role) ? (
         <>
           <Link to="/admin/organisationen" className={navLink} activeProps={navActive}>
@@ -75,7 +80,7 @@ function AppLayout() {
       <Link to="/profil" className="leading-tight hover:underline md:text-right">
         <div className="font-medium">{user.name}</div>
         <div className="text-xs text-slate-600">
-          {isStaffRole(user.role) ? ROLE_LABELS[user.role] : (user.organisationName ?? user.email)}
+          {isStaffRole(user.role) ? ROLE_LABELS[user.role] : user.organisations.map((o) => o.name).join(', ') || user.email}
         </div>
       </Link>
       <button type="button" onClick={handleLogout} className={navLink}>
@@ -125,6 +130,19 @@ function AppLayout() {
         <Outlet />
       </main>
       <LegalLinks className="pb-8" />
+      {isAdminRole(user.role) ? <VersionInfo /> : null}
     </div>
+  )
+}
+
+/** Laufende Version für Admins, z. B. für Fehlermeldungen und Rollbacks. */
+function VersionInfo() {
+  const { appInfo } = Route.useRouteContext()
+  return (
+    <p className="pb-6 text-center text-xs text-slate-500">
+      Version {appInfo.version}
+      {appInfo.commit ? ` (${appInfo.commit})` : null}
+      {appInfo.environment !== 'production' ? ` · ${appInfo.environment === 'staging' ? 'Testsystem' : 'Entwicklung'}` : null}
+    </p>
   )
 }

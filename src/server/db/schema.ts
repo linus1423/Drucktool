@@ -65,9 +65,6 @@ export const users = pgTable(
     passwordHash: text('password_hash'),
     role: userRole('role').notNull().default('customer'),
     status: userStatus('status').notNull().default('pending'),
-    organisationId: uuid('organisation_id').references(() => organisations.id, {
-      onDelete: 'set null',
-    }),
     reviewedById: uuid('reviewed_by_id'),
     reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
@@ -78,7 +75,52 @@ export const users = pgTable(
     anonymizedAt: timestamp('anonymized_at', { withTimezone: true }),
     ...timestamps,
   },
-  (t) => [uniqueIndex('users_email_unique').on(sql`lower(${t.email})`), index('users_organisation_idx').on(t.organisationId)],
+  (t) => [uniqueIndex('users_email_unique').on(sql`lower(${t.email})`)],
+)
+
+/** Kunden können keiner, einer oder mehreren Organisationen angehören (Issue #68). */
+export const organisationMembers = pgTable(
+  'organisation_members',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    organisationId: uuid('organisation_id')
+      .notNull()
+      .references(() => organisations.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.organisationId] }),
+    index('organisation_members_organisation_idx').on(t.organisationId),
+  ],
+)
+
+export const organisationRequestStatus = pgEnum('organisation_request_status', ['open', 'approved', 'rejected'])
+
+/**
+ * Ein Kunde fragt eine Organisation an. Mitarbeiter ordnen ihn dann einer bestehenden
+ * Organisation zu, legen aus der Anfrage eine neue an oder lehnen ab.
+ */
+export const organisationRequests = pgTable(
+  'organisation_requests',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    details: text('details').notNull().default(''),
+    status: organisationRequestStatus('status').notNull().default('open'),
+    // Die Organisation, der der Kunde am Ende zugeordnet wurde.
+    organisationId: uuid('organisation_id').references(() => organisations.id, { onDelete: 'set null' }),
+    reviewedById: uuid('reviewed_by_id').references(() => users.id, { onDelete: 'set null' }),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    // Begründung bei einer Ablehnung, geht an den Kunden.
+    note: text('note'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('organisation_requests_status_idx').on(t.status), index('organisation_requests_user_idx').on(t.userId)],
 )
 
 export const sessions = pgTable(
@@ -364,6 +406,7 @@ export const emailOutbox = pgTable(
 
 export type User = typeof users.$inferSelect
 export type Organisation = typeof organisations.$inferSelect
+export type OrganisationRequest = typeof organisationRequests.$inferSelect
 export type Request = typeof requests.$inferSelect
 
 // ---------------------------------------------------------------------------

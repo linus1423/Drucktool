@@ -6,6 +6,13 @@ import { requiredText } from '~/lib/validation'
 import { requireUser } from '../auth/guards.server'
 import { currentSessionId, destroyCurrentSession } from '../auth/session.server'
 import { getDb, schema } from '../db/client.server'
+import {
+  listMemberships,
+  listMyOrganisationRequests,
+  organisationRequestSchema,
+  requestOrganisation,
+  withdrawOrganisationRequest,
+} from '../organisations/organisations.server'
 
 const { users, sessions } = schema
 
@@ -28,6 +35,10 @@ export const getMyAccountFn = createServerFn({ method: 'GET' }).handler(async ()
     .from(sessions)
     .where(and(eq(sessions.userId, user.id), gt(sessions.expiresAt, new Date())))
     .orderBy(desc(sessions.createdAt))
+  const customer = user.role === 'customer'
+  const [memberships, organisationRequests] = customer
+    ? await Promise.all([listMemberships(db, user.id), listMyOrganisationRequests(user.id)])
+    : [[], []]
   return {
     ...user,
     firstName: row?.firstName ?? '',
@@ -37,6 +48,9 @@ export const getMyAccountFn = createServerFn({ method: 'GET' }).handler(async ()
     deliveryAddress: row?.deliveryAddress ?? null,
     // Nur ein Kürzel der Sitzungskennung verlassen den Server.
     sessions: active.map((s) => ({ ...s, id: s.id.slice(0, 16), current: s.id === current })),
+    // Alle Organisationen samt Status, auch deaktivierte (Issue #68).
+    memberships,
+    organisationRequests,
   }
 })
 
@@ -91,5 +105,17 @@ export const revokeMySessionsFn = createServerFn({ method: 'POST' })
     if (!target) throw new Error('Sitzung nicht gefunden')
     if (target.id === current) await destroyCurrentSession()
     else await db.delete(sessions).where(eq(sessions.id, target.id))
+    return { ok: true as const }
+  })
+
+/** Kunden fragen eine Organisation an; Mitarbeiter ordnen sie dann zu (Issue #68). */
+export const requestOrganisationFn = createServerFn({ method: 'POST' })
+  .validator(organisationRequestSchema)
+  .handler(async ({ data }) => requestOrganisation(await requireUser(), data))
+
+export const withdrawOrganisationRequestFn = createServerFn({ method: 'POST' })
+  .validator(z.object({ id: z.uuid() }))
+  .handler(async ({ data }) => {
+    await withdrawOrganisationRequest(await requireUser(), data.id)
     return { ok: true as const }
   })

@@ -2,16 +2,18 @@ import { queryOptions } from '@tanstack/react-query'
 import { getAdminCatalogFn, getOrderCatalogFn, listCatalogChangesFn } from '~/server/catalog/catalog.functions'
 import { getCurrentUser, getSiteLinksFn } from '~/server/auth/auth.functions'
 import { getMyAccountFn } from '~/server/account/account.functions'
-import { getRequestFn, listAssignableStaffFn, listRequestsFn } from '~/server/requests/requests.functions'
+import { getRequestFn, listAssignableStaffFn, listBoardFn, listRequestsFn } from '~/server/requests/requests.functions'
 import {
   getOrganisationFn,
   listActiveOrganisationsFn,
+  listOrganisationRequestsFn,
   listOrganisationsFn,
   listPendingRegistrationsFn,
   listUsersFn,
 } from '~/server/admin/admin.functions'
 import { getDashboardFn } from '~/server/requests/dashboard.functions'
 import { listAuditLogFn } from '~/server/audit/audit.functions'
+import { getAppInfoFn } from '~/server/app-info.functions'
 import { listMailTemplatesFn } from '~/server/mail/mail-templates.functions'
 import type { AuditFilter } from '~/server/audit/audit.server'
 import type { RequestStatus } from './status'
@@ -35,10 +37,22 @@ export const siteLinksQuery = queryOptions({
   staleTime: Infinity,
 })
 
+export const appInfoQuery = queryOptions({
+  queryKey: ['app-info'],
+  queryFn: () => getAppInfoFn(),
+  staleTime: Infinity,
+})
+
 export const requestListQuery = (filter: RequestListFilter) =>
   queryOptions({
     queryKey: ['requests', 'list', filter],
     queryFn: () => listRequestsFn({ data: filter }),
+  })
+
+export const requestBoardQuery = (filter: { mine?: boolean; search?: string }) =>
+  queryOptions({
+    queryKey: ['requests', 'list', 'board', filter],
+    queryFn: () => listBoardFn({ data: filter }),
   })
 
 // Unter 'requests', damit Statuswechsel die Kennzahlen mit auffrischen.
@@ -72,6 +86,11 @@ export const organisationsQuery = queryOptions({
 export const activeOrganisationsQuery = queryOptions({
   queryKey: ['organisations', 'active'],
   queryFn: () => listActiveOrganisationsFn(),
+})
+
+export const organisationRequestsQuery = queryOptions({
+  queryKey: ['organisations', 'requests'],
+  queryFn: () => listOrganisationRequestsFn(),
 })
 
 export const organisationQuery = (id: string) =>

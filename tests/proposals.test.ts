@@ -33,10 +33,10 @@ describe.skipIf(!url)('Änderungsvorschläge der Druckerei (Issue #50)', () => {
         { email: `p-staff2-${stamp}@test`, firstName: 'Staff', lastName: 'Zwei', role: 'staff', status: 'active' },
       ])
       .returning()
-    customer = { id: rows[0]!.id, role: 'customer', organisationId: null }
-    other = { id: rows[1]!.id, role: 'customer', organisationId: null }
-    staff = { id: rows[2]!.id, role: 'staff', organisationId: null }
-    staff2 = { id: rows[3]!.id, role: 'staff', organisationId: null }
+    customer = { id: rows[0]!.id, role: 'customer' }
+    other = { id: rows[1]!.id, role: 'customer' }
+    staff = { id: rows[2]!.id, role: 'staff' }
+    staff2 = { id: rows[3]!.id, role: 'staff' }
   })
 
   afterAll(async () => {

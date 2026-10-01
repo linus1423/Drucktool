@@ -143,8 +143,13 @@ function NewOrderPage() {
   const staff = isStaffRole(user.role)
   const { data: catalog } = useSuspenseQuery(orderCatalogQuery)
   const { data: account } = useSuspenseQuery(accountQuery)
-  const organisations = useQuery({ ...activeOrganisationsQuery, enabled: staff })
-  const [organisationId, setOrganisationId] = useState('')
+  const activeOrganisations = useQuery({ ...activeOrganisationsQuery, enabled: staff })
+  // Mitarbeiter wählen jede aktive Organisation, Kunden eine ihrer eigenen (Issue #68). Mit genau
+  // einer Organisation ist sie vorausgewählt; "Keine" bleibt immer möglich.
+  const organisations = staff ? (activeOrganisations.data ?? []) : user.organisations
+  const [organisationId, setOrganisationId] = useState(() =>
+    !staff && user.organisations.length === 1 ? user.organisations[0]!.id : '',
+  )
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [step, setStep] = useState(0)
@@ -253,7 +258,7 @@ function NewOrderPage() {
           deliveryAddress: draft.delivery === 'house_post' ? draft.deliveryAddress : null,
           acceptTerms: true,
           expectedTotalCents: priced.price.totalCents,
-          organisationId: staff ? organisationId || undefined : undefined,
+          organisationId: organisationId || undefined,
           reorderOfId: template.data?.source.id,
         },
       })
@@ -344,12 +349,12 @@ function NewOrderPage() {
                   draft={draft}
                   update={update}
                   catalog={catalog}
-                  staffOrganisation={
-                    staff ? (
+                  organisationField={
+                    staff || organisations.length > 0 ? (
                       <Field label="Organisation (optional)" htmlFor="organisationId">
                         <Select id="organisationId" value={organisationId} onChange={(e) => setOrganisationId(e.target.value)}>
                           <option value="">Keine</option>
-                          {organisations.data?.map((o) => (
+                          {organisations.map((o) => (
                             <option key={o.id} value={o.id}>
                               {o.name}
                             </option>
@@ -878,10 +883,10 @@ function DeliveryStep({ draft, update }: StepProps) {
   )
 }
 
-function SubmitStep({ draft, update, catalog, staffOrganisation }: StepProps & { staffOrganisation: ReactNode }) {
+function SubmitStep({ draft, update, catalog, organisationField }: StepProps & { organisationField: ReactNode }) {
   return (
     <>
-      {staffOrganisation}
+      {organisationField}
       <Alert tone="info">
         Mit dem Absenden geben Sie ein verbindliches Angebot zum angezeigten Preis ab. Der Auftrag kommt erst zustande, wenn ein
         Mitarbeiter der Druckerei ihn bestätigt.

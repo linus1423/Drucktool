@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { CONFLICT_MESSAGE } from '~/lib/errors'
 import { BILLING } from './fixtures'
 import { placeOrder } from './order-fixture'
@@ -20,6 +20,8 @@ describe.skipIf(!url)('Anfragen (Integration)', () => {
   let otherCustomer: Principal
   let colleague: Principal
   let noAddress: Principal
+  let orgAId: string
+  let orgBId: string
 
   beforeAll(async () => {
     const db = getDb()
@@ -41,7 +43,6 @@ describe.skipIf(!url)('Anfragen (Integration)', () => {
           lastName: 'A',
           role: 'customer',
           status: 'active',
-          organisationId: orgA!.id,
           billingAddress: BILLING,
         },
         {
@@ -50,7 +51,6 @@ describe.skipIf(!url)('Anfragen (Integration)', () => {
           lastName: 'B',
           role: 'customer',
           status: 'active',
-          organisationId: orgB!.id,
           billingAddress: BILLING,
         },
         {
@@ -59,17 +59,23 @@ describe.skipIf(!url)('Anfragen (Integration)', () => {
           lastName: 'A',
           role: 'customer',
           status: 'active',
-          organisationId: orgA!.id,
           billingAddress: BILLING,
         },
         { email: `n${stamp}@test`, firstName: 'Ohne', lastName: 'Adresse', role: 'customer', status: 'active' },
       ])
       .returning()
-    staff = { id: s!.id, role: 'staff', organisationId: null }
-    customer = { id: c!.id, role: 'customer', organisationId: orgA!.id }
-    otherCustomer = { id: o!.id, role: 'customer', organisationId: orgB!.id }
-    colleague = { id: k!.id, role: 'customer', organisationId: orgA!.id }
-    noAddress = { id: n!.id, role: 'customer', organisationId: null }
+    staff = { id: s!.id, role: 'staff' }
+    orgAId = orgA!.id
+    orgBId = orgB!.id
+    await db.insert(schema.organisationMembers).values([
+      { userId: c!.id, organisationId: orgAId },
+      { userId: o!.id, organisationId: orgBId },
+      { userId: k!.id, organisationId: orgAId },
+    ])
+    customer = { id: c!.id, role: 'customer' }
+    otherCustomer = { id: o!.id, role: 'customer' }
+    colleague = { id: k!.id, role: 'customer' }
+    noAddress = { id: n!.id, role: 'customer' }
   })
 
   afterAll(async () => {
@@ -80,10 +86,10 @@ describe.skipIf(!url)('Anfragen (Integration)', () => {
   const edit = { title: 'Visitenkarten', notes: '' }
 
   it('legt eine Anfrage an und merkt sich die Rechnungsadresse', async () => {
-    const created = await placeOrder(customer)
+    const created = await placeOrder(customer, { organisationId: orgAId })
     const detail = await getRequestDetail(customer, created.id)
     expect(detail.status).toBe('submitted')
-    expect(detail.organisationId).toBe(customer.organisationId)
+    expect(detail.organisationId).toBe(orgAId)
     expect(detail.billingAddress).toEqual(BILLING)
     expect(detail.version).toBe(1)
     expect(detail.events.map((e) => e.type)).toEqual(['created'])
@@ -96,6 +102,24 @@ describe.skipIf(!url)('Anfragen (Integration)', () => {
     const detail = await getRequestDetail(noAddress, created.id)
     expect(detail.organisationId).toBeNull()
     expect((await listRequests(noAddress, {})).rows.map((r) => r.id)).toEqual([created.id])
+  })
+
+  it('lässt Kunden nur eine ihrer aktiven Organisationen wählen', async () => {
+    // Ohne Auswahl geht der Auftrag ohne Organisation raus, auch wenn der Kunde Mitglied ist.
+    const plain = await placeOrder(customer)
+    expect((await getRequestDetail(customer, plain.id)).organisationId).toBeNull()
+    await expect(placeOrder(customer, { organisationId: orgBId })).rejects.toThrow('nicht (mehr) an')
+    // Mitarbeiter dürfen jede aktive Organisation wählen.
+    const byStaff = await placeOrder(staff, { organisationId: orgBId })
+    expect((await getRequestDetail(staff, byStaff.id)).organisationId).toBe(orgBId)
+
+    // Mehrere Organisationen: der Kunde wählt.
+    await getDb().insert(schema.organisationMembers).values({ userId: customer.id, organisationId: orgBId })
+    const second = await placeOrder(customer, { organisationId: orgBId })
+    expect((await getRequestDetail(customer, second.id)).organisationName).toBe('Kunde B')
+    await getDb()
+      .delete(schema.organisationMembers)
+      .where(and(eq(schema.organisationMembers.userId, customer.id), eq(schema.organisationMembers.organisationId, orgBId)))
   })
 
   it('zeigt Kunden nur ihre eigenen Anfragen', async () => {
