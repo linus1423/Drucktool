@@ -1,6 +1,7 @@
 // Preisberechnung (Lastenheft Schritt 7, Issue #45). Alle Beträge in Cent.
 // Dieselbe Funktion rechnet die Vorschau im Browser und den verbindlichen Preis auf dem Server.
 import {
+  bookletBlankPages,
   coverPagesFromMainFile,
   coverSheetsPerCopy,
   impose,
@@ -86,7 +87,8 @@ export function calculatePrice(
     // Kommt das Deckblatt aus der Druckdatei, werden diese Seiten nur auf dem Deckblatt
     // gedruckt und berechnet, nicht zusätzlich im Innenteil (Issue #85).
     const fromMain = order.coverPaper ? coverPagesFromMainFile(spec) : null
-    const innerPages = spec.pages - (fromMain?.taken ?? 0)
+    // Beim Booklet zählen die Leerseiten mit, die die Druckerei am Ende ergänzt (Issue #103).
+    const innerPages = spec.pages - (fromMain?.taken ?? 0) + bookletBlankPages(spec)
     const piecesPerCopy = spec.duplex ? Math.ceil(innerPages / 2) : innerPages
     const run = sheetsFor(piecesPerCopy * spec.copies, imp, sides)
     const click = imp.sheet === 'A4' ? pricing.printA4Cents : pricing.printA3Cents

@@ -102,6 +102,25 @@ export function coverPagesFromMainFile(spec: Pick<OrderSpec, 'coverFromMainFile'
   }
 }
 
+/**
+ * Leerseiten, die die Druckerei bei einem Booklet am Ende der Datei ergänzt: doppelseitig auf ein Vielfaches
+ * von 4, einseitig auf ein Vielfaches von 2. Nur ein Hinweis, die Bestellung bleibt möglich (Issue #103).
+ */
+export function bookletBlankPages(
+  spec: Pick<OrderSpec, 'bindingId' | 'duplex' | 'pages' | 'coverPaperId' | 'coverFromMainFile'>,
+) {
+  if (spec.bindingId !== 'saddle_stitch') return 0
+  const inner = spec.pages - (spec.coverPaperId ? (coverPagesFromMainFile(spec)?.taken ?? 0) : 0)
+  const multiple = spec.duplex ? 4 : 2
+  return (multiple - (inner % multiple)) % multiple
+}
+
+export function bookletWarning(spec: Parameters<typeof bookletBlankPages>[0]): string | null {
+  const blank = bookletBlankPages(spec)
+  if (!blank) return null
+  return `Für ein Booklet sollte die Seitenzahl ${spec.duplex ? 'bei doppelseitigem Druck durch 4' : 'bei einseitigem Druck durch 2'} teilbar sein. Wenn das so stimmt, ergänzen wir am Ende der Datei ${blank === 1 ? 'eine Leerseite' : `${blank} Leerseiten`}.`
+}
+
 export const orderSpecSchema = z.object({
   formatId: z.string().min(1, 'Bitte ein Format wählen').max(50),
   customWidthMm: z.number().int().min(CUSTOM_MIN_MM).max(CUSTOM_MAX_MM.long).nullable(),
@@ -444,10 +463,6 @@ export function resolveOrder(
   if (spec.borderless) {
     const choice = borderlessChoice(format, binding, paper, size)
     if (!choice.allowed) errors.push(`Randlos ist nicht möglich: ${choice.reason}`)
-  }
-
-  if (binding.id === 'saddle_stitch' && spec.pages % 4 !== 0) {
-    errors.push('Für ein Booklet muss die Seitenzahl durch 4 teilbar sein. Leere Seiten bitte in der Datei ergänzen.')
   }
 
   if (errors.length) return { ok: false, errors }
