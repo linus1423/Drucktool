@@ -177,9 +177,9 @@ describe.skipIf(!url)('OpenID Connect: Benutzerzuordnung (Integration)', async (
 
   it('erlaubt nur relative Weiterleitungen', () => {
     expect(safeRedirect('/konto')).toBe('/konto')
-    expect(safeRedirect('//evil.example')).toBe('/auftraege')
-    expect(safeRedirect('/\\evil.example')).toBe('/auftraege')
-    expect(safeRedirect('https://evil.example')).toBe('/auftraege')
-    expect(safeRedirect(null)).toBe('/auftraege')
+    expect(safeRedirect('//evil.example')).toBe('/uebersicht')
+    expect(safeRedirect('/\\evil.example')).toBe('/uebersicht')
+    expect(safeRedirect('https://evil.example')).toBe('/uebersicht')
+    expect(safeRedirect(null)).toBe('/uebersicht')
   })
 })

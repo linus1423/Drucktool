@@ -21,6 +21,8 @@ import type { JsonObject } from '../../lib/json'
 import type { BillingAddress, DeliveryAddress, StoredBillingAddress } from '../../lib/address'
 import { DELIVERY_METHODS } from '../../lib/order'
 import type { OrderSnapshot } from '../../lib/snapshot'
+import type { SheetSize } from '../../lib/catalog'
+import type { MailBlock } from '../../lib/mail-templates'
 import type { ChangeProposal } from '../../lib/proposal'
 
 export const userRole = pgEnum('user_role', USER_ROLES)
@@ -147,7 +149,12 @@ export const requests = pgTable(
   'requests',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    number: integer('number').generatedAlwaysAsIdentity({ startWith: 1001 }).notNull().unique(),
+    // Auftragsnummer im Format JJMMxxxx, fortlaufend je Monat (Issue #90). Vergibt die Datenbank über
+    // next_request_number(), damit auch gleichzeitige Aufträge keine Nummer doppelt bekommen.
+    number: integer('number')
+      .notNull()
+      .unique()
+      .default(sql`next_request_number()`),
     // Organisationen sind optional; sichtbar ist ein Auftrag für seinen Ersteller.
     organisationId: uuid('organisation_id').references(() => organisations.id, { onDelete: 'restrict' }),
     createdById: uuid('created_by_id')
@@ -181,6 +188,9 @@ export const requests = pgTable(
     statusChangedAt: timestamp('status_changed_at', { withTimezone: true }).notNull().defaultNow(),
     // Von der Druckerei zugesagter Termin, für Kunden sichtbar.
     promisedDate: date('promised_date'),
+    // Bogen, auf dem gedruckt wird, nur für Mitarbeiter (Issue #88). Kopie der Katalogwerte, null heißt: wie berechnet.
+    printSheet: jsonb('print_sheet').$type<SheetSize>(),
+    coverPrintSheet: jsonb('cover_print_sheet').$type<SheetSize>(),
     // Interne Frist, nur für Mitarbeiter.
     internalDueDate: date('internal_due_date'),
     // Nur für Mitarbeiter sichtbar, solange der Auftrag bestätigt ist.
@@ -269,6 +279,7 @@ export const requestEventType = pgEnum('request_event_type', [
   'change_rejected',
   'change_withdrawn',
   'dates_changed',
+  'print_sheet_changed',
 ])
 
 export const requestEvents = pgTable(
@@ -426,6 +437,8 @@ export const papers = pgTable('papers', {
   forPlotter: boolean('for_plotter').notNull().default(false),
   /** Größtes Endformat, das auf diesem Papier möglich ist. */
   maxFormatId: text('max_format_id').references(() => formats.id, { onDelete: 'set null' }),
+  /** Bogengrößen, in denen das Papier vorrätig ist (Issue #88); daraus wählen Mitarbeiter das Druckformat. */
+  sheetSizes: jsonb('sheet_sizes').$type<SheetSize[]>().notNull().default([]),
   available: boolean('available').notNull().default(true),
   helpText: text('help_text').notNull().default(''),
   sortOrder: integer('sort_order').notNull().default(0),
@@ -454,6 +467,23 @@ export const paperCoverColors = pgTable(
   },
   (t) => [uniqueIndex('paper_cover_colors_unique').on(t.paperId, t.coverColorId)],
 )
+
+/** Zähler für die Auftragsnummern je Monat (JJMM), siehe next_request_number() in Migration 0016. */
+export const requestNumberCounters = pgTable('request_number_counters', {
+  month: integer('month').primaryKey(),
+  last: integer('last').notNull(),
+})
+
+/** Von Admins angepasste E-Mail-Vorlagen (Issue #89); fehlt eine Zeile, gilt der Standard aus src/lib/mail-templates.ts. */
+export const mailTemplates = pgTable('mail_templates', {
+  key: text('key').primaryKey(),
+  subject: text('subject').notNull(),
+  mode: text('mode').$type<'blocks' | 'html'>().notNull().default('blocks'),
+  blocks: jsonb('blocks').$type<MailBlock[]>().notNull().default([]),
+  html: text('html').notNull().default(''),
+  updatedById: uuid('updated_by_id').references(() => users.id, { onDelete: 'set null' }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
 
 /** Übrige Preise und Texte als Schlüssel/Wert, z. B. Druckpreise pro Image und Mindestpreis. */
 export const settings = pgTable('settings', {

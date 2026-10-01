@@ -77,6 +77,15 @@ Abgelehnt / Storniert
 Die Übersicht zeigt Mitarbeitern standardmäßig die Warteschlange aller offenen Aufträge, daneben die fertigen.
 Die erlaubten Übergänge je Rolle stehen in `src/lib/status.ts`.
 
+## Übersicht
+
+Nach dem Anmelden landet man auf der Übersicht (`/uebersicht`). Mitarbeiter sehen dort die offenen Aufträge je Status
+samt internem Unterstatus, was ihnen zugewiesen ist, was niemandem zugewiesen ist, was seit gestern eingegangen ist und
+welche Änderungsvorschläge beim Kunden liegen. Dazu kommen die Durchlaufzeit von „Eingereicht“ bis „Fertig“ (Median
+und Durchschnitt der letzten 90 Tage), eingegangene und fertige Aufträge mit Umsatz je Monat über zwölf Monate und die
+häufigsten Formate, Bindungen und Papiere. Kunden sehen ihre offenen Aufträge und was auf ihre Antwort wartet.
+Alle Zahlen werden beim Aufruf aus den Aufträgen und ihrer Historie berechnet (`src/server/requests/dashboard.server.ts`).
+
 ## Katalog und Preise
 
 Admins pflegen unter „Katalog und Preise“ alles, was Kunden im Bestellformular wählen können:
@@ -91,6 +100,11 @@ Admins pflegen unter „Katalog und Preise“ alles, was Kunden im Bestellformul
   diese Farben und verwirft eine nicht mehr passende Farbe; der Server prüft dasselbe beim Absenden. Ohne separates
   Deckblatt gelten alle Farben, die die Bindung erlaubt. Die Migration `0014_cover_colors_per_paper.sql` gibt jedem
   bestehenden Deckblattpapier zunächst alle Farben, damit sich für Kunden nichts ändert.
+- **Vorrätige Bogengrößen** je Papier (z. B. A3, SRA3 oder eigene Maße). Am Auftrag wählen Mitarbeiter unter
+  „Druckbogen“, auf welcher davon gedruckt wird, getrennt für Innenteil und Deckblatt. Das ist rein intern: Preis
+  und Status bleiben, der Kunde sieht nichts und bekommt keine Mail. Ohne Auswahl gilt der Bogen aus der
+  Preisberechnung. Die Migration `0017_print_sheets.sql` übernimmt für bestehende Papiere die Bögen, für die ein
+  Preis hinterlegt ist, und für Plotterpapier das größte Format.
 - **Preise und Texte** (Druck pro Image, Mindestpreis, Hauspost, allgemeine Hilfetexte).
 
 Jede Änderung landet mit altem und neuem Stand in `catalog_changes` und ist unter „Änderungen“ sichtbar.
@@ -99,6 +113,11 @@ dort nur Platzhalter und müssen vor dem Start gesetzt werden. Ebenso ist der Te
 („Preise und Texte“) nur ein Platzhalter.
 
 ## Neuer Auftrag
+
+Jeder Auftrag bekommt beim Absenden eine achtstellige Nummer im Format `JJMMxxxx`, z. B. `#26100001` für den ersten
+Auftrag im Oktober 2026. Der Zähler beginnt jeden Monat (deutsche Zeit) wieder bei 0001; die Datenbank vergibt die
+Nummer über `next_request_number()`, sodass auch gleichzeitige Aufträge keine Nummer doppelt bekommen. Aufträge von
+vor der Umstellung behalten ihre alte Nummer.
 
 Kunden und Mitarbeiter legen Aufträge in sieben Schritten an: Datei, Format, Bindung, Papier (mit optionalem
 Deckblatt und Coverfarbe), Optionen, Lieferung und Absenden. Jeder Schritt zeigt nur, was zum bisher Gewählten
@@ -174,6 +193,19 @@ Die Mails werden in derselben Transaktion wie die Änderung in die Tabelle `emai
 eigenen Worker-Prozess verschickt (`pnpm mail:worker`, im Container `worker`). Scheitert der Versand, versucht der
 Worker es mit wachsendem Abstand bis zu acht Mal erneut. Ohne `SMTP_URL` werden Mails nur ins Log geschrieben. Derselbe
 Worker räumt stündlich abgelaufene Daten auf (siehe Sicherheit).
+
+### Vorlagen anpassen
+
+Unter **E-Mails** (nur Admins) lassen sich Betreff und Text jeder Benachrichtigung ändern. Eine Vorlage besteht aus
+Bausteinen (Absatz, Hervorhebung, Button) mit Platzhaltern wie `{{auftrag}}` oder `{{link}}`; welche es gibt, steht
+neben dem Editor. Bausteine, deren Platzhalter leer sind, entfallen beim Versand (z. B. die Notiz beim Statuswechsel).
+Wer mehr Freiheit braucht, schaltet auf eigenes HTML um. Platzhalterwerte werden immer maskiert, Buttons akzeptieren
+nur `http(s)`- und `mailto`-Links. Die Vorschau zeigt die Mail mit Beispielwerten, „Testmail an mich“ legt sie in den
+Postausgang. Unbekannte Platzhalter werden nicht gespeichert. Ohne Anpassung gelten die Standardtexte aus
+`src/lib/mail-templates.ts`; „Auf Standard zurücksetzen“ löscht die Anpassung wieder.
+
+Absendername, Antwortadresse, Kopfzeile, Signatur und Fußzeile gelten für alle Mails. Die Absenderadresse selbst kommt
+weiter aus `MAIL_FROM`. Alle Änderungen landen im Protokoll.
 
 ## Anmeldung über OpenID Connect
 
