@@ -1,15 +1,17 @@
 // Legt fest, wer bei welchem Ereignis eine E-Mail bekommt.
 // Grundregeln: Der Auslöser selbst bekommt nie eine Mail, und nur aktive Benutzer mit
 // eingeschalteten Benachrichtigungen werden angeschrieben.
-import { and, eq, inArray, ne } from 'drizzle-orm'
+import { and, eq, inArray, ne, or } from 'drizzle-orm'
 import type { RequestStatus } from '~/lib/status'
 import { schema, type Tx } from '../db/client.server'
 import { enqueueMail } from './outbox.server'
+import { mutedIds, watcherIds } from '../requests/watchers.server'
 import {
   assignedMail,
   changeAnsweredMail,
   changeProposedMail,
   commentMail,
+  mentionMail,
   promisedDateMail,
   registrationApprovedMail,
   registrationReceivedMail,
@@ -53,14 +55,15 @@ async function loadRequest(tx: Tx, requestId: string) {
   return row
 }
 
-/** Der Kunde, der den Auftrag angelegt hat. */
-async function customerRecipients(tx: Tx, createdById: string, excludeId: string | null) {
+/** Der Kunde, der den Auftrag angelegt hat, sofern er das Beobachten nicht abgeschaltet hat. */
+async function customerRecipients(tx: Tx, request: { id: string; createdById: string }, excludeId: string | null) {
+  if ((await mutedIds(tx, request.id)).has(request.createdById)) return []
   const rows = await tx
     .select({ email: users.email })
     .from(users)
     .where(
       and(
-        eq(users.id, createdById),
+        eq(users.id, request.createdById),
         eq(users.role, 'customer'),
         eq(users.status, 'active'),
         eq(users.emailNotifications, true),
@@ -68,6 +71,42 @@ async function customerRecipients(tx: Tx, createdById: string, excludeId: string
       ),
     )
   return rows.map((r) => r.email)
+}
+
+type WatchedRequest = { id: string; createdById: string; assigneeId: string | null }
+
+/**
+ * Beobachter des Auftrags (Issue #13), getrennt nach Kunden und Mitarbeitern, weil beide unterschiedliche
+ * Mails bekommen. Solange niemand zuständig ist, erfahren bei Aktionen des Kunden alle Mitarbeiter davon.
+ */
+async function watcherRecipients(
+  tx: Tx,
+  actor: Actor,
+  request: WatchedRequest,
+  opts: { staffOnly?: boolean; exclude?: string[] } = {},
+) {
+  const ids = await watcherIds(tx, request)
+  const muted = await mutedIds(tx, request.id)
+  const everyStaff = !isStaff(actor) && !request.assigneeId
+  if (ids.size === 0 && !everyStaff) return { customers: [], staff: [] }
+  const rows = await tx
+    .select({ id: users.id, email: users.email, role: users.role })
+    .from(users)
+    .where(
+      and(
+        or(ids.size ? inArray(users.id, [...ids]) : undefined, everyStaff ? inArray(users.role, STAFF_ROLES) : undefined),
+        opts.staffOnly ? inArray(users.role, STAFF_ROLES) : undefined,
+        eq(users.status, 'active'),
+        eq(users.emailNotifications, true),
+        ne(users.id, actor.id),
+      ),
+    )
+  const skip = new Set([...muted, ...(opts.exclude ?? [])])
+  const wanted = rows.filter((r) => !skip.has(r.id))
+  return {
+    customers: wanted.filter((r) => r.role === 'customer').map((r) => r.email),
+    staff: wanted.filter((r) => r.role !== 'customer').map((r) => r.email),
+  }
 }
 
 /** Der zuständige Mitarbeiter, oder alle Mitarbeiter, solange niemand zugewiesen ist. */
@@ -95,7 +134,7 @@ export async function notifyRequestCreated(tx: Tx, actor: Actor, requestId: stri
   )
   // Eingangsbestätigung an den Kunden (Lastenheft 7: "Auftrag eingereicht").
   if (!isStaff(actor)) {
-    await enqueueMail(tx, await customerRecipients(tx, request.createdById, null), requestReceivedMail(request))
+    await enqueueMail(tx, await customerRecipients(tx, request, null), requestReceivedMail(request))
   }
 }
 
@@ -105,12 +144,11 @@ export async function notifyStatusChanged(
   input: { requestId: string; from: RequestStatus; to: RequestStatus; note?: string | null },
 ) {
   const request = await loadRequest(tx, input.requestId)
-  const content = statusChangedMail({ ...request, ...input, actorName: await actorName(tx, actor.id) })
-  // Mitarbeiter informieren den Kunden, Kunden informieren die Druckerei.
-  const recipients = isStaff(actor)
-    ? await customerRecipients(tx, request.createdById, actor.id)
-    : await staffRecipients(tx, request.assigneeId, actor.id)
-  await enqueueMail(tx, recipients, content)
+  const mail = { ...request, ...input, actorName: await actorName(tx, actor.id) }
+  // Alle Beobachter außer dem Auslöser; ohne Zuständigen bei Kundenaktionen alle Mitarbeiter.
+  const recipients = await watcherRecipients(tx, actor, request)
+  await enqueueMail(tx, recipients.customers, statusChangedMail(mail))
+  await enqueueMail(tx, recipients.staff, statusChangedMail({ ...mail, forStaff: true }))
 }
 
 // Ein Vorschlag braucht die Zustimmung des Kunden; die Mail geht deshalb auch an Mitarbeiter, die Aufträge
@@ -173,24 +211,42 @@ export async function notifyPromisedDate(tx: Tx, actor: Actor, input: { requestI
   const request = await loadRequest(tx, input.requestId)
   await enqueueMail(
     tx,
-    await customerRecipients(tx, request.createdById, actor.id),
+    await customerRecipients(tx, request, actor.id),
     promisedDateMail({ ...request, actorName: await actorName(tx, actor.id), date: input.date }),
   )
 }
 
-export async function notifyComment(tx: Tx, actor: Actor, input: { requestId: string; body: string; internal: boolean }) {
+export async function notifyComment(
+  tx: Tx,
+  actor: Actor,
+  input: { requestId: string; body: string; internal: boolean; attachmentNames?: string[]; mentionedIds?: string[] },
+) {
   const request = await loadRequest(tx, input.requestId)
-  const content = commentMail({ ...request, ...input, actorName: await actorName(tx, actor.id) })
-  let recipients: string[]
-  if (input.internal) {
-    // Interne Notizen gehen nur an den Zuständigen, nie an Kunden.
-    recipients = request.assigneeId ? await staffRecipients(tx, request.assigneeId, actor.id) : []
-  } else if (isStaff(actor)) {
-    recipients = await customerRecipients(tx, request.createdById, actor.id)
-  } else {
-    recipients = await staffRecipients(tx, request.assigneeId, actor.id)
+  const name = await actorName(tx, actor.id)
+  const mentioned = input.mentionedIds ?? []
+  // Erwähnte bekommen eine eigene Mail statt der allgemeinen Benachrichtigung.
+  if (mentioned.length) {
+    const rows = await tx
+      .select({ email: users.email })
+      .from(users)
+      .where(
+        and(
+          inArray(users.id, mentioned),
+          inArray(users.role, STAFF_ROLES),
+          eq(users.status, 'active'),
+          eq(users.emailNotifications, true),
+          ne(users.id, actor.id),
+        ),
+      )
+    await enqueueMail(
+      tx,
+      rows.map((r) => r.email),
+      mentionMail({ ...request, actorName: name, body: input.body, internal: input.internal }),
+    )
   }
-  await enqueueMail(tx, recipients, content)
+  // Interne Notizen gehen nie an Kunden, auch nicht an beobachtende.
+  const recipients = await watcherRecipients(tx, actor, request, { staffOnly: input.internal, exclude: mentioned })
+  await enqueueMail(tx, [...recipients.customers, ...recipients.staff], commentMail({ ...request, ...input, actorName: name }))
 }
 
 export async function notifyAssigned(tx: Tx, actor: Actor, input: { requestId: string; assigneeId: string | null }) {

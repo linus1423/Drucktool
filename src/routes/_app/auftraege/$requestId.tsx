@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { formatBillingAddress, formatDeliveryAddress } from '~/lib/address'
-import { formatBytes } from '~/components/FileUpload'
+import { formatBytes, uploadFile, type UploadedFile } from '~/components/FileUpload'
 import { AttentionBadge } from '~/components/AttentionBadge'
 import { ProposalCard, ProposeChangeForm } from '~/components/ChangeProposal'
 import { RequestFields, useRequestForm } from '~/components/RequestFields'
@@ -30,6 +30,7 @@ import {
   changeStatusFn,
   setDatesFn,
   setInternalStatusFn,
+  setWatchingFn,
   updateRequestFn,
 } from '~/server/requests/requests.functions'
 
@@ -98,7 +99,30 @@ function RequestDetailPage() {
           {request.confirmedAt
             ? ` · bestätigt von ${request.confirmedByName ?? 'der Druckerei'} am ${formatDateTime(request.confirmedAt)}`
             : ''}
+          {request.reorderOf ? (
+            <>
+              {' · Nachbestellung von '}
+              <Link to="/auftraege/$requestId" params={{ requestId: request.reorderOf.id }} className="underline">
+                {formatRequestNumber(request.reorderOf.number)} {request.reorderOf.title}
+              </Link>
+            </>
+          ) : null}
         </p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          {request.order && (staff || request.createdById === user.id) ? (
+            <Link
+              to="/auftraege/neu"
+              search={{ vorlage: request.id }}
+              className="inline-flex items-center rounded-md px-3 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100"
+            >
+              Erneut bestellen
+            </Link>
+          ) : null}
+          <WatchButton request={request} />
+          {staff && request.watchers.length ? (
+            <span className="text-sm text-slate-600">Beobachtet von {request.watchers.map((w) => w.name).join(', ')}</span>
+          ) : null}
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -482,18 +506,103 @@ function Assignment({ request }: { request: Detail }) {
   )
 }
 
+function WatchButton({ request }: { request: Detail }) {
+  const refresh = useRefresh(request.id)
+  const mutation = useMutation({
+    mutationFn: () => setWatchingFn({ data: { id: request.id, watching: !request.watching } }),
+    onSuccess: refresh,
+  })
+  return (
+    <>
+      <Button
+        variant="secondary"
+        aria-pressed={request.watching}
+        disabled={mutation.isPending}
+        onClick={() => mutation.mutate()}
+        title={
+          request.watching
+            ? 'Sie bekommen E-Mails zu Nachrichten und Statusänderungen dieses Auftrags.'
+            : 'Sie bekommen keine E-Mails zu diesem Auftrag.'
+        }
+      >
+        {request.watching ? '🔔 Beobachten beenden' : '🔕 Beobachten'}
+      </Button>
+      {mutation.error ? <span className="text-sm text-rose-600">{errorMessage(mutation.error)}</span> : null}
+    </>
+  )
+}
+
+/** Hebt @Name-Erwähnungen in einer Nachricht hervor. */
+function MentionText({ body, mentions }: { body: string; mentions: { id: string; name: string }[] }) {
+  if (!mentions.length) return <>{body}</>
+  const names = [...mentions].sort((a, b) => b.name.length - a.name.length).map((m) => m.name)
+  const pattern = new RegExp(`(@(?:${names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')}))`, 'giu')
+  return (
+    <>
+      {body.split(pattern).map((part, i) =>
+        i % 2 === 1 ? (
+          <mark key={i} className="rounded bg-sky-100 px-0.5 font-medium text-sky-900">
+            {part}
+          </mark>
+        ) : (
+          part
+        ),
+      )}
+    </>
+  )
+}
+
+function MentionPicker({ onPick }: { onPick: (name: string) => void }) {
+  const { data: staff = [] } = useQuery(assignableStaffQuery)
+  return (
+    <Select
+      aria-label="Mitarbeiter erwähnen"
+      value=""
+      onChange={(e) => {
+        if (e.target.value) onPick(e.target.value)
+      }}
+      className="w-auto"
+    >
+      <option value="">@ Erwähnen …</option>
+      {staff.map((s) => (
+        <option key={s.id} value={s.name}>
+          {s.name}
+        </option>
+      ))}
+    </Select>
+  )
+}
+
 function Comments({ request, staff }: { request: Detail; staff: boolean }) {
   const refresh = useRefresh(request.id)
   const [body, setBody] = useState('')
   const [internal, setInternal] = useState(false)
+  const [attachments, setAttachments] = useState<UploadedFile[]>([])
+  const [uploading, setUploading] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const mutation = useMutation({
-    mutationFn: () => addCommentFn({ data: { id: request.id, body, internal } }),
+    mutationFn: () => addCommentFn({ data: { id: request.id, body, internal, attachmentIds: attachments.map((a) => a.id) } }),
     onSuccess: async () => {
       setBody('')
       setInternal(false)
+      setAttachments([])
       await refresh()
     },
   })
+  const addFiles = async (files: FileList | null) => {
+    setUploadError(null)
+    for (const file of Array.from(files ?? [])) {
+      setUploading(file.name)
+      try {
+        const uploaded = await uploadFile(file, 'attachment', () => {})
+        setAttachments((list) => [...list, uploaded])
+      } catch (e) {
+        setUploadError(`${file.name}: ${(e as Error).message}`)
+      }
+    }
+    setUploading(null)
+  }
+  const canSend = (body.trim().length > 0 || attachments.length > 0) && !uploading
 
   return (
     <Card title="Kommunikation">
@@ -520,7 +629,25 @@ function Comments({ request, staff }: { request: Detail; staff: boolean }) {
                   {c.internal ? <Badge className="bg-amber-200 text-amber-900">Intern</Badge> : null}
                   <span>{formatDateTime(c.createdAt)}</span>
                 </div>
-                <p className="whitespace-pre-wrap">{c.body}</p>
+                {c.body ? (
+                  <p className="whitespace-pre-wrap">
+                    <MentionText body={c.body} mentions={c.mentions} />
+                  </p>
+                ) : null}
+                {c.attachments.length ? (
+                  <ul className="mt-2 flex flex-wrap gap-2">
+                    {c.attachments.map((a) => (
+                      <li key={a.id}>
+                        <a
+                          href={`/api/dateien/${a.id}`}
+                          className="inline-flex items-center gap-1 rounded bg-white px-2 py-1 text-xs ring-1 ring-slate-200 hover:bg-slate-100"
+                        >
+                          📎 {a.filename} <span className="text-slate-500">{formatBytes(a.sizeBytes)}</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -529,7 +656,7 @@ function Comments({ request, staff }: { request: Detail; staff: boolean }) {
           className="space-y-2"
           onSubmit={(e) => {
             e.preventDefault()
-            if (body.trim()) mutation.mutate()
+            if (canSend) mutation.mutate()
           }}
         >
           {mutation.error ? <Alert>{errorMessage(mutation.error)}</Alert> : null}
@@ -540,7 +667,39 @@ function Comments({ request, staff }: { request: Detail; staff: boolean }) {
             onChange={(e) => setBody(e.target.value)}
             placeholder={staff ? 'Nachricht an den Kunden oder interne Notiz …' : 'Nachricht an die Druckerei …'}
           />
-          <div className="flex items-center justify-between gap-2">
+          {attachments.length || uploading ? (
+            <ul className="flex flex-wrap gap-2 text-xs">
+              {attachments.map((a) => (
+                <li key={a.id} className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1">
+                  📎 {a.filename}
+                  <button
+                    type="button"
+                    aria-label={`${a.filename} entfernen`}
+                    className="ml-1 text-slate-500 hover:text-slate-900"
+                    onClick={() => setAttachments((list) => list.filter((x) => x.id !== a.id))}
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+              {uploading ? <li className="px-2 py-1 text-slate-500">{uploading} wird hochgeladen …</li> : null}
+            </ul>
+          ) : null}
+          {uploadError ? <p className="text-sm text-rose-600">{uploadError}</p> : null}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label className="cursor-pointer text-sm text-slate-700 underline">
+              Datei anhängen
+              <input
+                type="file"
+                multiple
+                className="sr-only"
+                onChange={(e) => {
+                  void addFiles(e.target.files)
+                  e.target.value = ''
+                }}
+              />
+            </label>
+            {staff ? <MentionPicker onPick={(name) => setBody((b) => `${b}${b && !/\s$/.test(b) ? ' ' : ''}@${name} `)} /> : null}
             {staff ? (
               <label className="flex items-center gap-2 text-sm text-slate-700">
                 <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} />
@@ -549,7 +708,7 @@ function Comments({ request, staff }: { request: Detail; staff: boolean }) {
             ) : (
               <span />
             )}
-            <Button type="submit" disabled={mutation.isPending || !body.trim()}>
+            <Button type="submit" disabled={mutation.isPending || !canSend}>
               Senden
             </Button>
           </div>
@@ -562,7 +721,9 @@ function Comments({ request, staff }: { request: Detail; staff: boolean }) {
 function describeEvent(e: Detail['events'][number]) {
   switch (e.type) {
     case 'created':
-      return 'hat den Auftrag eingereicht'
+      return typeof e.data.reorderOfNumber === 'number'
+        ? `hat den Auftrag als Nachbestellung von ${formatRequestNumber(e.data.reorderOfNumber)} eingereicht`
+        : 'hat den Auftrag eingereicht'
     case 'updated':
       return 'hat den Auftrag bearbeitet'
     case 'status_changed':

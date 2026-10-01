@@ -6,6 +6,7 @@ import {
   answerChangeSchema,
   setDates,
   setDatesSchema,
+  prepareReorder,
   proposeChange,
   proposeChangeSchema,
   withdrawChange,
@@ -26,6 +27,8 @@ import {
   listRequests,
   updateRequest,
   updateRequestSchema,
+  setWatchingRequest,
+  watchSchema,
 } from './requests.server'
 
 export const listRequestsFn = createServerFn({ method: 'GET' })
@@ -80,3 +83,11 @@ export const withdrawChangeFn = createServerFn({ method: 'POST' })
 export const setDatesFn = createServerFn({ method: 'POST' })
   .validator(setDatesSchema)
   .handler(async ({ data }) => setDates(await requireStaff(), data))
+
+export const prepareReorderFn = createServerFn({ method: 'POST' })
+  .validator(z.object({ id: z.uuid() }))
+  .handler(async ({ data }) => prepareReorder(await requireUser(), data.id))
+
+export const setWatchingFn = createServerFn({ method: 'POST' })
+  .validator(watchSchema)
+  .handler(async ({ data }) => setWatchingRequest(await requireUser(), data))
