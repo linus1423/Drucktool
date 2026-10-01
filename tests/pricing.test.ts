@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   borderlessChoice,
   bindingChoices,
+  bookletWarning,
   findFormat,
   formatSize,
   impose,
@@ -69,9 +70,20 @@ describe('Auswahlregeln', () => {
     expect(errors({ borderless: true, paperId: PAPER.noSra3 })[0]).toContain('SRA3')
   })
 
-  it('verlangt beim Booklet eine durch 4 teilbare Seitenzahl', () => {
-    expect(errors({ bindingId: 'saddle_stitch', duplex: true, pages: 6 })[0]).toContain('durch 4 teilbar')
-    expect(errors({ bindingId: 'saddle_stitch', duplex: true, pages: 8 })).toEqual([])
+  it('weist beim Booklet nur auf fehlende Seiten hin und rechnet die Leerseiten mit (Issue #103)', () => {
+    const booklet = { bindingId: 'saddle_stitch' }
+    expect(errors({ ...booklet, duplex: true, pages: 6 })).toEqual([])
+    expect(bookletWarning(spec({ ...booklet, duplex: true, pages: 6 }))).toContain('ergänzen wir am Ende der Datei 2 Leerseiten')
+    expect(bookletWarning(spec({ ...booklet, duplex: true, pages: 8 }))).toBeNull()
+    expect(bookletWarning(spec({ ...booklet, duplex: false, pages: 5 }))).toContain('eine Leerseite')
+    expect(bookletWarning(spec({ ...booklet, duplex: false, pages: 6 }))).toBeNull()
+    expect(bookletWarning(spec({ bindingId: 'glue', duplex: true, pages: 6 }))).toBeNull()
+    expect(price({ ...booklet, duplex: true, pages: 6 }).totalCents).toBe(
+      price({ ...booklet, duplex: true, pages: 8 }).totalCents,
+    )
+    expect(price({ ...booklet, duplex: false, pages: 5 }).totalCents).toBe(
+      price({ ...booklet, duplex: false, pages: 6 }).totalCents,
+    )
   })
 
   it('erlaubt durchsichtiges Cover nur bei geteiltem Cover', () => {

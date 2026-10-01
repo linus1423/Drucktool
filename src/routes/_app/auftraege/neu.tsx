@@ -16,6 +16,7 @@ import {
   COVER_FROM_MAIN_FILE_LABELS,
   coverPagesFromMainFile,
   bindingChoices,
+  bookletWarning,
   borderlessChoice,
   coverColorChoices,
   duplexChoice,
@@ -929,6 +930,9 @@ function PricePreview({
   size: { widthMm: number; heightMm: number } | null
 }) {
   const pages = pagesOf(draft)
+  const spec = toSpec(draft)
+  // Nur ein Hinweis: fehlende Seiten ergänzt die Druckerei als Leerseiten (Issue #103).
+  const warning = priced?.ok && spec ? bookletWarning(spec) : null
   const rows: [string, string | undefined][] = [
     ['Datei', draft.mainFile ? `${draft.mainFile.filename}${pages ? `, ${pages} S.` : ''}` : undefined],
     [
@@ -966,6 +970,7 @@ function PricePreview({
               <dt>Gesamt</dt>
               <dd>{formatMoney(priced.price.totalCents)}</dd>
             </div>
+            {warning ? <p className="text-xs text-amber-700">{warning}</p> : null}
             {priced.price.lines.some((l) => l.key === 'minimum') ? (
               <p className="text-xs text-slate-500">
                 Enthält den Mindestpreis von {formatMoney(catalog.pricing.minimumOrderCents)}.
