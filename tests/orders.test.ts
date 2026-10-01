@@ -123,18 +123,40 @@ describe.skipIf(!url)('Aufträge aus dem Wizard (Integration)', () => {
     if (!priced.ok) throw new Error(priced.errors.join())
     const withSpec = { ...input, spec, expectedTotalCents: priced.price.totalCents }
     await expect(createRequest(customer, withSpec)).rejects.toThrow('Deckblatt hochladen')
-    const cover = await testUpload(customer, 'cover', 3)
-    await expect(createRequest(customer, { ...withSpec, coverFileId: cover.id })).rejects.toThrow('höchstens 2 Seiten')
+    const wrongCount = await testUpload(customer, 'cover', 3)
+    await expect(createRequest(customer, { ...withSpec, coverFileId: wrongCount.id })).rejects.toThrow(
+      'Seitenzahl passt nicht',
+    )
     const goodCover = await testUpload(customer, 'cover', 1)
     const created = await createRequest(customer, { ...withSpec, coverFileId: goodCover.id })
     const detail = await getRequestDetail(customer, created.id)
     expect(detail.files.map((f) => f.role).sort()).toEqual(['cover', 'main'])
   })
 
+  it('nimmt Deckblatt-Dateien mit beliebig vielen Seiten zum selben Preis an', async () => {
+    const card = (await getDb().select().from(schema.papers)).find((p) => p.name === 'Karton')!
+    const { calculatePrice } = await import('~/lib/pricing')
+    const { getCatalog } = await import('~/server/catalog/catalog.server')
+    const catalog = await getCatalog({ onlyAvailable: true })
+    const totals: number[] = []
+    // null: unlesbare Deckblatt-Datei ohne Seitenzahl.
+    for (const pages of [1, 2, 5, null]) {
+      const input = await orderInput(customer, { spec: { bindingId: 'plastic_comb' } })
+      const spec = { ...input.spec, coverPaperId: card.id, coverPages: pages }
+      const priced = calculatePrice(catalog, spec)
+      if (!priced.ok) throw new Error(priced.errors.join())
+      totals.push(priced.price.totalCents)
+      const cover = await testUpload(customer, 'cover', pages)
+      const expectedTotalCents = priced.price.totalCents
+      await createRequest(customer, { ...input, spec, coverFileId: cover.id, expectedTotalCents })
+    }
+    expect(new Set(totals).size).toBe(1)
+  })
+
   it('nimmt das Deckblatt ohne eigene Datei aus der Druckdatei', async () => {
     const card = (await getDb().select().from(schema.papers)).find((p) => p.name === 'Karton')!
     const input = await orderInput(customer, {
-      spec: { bindingId: 'plastic_comb', pages: 4, coverPaperId: card.id, coverPages: 2, coverFromMainFile: true },
+      spec: { bindingId: 'plastic_comb', pages: 6, coverPaperId: card.id, coverFromMainFile: 'frontBack' },
     })
     const cover = await testUpload(customer, 'cover', 2)
     await expect(createRequest(customer, { ...input, coverFileId: cover.id })).rejects.toThrow('nicht aus der Druckdatei')
@@ -144,8 +166,9 @@ describe.skipIf(!url)('Aufträge aus dem Wizard (Integration)', () => {
     const { describeOrder } = await import('~/lib/snapshot')
     expect(describeOrder(detail.order!)).toContainEqual([
       'Deckblatt-Datei',
-      'keine separate Datei, aus der Druckdatei: vorne Seite 1, hinten Seite 4',
+      'keine separate Datei, aus der Druckdatei: vorne Seiten 1–2, hinten Seiten 5–6',
     ])
+    expect(describeOrder(detail.order!)).toContainEqual(['Deckblatt', 'Karton 300 g/m², vorne und hinten'])
   })
 
   it('liefert Dateien nur an Berechtigte aus', async () => {

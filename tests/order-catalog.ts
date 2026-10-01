@@ -128,7 +128,7 @@ export function spec(overrides: Partial<OrderSpec> = {}): OrderSpec {
     paperId: PAPER.standard,
     coverPaperId: null,
     coverPages: null,
-    coverFromMainFile: false,
+    coverFromMainFile: null,
     coverColorId: null,
     coverBackColorId: null,
     borderless: false,

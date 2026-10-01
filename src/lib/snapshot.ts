@@ -6,6 +6,7 @@ import {
   type CatalogBinding,
   type CatalogCoverColor,
   type CatalogPaper,
+  COVER_FROM_MAIN_FILE_LABELS,
   coverPagesFromMainFile,
   type OrderSpec,
   type ResolvedOrder,
@@ -54,9 +55,14 @@ export function describeOrder(s: Omit<OrderSnapshot, 'pricing' | 'price'>): [lab
   rows.push(['Seiten', `${spec.pages} ${spec.pages === 1 ? 'Seite' : 'Seiten'}, ${spec.duplex ? 'doppelseitig' : 'einseitig'}`])
   rows.push(['Papier', paperLabel(s.paper)])
   if (s.coverPaper) {
-    rows.push(['Deckblatt', `${paperLabel(s.coverPaper)}, ${spec.coverPages === 2 ? 'vorne und hinten' : 'vorne'}`])
     // Ohne eigene Datei muss die Druckerei wissen, welche Seiten aufs Deckblatt kommen.
     const fromMain = coverPagesFromMainFile(spec)
+    const detail = spec.coverFromMainFile
+      ? COVER_FROM_MAIN_FILE_LABELS[spec.coverFromMainFile]
+      : spec.coverPages
+        ? `Datei mit ${spec.coverPages} ${spec.coverPages === 1 ? 'Seite' : 'Seiten'}`
+        : null
+    rows.push(['Deckblatt', `${paperLabel(s.coverPaper)}${detail ? `, ${detail}` : ''}`])
     if (fromMain) {
       const pages = fromMain.back ? `vorne ${fromMain.front}, hinten ${fromMain.back}` : `vorne ${fromMain.front}`
       rows.push(['Deckblatt-Datei', `keine separate Datei, aus der Druckdatei: ${pages}`])
