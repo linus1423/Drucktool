@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { borderlessChoice, bindingChoices, findFormat, impose, piecesPerSheet, resolveOrder, suggestFormat } from '~/lib/order'
+import {
+  borderlessChoice,
+  bindingChoices,
+  findFormat,
+  impose,
+  orderSpecSchema,
+  piecesPerSheet,
+  resolveOrder,
+  suggestFormat,
+} from '~/lib/order'
 import { calculatePrice } from '~/lib/pricing'
 import { CATALOG, COLOR, PAPER, spec } from './order-catalog'
 
@@ -76,21 +85,24 @@ describe('Auswahlregeln', () => {
     expect(errors({ formatId: 'custom' })[0]).toContain('Breite und Höhe')
   })
 
-  it('verlangt die Deckblatt-Datei, wenn ein Deckblatt gewählt ist', () => {
-    expect(errors({ bindingId: 'plastic_comb', coverPaperId: PAPER.card })).toContain(
-      'Bitte die Datei für das Deckblatt hochladen.',
-    )
+  it('prüft das Deckblatt unabhängig von der Seitenzahl der Datei', () => {
+    // Unlesbare Deckblatt-Dateien haben keine Seitenzahl; die Datei selbst prüft createRequest.
+    expect(errors({ bindingId: 'plastic_comb', coverPaperId: PAPER.card })).toEqual([])
     expect(errors({ bindingId: 'loose', coverPaperId: PAPER.card, coverPages: 1 })[0]).toContain(
       'Ein separates Deckblatt gibt es bei Lose nicht',
     )
   })
 
   it('erlaubt ein Deckblatt ohne eigene Datei aus der Druckdatei', () => {
-    const cover = { bindingId: 'plastic_comb', coverPaperId: PAPER.card, coverFromMainFile: true }
-    expect(errors({ ...cover, pages: 10, coverPages: 2 })).toEqual([])
-    expect(errors({ ...cover, pages: 10 })).toContain('Bitte angeben, ob das Deckblatt nur vorne oder vorne und hinten ist.')
-    expect(errors({ ...cover, pages: 4, duplex: true, coverPages: 2 })[0]).toContain('mehr als 4 Seiten')
-    expect(errors({ coverFromMainFile: true, coverPages: 1, pages: 4 })).toContain('Ein Deckblatt ist nicht ausgewählt.')
+    const cover = { bindingId: 'plastic_comb', coverPaperId: PAPER.card }
+    expect(errors({ ...cover, pages: 10, coverFromMainFile: 'frontBack' })).toEqual([])
+    // Das Deckblatt ist immer beidseitig: vorne und hinten brauchen vier Seiten, auch einseitig.
+    expect(errors({ ...cover, pages: 4, coverFromMainFile: 'frontBack' })[0]).toContain('mehr als 4 Seiten')
+    expect(errors({ ...cover, pages: 2, coverFromMainFile: 'front' })[0]).toContain('mehr als 2 Seiten')
+    expect(errors({ coverFromMainFile: 'front', pages: 4 })).toContain('Ein Deckblatt ist nicht ausgewählt.')
+    // Ältere Aufträge kennen das Feld nicht.
+    const { coverFromMainFile: _, ...old } = spec({ coverPaperId: PAPER.card, coverPages: 2 })
+    expect(orderSpecSchema.parse(old).coverFromMainFile).toBeNull()
   })
 
   it('schlägt das Format anhand der PDF-Seitengröße vor', () => {
@@ -171,18 +183,29 @@ describe('Preise', () => {
     expect(p.totalCents).toBe(445)
   })
 
+  it('rechnet das Deckblatt unabhängig von seiner Seitenzahl als ein beidseitiges Blatt', () => {
+    const base = { bindingId: 'plastic_comb', pages: 20, duplex: true, copies: 3, coverPaperId: PAPER.card }
+    const one = price({ ...base, coverPages: 1 })
+    const many = price({ ...base, coverPages: 7 })
+    expect(many.totalCents).toBe(one.totalCents)
+    expect(one.cover).toMatchObject({ sheet: 'A4', ups: 1 })
+    // 3 Deckblätter: 3 A4-Bögen, beidseitig 6 Klicks, Papier 2 A3-Bögen.
+    expect(amount(one, 'cover_print')).toBe(6 * 10)
+    expect(amount(one, 'cover_paper')).toBe(2 * 15)
+  })
+
   it('Deckblatt aus der Druckdatei: Seiten nicht doppelt berechnen', () => {
-    const cover = { bindingId: 'plastic_comb', coverPaperId: PAPER.card, coverFromMainFile: true }
+    const cover = { bindingId: 'plastic_comb', coverPaperId: PAPER.card }
     // Doppelseitig: Seiten 1–2 und 19–20 auf Karton, 16 Seiten im Innenteil.
-    const p = price({ ...cover, pages: 20, duplex: true, coverPages: 2 })
+    const p = price({ ...cover, pages: 20, duplex: true, coverFromMainFile: 'frontBack' })
     expect(amount(p, 'print')).toBe(16 * 10)
     expect(amount(p, 'paper')).toBe(4 * 2)
     expect(amount(p, 'cover_print')).toBe(4 * 10)
     expect(amount(p, 'cover_paper')).toBe(1 * 15)
     expect(p.totalCents).toBe(160 + 8 + 40 + 15 + 200)
-    // Einseitig: nur Seite 1 auf Karton.
-    const single = price({ ...cover, pages: 10, coverPages: 1 })
-    expect(amount(single, 'print')).toBe(9 * 10)
-    expect(amount(single, 'cover_print')).toBe(1 * 10)
+    // Einseitiger Innenteil: das Deckblatt nimmt trotzdem Seiten 1–2 und ist beidseitig.
+    const single = price({ ...cover, pages: 10, coverFromMainFile: 'front' })
+    expect(amount(single, 'print')).toBe(8 * 10)
+    expect(amount(single, 'cover_print')).toBe(2 * 10)
   })
 })

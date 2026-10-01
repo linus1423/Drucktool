@@ -105,8 +105,10 @@ vorschlägt. Das Lastenheft sieht den Upload erst nach den Optionen vor.
 **Preisberechnung** (`src/lib/pricing.ts`): Die Seiten werden auf den kleinsten passenden Druckbogen ausgeschossen
 (A4, A3 oder SRA3). Klicks = Bögen × Seiten, A4-Bögen zum A4-Preis, A3 und SRA3 zum A3-Preis. Papier zählt pro A3-
 bzw. SRA3-Bogen (zwei A4-Bögen = ein A3-Bogen). Randlos druckt auf SRA3 mit 3 mm Beschnitt. Plots kosten einen festen
-Preis pro Seite. Dazu kommen Bindung (pro Exemplar oder pro Blatt), einmalige Kosten, Deckblatt (jede Deckblattseite
-ein einseitiger Bogen), dann der Mindestpreis und die Lieferung. Kunden sehen nur Druck- und Lieferkosten.
+Preis pro Seite. Dazu kommen Bindung (pro Exemplar oder pro Blatt), einmalige Kosten, Deckblatt (immer ein beidseitig
+bedrucktes Blatt pro Exemplar, egal wie viele Seiten die Deckblatt-Datei hat; ohne eigene Datei aus der Druckdatei
+die ersten zwei Seiten, bei vorne und hinten zusätzlich die letzten zwei als zweites Blatt), dann der Mindestpreis
+und die Lieferung. Kunden sehen nur Druck- und Lieferkosten.
 
 Beim Absenden rechnet der Server neu. Weicht der Preis von der Vorschau ab, weil sich der Katalog geändert hat,
 wird der Auftrag nicht angelegt und der Kunde sieht den neuen Preis. Angelegte Aufträge speichern Auswahl, Preis und
