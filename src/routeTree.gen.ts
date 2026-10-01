@@ -17,6 +17,7 @@ import { Route as RegistrierenRouteImport } from './routes/registrieren'
 import { Route as AppAdminRouteRouteImport } from './routes/_app/admin/route'
 import { Route as AppKontoRouteImport } from './routes/_app/konto'
 import { Route as AppProfilRouteImport } from './routes/_app/profil'
+import { Route as AppUebersichtRouteImport } from './routes/_app/uebersicht'
 import { Route as AnfragenIndexRouteImport } from './routes/anfragen/index'
 import { Route as AnfragenSplatRouteImport } from './routes/anfragen/$'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
@@ -74,6 +75,11 @@ const AppKontoRoute = AppKontoRouteImport.update({
 const AppProfilRoute = AppProfilRouteImport.update({
   id: '/profil',
   path: '/profil',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppUebersichtRoute = AppUebersichtRouteImport.update({
+  id: '/uebersicht',
+  path: '/uebersicht',
   getParentRoute: () => AppRoute,
 } as any)
 const AnfragenIndexRoute = AnfragenIndexRouteImport.update({
@@ -184,6 +190,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AppAdminRouteRouteWithChildren
   '/konto': typeof AppKontoRoute
   '/profil': typeof AppProfilRoute
+  '/uebersicht': typeof AppUebersichtRoute
   '/anfragen/$': typeof AnfragenSplatRoute
   '/api/health': typeof ApiHealthRoute
   '/anfragen/': typeof AnfragenIndexRoute
@@ -212,6 +219,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AppAdminRouteRouteWithChildren
   '/konto': typeof AppKontoRoute
   '/profil': typeof AppProfilRoute
+  '/uebersicht': typeof AppUebersichtRoute
   '/anfragen/$': typeof AnfragenSplatRoute
   '/api/health': typeof ApiHealthRoute
   '/anfragen': typeof AnfragenIndexRoute
@@ -242,6 +250,7 @@ export interface FileRoutesById {
   '/_app/admin': typeof AppAdminRouteRouteWithChildren
   '/_app/konto': typeof AppKontoRoute
   '/_app/profil': typeof AppProfilRoute
+  '/_app/uebersicht': typeof AppUebersichtRoute
   '/anfragen/$': typeof AnfragenSplatRoute
   '/api/health': typeof ApiHealthRoute
   '/anfragen/': typeof AnfragenIndexRoute
@@ -272,6 +281,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/konto'
     | '/profil'
+    | '/uebersicht'
     | '/anfragen/$'
     | '/api/health'
     | '/anfragen/'
@@ -300,6 +310,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/konto'
     | '/profil'
+    | '/uebersicht'
     | '/anfragen/$'
     | '/api/health'
     | '/anfragen'
@@ -329,6 +340,7 @@ export interface FileRouteTypes {
     | '/_app/admin'
     | '/_app/konto'
     | '/_app/profil'
+    | '/_app/uebersicht'
     | '/anfragen/$'
     | '/api/health'
     | '/anfragen/'
@@ -423,6 +435,13 @@ declare module '@tanstack/react-router' {
       path: '/profil'
       fullPath: '/profil'
       preLoaderRoute: typeof AppProfilRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/uebersicht': {
+      id: '/_app/uebersicht'
+      path: '/uebersicht'
+      fullPath: '/uebersicht'
+      preLoaderRoute: typeof AppUebersichtRouteImport
       parentRoute: typeof AppRoute
     }
     '/anfragen/': {
@@ -590,6 +609,7 @@ interface AppRouteChildren {
   AppAdminRouteRoute: typeof AppAdminRouteRouteWithChildren
   AppKontoRoute: typeof AppKontoRoute
   AppProfilRoute: typeof AppProfilRoute
+  AppUebersichtRoute: typeof AppUebersichtRoute
   AppAuftraegeRequestIdRoute: typeof AppAuftraegeRequestIdRoute
   AppAuftraegeNeuRoute: typeof AppAuftraegeNeuRoute
   AppAuftraegeIndexRoute: typeof AppAuftraegeIndexRoute
@@ -599,6 +619,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAdminRouteRoute: AppAdminRouteRouteWithChildren,
   AppKontoRoute: AppKontoRoute,
   AppProfilRoute: AppProfilRoute,
+  AppUebersichtRoute: AppUebersichtRoute,
   AppAuftraegeRequestIdRoute: AppAuftraegeRequestIdRoute,
   AppAuftraegeNeuRoute: AppAuftraegeNeuRoute,
   AppAuftraegeIndexRoute: AppAuftraegeIndexRoute,
