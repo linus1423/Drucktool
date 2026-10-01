@@ -1,0 +1,70 @@
+# Automatische Updates für Abhängigkeiten. Sicherheitsupdates kommen unabhängig vom Zeitplan sofort,
+# sobald "Dependabot security updates" in den Repository-Einstellungen aktiviert ist.
+version: 2
+updates:
+  - package-ecosystem: npm # pnpm wird über pnpm-lock.yaml erkannt
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: 'npm'
+    groups:
+      tanstack:
+        patterns: ['@tanstack/*']
+      react:
+        patterns: ['react', 'react-dom', '@types/react', '@types/react-dom']
+      drizzle:
+        patterns: ['drizzle-orm', 'drizzle-kit']
+      build:
+        patterns:
+          ['vite', 'vite-*', '@vitejs/*', 'vitest', 'nitro', 'esbuild', 'tsx', 'typescript', 'tailwindcss', '@tailwindcss/*']
+      # Alles Übrige ohne Major-Sprung in einem PR.
+      sonstige:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Berlin
+    commit-message:
+      prefix: 'actions'
+    groups:
+      actions:
+        patterns: ['*']
+
+  # Basis-Image im Dockerfile (node:22-alpine).
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Berlin
+    commit-message:
+      prefix: 'docker'
+    ignore:
+      # Node nur auf LTS-Versionen umstellen, das passiert bewusst von Hand.
+      - dependency-name: node
+        update-types: ['version-update:semver-major']
+
+  # Images in docker-compose.yml (Postgres). ansible/roles/drucktool/templates/docker-compose.yml.j2 bitte von Hand nachziehen.
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Berlin
+    commit-message:
+      prefix: 'docker'
+    ignore:
+      # Ein Major-Update von Postgres braucht ein Dump/Restore der Datenbank und wird nie automatisch vorgeschlagen.
+      - dependency-name: postgres
+        update-types: ['version-update:semver-major']
