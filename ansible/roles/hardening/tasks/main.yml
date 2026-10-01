@@ -1,0 +1,95 @@
+# Firewall, SSH, fail2ban und automatische Sicherheitsupdates für Debian/Ubuntu.
+
+- name: Sicherstellen, dass die SSH-Härtung niemanden aussperrt
+  ansible.builtin.assert:
+    that:
+      - (ansible_user | default('')) != 'root'
+      - ansible_password is not defined
+      - ansible_ssh_pass is not defined
+    fail_msg: >-
+      Die SSH-Härtung schaltet Root-Login und Passwort-Anmeldung ab. Ansible verbindet sich aber als root oder mit
+      Passwort. Bitte einen Benutzer mit SSH-Schlüssel und sudo anlegen und als ansible_user eintragen, oder
+      hardening_ssh_enabled: false setzen.
+  when: hardening_ssh_enabled
+
+- name: Pakete für die Härtung installieren
+  ansible.builtin.apt:
+    name: "{{ hardening_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  vars:
+    hardening_packages: >-
+      {{ (['ufw'] if hardening_firewall_enabled else [])
+      + (['fail2ban', 'python3-systemd'] if hardening_fail2ban_enabled else [])
+      + (['unattended-upgrades'] if hardening_unattended_upgrades_enabled else []) }}
+  when: hardening_packages | length > 0
+
+# SSH zuerst freigeben, dann einschalten, damit die laufende Verbindung bleibt.
+- name: Firewall – SSH erlauben
+  community.general.ufw:
+    rule: allow
+    port: "{{ hardening_ssh_port | string }}"
+    proto: tcp
+    comment: SSH
+  when: hardening_firewall_enabled
+
+- name: Firewall – HTTP und HTTPS erlauben
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+    comment: Caddy
+  loop: ['80', '443']
+  when: hardening_firewall_enabled
+
+- name: Firewall – alles andere eingehend sperren und einschalten
+  community.general.ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+  when: hardening_firewall_enabled
+
+# Ubuntu 24.04 startet sshd per Socket-Aktivierung; bis zur ersten Verbindung fehlt das Verzeichnis, und
+# "sshd -t" zur Prüfung der Konfiguration bricht ohne es ab.
+- name: Verzeichnis für die SSH-Konfigurationsprüfung anlegen
+  ansible.builtin.file:
+    path: /run/sshd
+    state: directory
+    mode: '0755'
+  when: hardening_ssh_enabled
+
+- name: SSH nur mit Schlüssel und ohne Root-Login
+  ansible.builtin.template:
+    src: sshd.conf.j2
+    # 00-…, damit die Einstellungen vor z. B. 50-cloud-init.conf greifen (der erste Wert gilt).
+    dest: /etc/ssh/sshd_config.d/00-drucktool.conf
+    mode: '0644'
+    validate: /usr/sbin/sshd -t -f %s
+  when: hardening_ssh_enabled
+  notify: SSH neu laden
+
+- name: Fail2ban für SSH einrichten
+  ansible.builtin.template:
+    src: fail2ban.local.j2
+    dest: /etc/fail2ban/jail.d/drucktool.local
+    mode: '0644'
+  when: hardening_fail2ban_enabled
+  notify: Fail2ban neu starten
+
+- name: Fail2ban starten
+  ansible.builtin.service:
+    name: fail2ban
+    state: started
+    enabled: true
+  when: hardening_fail2ban_enabled
+
+- name: Automatische Sicherheitsupdates einschalten
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/apt/apt.conf.d/{{ item }}"
+    mode: '0644'
+  loop:
+    - 20auto-upgrades
+    - 52drucktool-unattended-upgrades
+  when: hardening_unattended_upgrades_enabled

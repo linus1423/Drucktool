@@ -1,4 +1,17 @@
 drucktool_dir: /opt/drucktool
+drucktool_domain: ''
+drucktool_acme_email: ''
+# Ohne Domain ist die App nur auf dem Server selbst (127.0.0.1:3000) erreichbar, z. B. per SSH-Tunnel.
+# true gibt Port 3000 ohne HTTPS nach außen frei (Docker umgeht dabei die Firewall!).
+drucktool_expose_app_port: false
+# Beispielwerte aus vault.example.yml und .env.example. Das Playbook bricht ab, wenn eines davon gesetzt ist.
+drucktool_example_passwords:
+  - bitte-ein-langes-zufaelliges-passwort
+  - bitte-aendern-mindestens-12-zeichen
+  - bitte-aendern-123
+  - drucktool
+  - changeme
+  - password
 drucktool_backup_dir: /var/backups/drucktool
 drucktool_backup_keep_days: 14
 drucktool_upload_max_mb: 500

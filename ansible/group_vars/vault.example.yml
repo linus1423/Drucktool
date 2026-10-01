@@ -2,6 +2,7 @@
 #   cp group_vars/vault.example.yml vault/production.yml && ansible-vault encrypt vault/production.yml
 #   cp group_vars/vault.example.yml vault/staging.yml    && ansible-vault encrypt vault/staging.yml
 # z. B. mit: openssl rand -hex 24
+# Das Playbook bricht ab, solange hier noch die Beispielwerte stehen.
 drucktool_postgres_password: 'bitte-ein-langes-zufaelliges-passwort'
 drucktool_superadmin_password: 'bitte-aendern-mindestens-12-zeichen'
 # Nur nötig, wenn das Image in einer privaten Registry liegt.

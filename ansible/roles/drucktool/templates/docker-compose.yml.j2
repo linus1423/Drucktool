@@ -36,10 +36,12 @@ services:
       # Hochgeladene Druckdateien, gehört dem Benutzer node (UID 1000) im Container.
       - ./uploads:/app/uploads
     ports:
-{% if drucktool_domain %}
-      # Nur lokal erreichbar, Caddy übernimmt HTTPS.
+{% if drucktool_domain or not drucktool_expose_app_port %}
+      # Nur auf dem Server erreichbar{{ ', Caddy übernimmt HTTPS' if drucktool_domain else ' (ohne Domain z. B. per SSH-Tunnel)' }}.
+      # Docker umgeht die Firewall, deshalb nie ohne 127.0.0.1 veröffentlichen.
       - '127.0.0.1:3000:3000'
 {% else %}
+      # drucktool_expose_app_port: ohne HTTPS aus dem Internet erreichbar.
       - '3000:3000'
 {% endif %}
 
