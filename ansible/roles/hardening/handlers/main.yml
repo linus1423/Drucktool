@@ -1,0 +1,9 @@
+- name: SSH neu laden
+  ansible.builtin.service:
+    name: ssh
+    state: reloaded
+
+- name: Fail2ban neu starten
+  ansible.builtin.service:
+    name: fail2ban
+    state: restarted

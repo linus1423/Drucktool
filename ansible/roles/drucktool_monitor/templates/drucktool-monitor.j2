@@ -1,0 +1,43 @@
+#!/bin/bash
+# Verwaltet von Ansible (Rolle drucktool_monitor). Prüft die Anwendung wie ein Besucher von außen und meldet das Ergebnis
+# an den Überwachungsdienst. Aufruf von Hand: drucktool-monitor
+set -uo pipefail
+
+ping_url="{{ drucktool_monitor_ping_url }}"
+domain="{{ drucktool_domain | default('') }}"
+min_tage={{ drucktool_monitor_tls_min_days }}
+{% if drucktool_domain | default('') %}
+# Über die öffentliche Adresse, damit auch Caddy, DNS und Zertifikat mitgeprüft werden.
+url="https://{{ drucktool_domain }}/api/health"
+{% else %}
+url="http://127.0.0.1:3000/api/health"
+{% endif %}
+
+melden() {
+  [ -n "$ping_url" ] || return 0
+  curl -fsS -m 10 --retry 3 -o /dev/null "$@" || echo "$(date -Is) Überwachungsdienst nicht erreichbar" >&2
+}
+
+fehler=''
+if ! antwort=$(curl -fsS -m 15 "$url" 2>&1); then
+  fehler="Healthcheck $url fehlgeschlagen: $antwort"
+elif ! grep -q '"status":"ok"' <<<"$antwort"; then
+  fehler="Healthcheck $url meldet: $antwort"
+elif [ -n "$domain" ]; then
+  ende=$(openssl s_client -servername "$domain" -connect "$domain:443" </dev/null 2>/dev/null |
+    openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
+  if [ -z "$ende" ]; then
+    fehler="TLS-Zertifikat von $domain nicht lesbar"
+  else
+    tage=$(( ($(date -d "$ende" +%s) - $(date +%s)) / 86400 ))
+    if [ "$tage" -lt "$min_tage" ]; then fehler="TLS-Zertifikat von $domain läuft in $tage Tagen ab ($ende)"; fi
+  fi
+fi
+
+if [ -n "$fehler" ]; then
+  echo "$(date -Is) $fehler" >&2
+  melden --data-raw "$fehler" "$ping_url/fail"
+  exit 1
+fi
+echo "$(date -Is) OK: $antwort"
+melden "$ping_url"

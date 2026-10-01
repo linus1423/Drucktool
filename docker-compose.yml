@@ -2,6 +2,11 @@
 services:
   db:
     image: postgres:16-alpine
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '5'
     restart: unless-stopped
     environment:
       POSTGRES_DB: drucktool
@@ -18,6 +23,7 @@ services:
   app:
     build: .
     image: drucktool:local
+    logging: *logging
     restart: unless-stopped
     depends_on:
       db:
@@ -27,6 +33,8 @@ services:
       APP_URL: ${APP_URL:-http://localhost:3000}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       TRUST_PROXY: ${TRUST_PROXY:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      SENTRY_DSN: ${SENTRY_DSN:-}
       SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-}
       SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-}
       UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-500}
@@ -44,6 +52,7 @@ services:
   worker:
     image: drucktool:local
     command: worker
+    logging: *logging
     restart: unless-stopped
     depends_on:
       app:
@@ -51,6 +60,8 @@ services:
     environment:
       DATABASE_URL: postgres://drucktool:${POSTGRES_PASSWORD:-drucktool}@db:5432/drucktool
       APP_URL: ${APP_URL:-http://localhost:3000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      SENTRY_DSN: ${SENTRY_DSN:-}
       SMTP_URL: ${SMTP_URL:-}
       MAIL_FROM: ${MAIL_FROM:-Drucktool <noreply@localhost>}
       AUDIT_LOG_RETENTION_DAYS: ${AUDIT_LOG_RETENTION_DAYS:-365}

@@ -379,6 +379,8 @@ export async function getRequestDetail(user: Principal, id: string) {
     // Solange ein Vorschlag offen ist, bleiben nur Stornieren und Ablehnen; der Rest läuft über den Vorschlag.
     transitions: allowedTransitions(r.status, actorOf(user)).filter((t) => !r.proposal || t === 'cancelled' || t === 'rejected'),
     canAnswerProposal: !!r.proposal && r.createdById === user.id,
+    // Antwortet der Kunde außerhalb des Tools, tragen Mitarbeiter sie ein (Issue #113).
+    canRecordAnswer: !!r.proposal && isStaff && r.createdById !== user.id,
     canEdit: canEditRequest(user, r.status),
   }
 }
@@ -689,13 +691,20 @@ export const answerChangeSchema = z.object({
   id: z.uuid(),
   version: z.number().int().positive(),
   accept: z.boolean(),
+  /** Nur Mitarbeiter: wie der Kunde außerhalb des Tools geantwortet hat, z. B. per Mail (Issue #113). */
+  note: z.string().trim().max(5000).optional(),
 })
 
-/** Der Kunde nimmt den Vorschlag an (er wird wirksam) oder lehnt ihn ab (alles bleibt, wie es war). */
+/**
+ * Der Kunde nimmt den Vorschlag an (er wird wirksam) oder lehnt ihn ab (alles bleibt, wie es war).
+ * Antwortet der Kunde per Mail oder Telefon, tragen Mitarbeiter seine Antwort mit einem Vermerk ein (Issue #113).
+ */
 export async function answerChange(user: Principal, input: z.infer<typeof answerChangeSchema>) {
   return getDb().transaction(async (tx) => {
     const current = await loadForUpdate(tx, user, input.id)
-    if (current.createdById !== user.id) throw new Error('Nur der Auftraggeber kann dem Vorschlag zustimmen')
+    const onBehalf = current.createdById !== user.id
+    if (onBehalf && !isStaffRole(user.role)) throw new Error('Nur der Auftraggeber kann dem Vorschlag zustimmen')
+    if (onBehalf && !input.note) throw new Error('Bitte festhalten, wie der Kunde geantwortet hat, z. B. per Mail am …')
     if (current.version !== input.version) throw new Error(CONFLICT_MESSAGE)
     const p = current.proposal
     if (!p) throw new Error('Es gibt keinen offenen Änderungsvorschlag')
@@ -719,9 +728,18 @@ export async function answerChange(user: Principal, input: z.infer<typeof answer
       type: input.accept ? 'change_accepted' : 'change_rejected',
       fromStatus: current.status,
       toStatus: updated.status,
-      data: { totalCents: p.totalCents, previousTotalCents: current.totalCents },
+      data: {
+        totalCents: p.totalCents,
+        previousTotalCents: current.totalCents,
+        ...(onBehalf ? { onBehalf: true, note: input.note } : {}),
+      },
     })
-    await notifyChangeAnswered(tx, user, { requestId: input.id, accepted: input.accept, proposedById: p.proposedById })
+    await notifyChangeAnswered(tx, user, {
+      requestId: input.id,
+      accepted: input.accept,
+      proposedById: p.proposedById,
+      onBehalfNote: onBehalf ? (input.note ?? null) : null,
+    })
     return { version: updated.version, status: updated.status }
   })
 }

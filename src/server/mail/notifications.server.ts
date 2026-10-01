@@ -9,6 +9,7 @@ import { mutedIds, watcherIds } from '../requests/watchers.server'
 import {
   assignedMail,
   changeAnsweredMail,
+  changeRecordedMail,
   changeProposedMail,
   commentMail,
   mentionMail,
@@ -184,13 +185,17 @@ export async function notifyChangeProposed(tx: Tx, actor: Actor, input: { reques
   )
 }
 
-/** Antwort des Kunden an den Mitarbeiter, der den Vorschlag gemacht hat. */
+/**
+ * Antwort des Kunden an den Mitarbeiter, der den Vorschlag gemacht hat. Haben Mitarbeiter die Antwort für den
+ * Kunden eingetragen (Issue #113), bekommt der Kunde eine Bestätigung mit dem neuen Stand.
+ */
 export async function notifyChangeAnswered(
   tx: Tx,
   actor: Actor,
-  input: { requestId: string; accepted: boolean; proposedById: string },
+  input: { requestId: string; accepted: boolean; proposedById: string; onBehalfNote?: string | null },
 ) {
   const request = await loadRequest(tx, input.requestId)
+  const name = await actorName(tx, actor.id)
   const rows = await tx
     .select({ email: users.email })
     .from(users)
@@ -205,8 +210,15 @@ export async function notifyChangeAnswered(
   await enqueueMail(
     tx,
     rows.map((r) => r.email),
-    changeAnsweredMail({ ...request, actorName: await actorName(tx, actor.id), accepted: input.accepted }),
+    changeAnsweredMail({ ...request, actorName: name, accepted: input.accepted }),
   )
+  if (input.onBehalfNote != null) {
+    await enqueueMail(
+      tx,
+      await customerRecipients(tx, request, actor.id),
+      changeRecordedMail({ ...request, actorName: name, accepted: input.accepted, note: input.onBehalfNote }),
+    )
+  }
 }
 
 export async function notifyPromisedDate(tx: Tx, actor: Actor, input: { requestId: string; date: string | null }) {

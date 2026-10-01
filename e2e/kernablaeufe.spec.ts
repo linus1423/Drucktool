@@ -83,12 +83,15 @@ test('Mitarbeiter schlägt eine Änderung vor', async ({ page }) => {
   await check(page, 'Auftragsliste')
   await page.goto(requestPath)
   await check(page, 'Auftrag (Mitarbeiter)')
-  await page.getByRole('button', { name: 'Änderung vorschlagen' }).click()
+  await page.getByRole('button', { name: 'Auftrag ändern' }).click()
   await page.locator('#proposal-copies').fill('30')
   await page.locator('#proposal-reason').fill('Laut Telefonat 30 statt 20 Exemplare.')
   await check(page, 'Änderungsvorschlag')
   await page.getByRole('button', { name: 'Vorschlag an den Kunden senden' }).click()
   await page.getByText('Wartet auf die Zustimmung des Kunden.').waitFor()
+  // Antwortet der Kunde per Mail, trägt die Druckerei sie hier ein (Issue #113).
+  await expect(page.getByRole('button', { name: 'Zustimmung eintragen' })).toBeDisabled()
+  await check(page, 'Vorschlag (Mitarbeiter)')
 })
 
 test('Kunde nimmt die Änderung an', async ({ page }) => {

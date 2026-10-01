@@ -67,6 +67,15 @@ Im Profil sieht jeder seine angemeldeten Geräte und kann sie einzeln oder alle 
   `docker compose --profile virenscanner up -d` und `CLAMAV_HOST=clamav`. Ohne `CLAMAV_HOST` wird nicht geprüft.
 - **Aufräumen:** Der Worker löscht beim Start und dann stündlich abgelaufene Sitzungen, Anmeldelinks,
   Rate-Limit-Zähler und alte Audit-Einträge, dazu die Daten mit Löschfrist (siehe Datenschutz). Die Löschungen sind idempotent, mehrere Worker stören sich nicht.
+- **Server-Härtung (Ansible-Rolle `hardening`):** Firewall `ufw` lässt eingehend nur SSH, HTTP und HTTPS zu. Weil
+  Docker die Firewall für veröffentlichte Ports umgeht, bindet die Compose-Datei die App immer an `127.0.0.1:3000`
+  (ohne Domain erreichbar per `ssh -L 3000:127.0.0.1:3000 deploy@server`); nur `drucktool_expose_app_port: true` gibt
+  Port 3000 ohne HTTPS frei, mit Warnung beim Ausrollen. SSH nur noch mit Schlüssel und ohne Root-Login (das Playbook
+  bricht vorher ab, wenn Ansible selbst als root oder mit Passwort verbindet), `fail2ban` sperrt IPs nach 5
+  Fehlversuchen für eine Stunde, `unattended-upgrades` spielt täglich Sicherheitsupdates ein (Neustart nur mit
+  `hardening_automatic_reboot: true`). Das Playbook bricht ab, solange im Vault Beispielpasswörter stehen. Alles
+  einzeln abschaltbar, siehe `ansible/roles/hardening/defaults/main.yml`, oder ganz mit
+  `drucktool_hardening_enabled: false`. Prüfen nach dem Ausrollen: `nmap -Pn <server>` zeigt nur 22, 80 und 443.
 
 ## Status eines Auftrags
 
@@ -302,6 +311,26 @@ Der Container spielt beim Start die Migrationen ein und legt den Superadmin an, 
 (`RUN_MIGRATIONS=false` schaltet das ab). Healthcheck: `GET /api/health`. Der Dienst `worker` nutzt dasselbe Image
 und verschickt die E-Mails. Druckdateien liegen im Volume `uploads`.
 
+## Logs und Überwachung
+
+- **Logs:** Die App schreibt in Produktion eine JSON-Zeile pro Eintrag (`LOG_FORMAT=text` für lesbaren Text, lokal
+  der Standard), mit Zeit, Level, Request-ID, Nutzer-ID sowie Methode, Pfad, Status und Dauer jeder Anfrage.
+  Passwörter, Tokens, Cookies und Abfrageparameter werden nie geschrieben. Jede Antwort trägt die Request-ID im
+  Header `x-request-id`. Auf dem Server: `docker compose -f /opt/drucktool/docker-compose.yml logs -f app`, z. B.
+  gefiltert mit `| grep <request-id>`. Die Compose-Dateien begrenzen die Logs je Container (Ansible:
+  `drucktool_log_max_size` × `drucktool_log_max_files`, Standard 5 × 10 MB).
+- **Unerwartete Fehler** (Datenbank, Programmierfehler) landen mit Stacktrace und Request-ID im Log. Der Nutzer sieht
+  nur „Es ist ein unerwarteter Fehler aufgetreten … (Fehlernummer <request-id>)“, über die sich der Logeintrag finden
+  lässt. Fachliche Meldungen („Passwort ist falsch“) bleiben unverändert.
+- **Fehler-Tracking (optional):** Mit `SENTRY_DSN` (Ansible: `drucktool_sentry_dsn`) geht jeder Fehler-Logeintrag
+  zusätzlich an Sentry oder ein selbst gehostetes GlitchTip, mit Version, Umgebung, Request-ID und Nutzer-ID.
+- **Uptime und TLS-Zertifikat:** Ein externer Dienst sollte `https://<domain>/api/health` überwachen (erwartet HTTP 200
+  mit `"status":"ok"`). Am einfachsten über [healthchecks.io](https://healthchecks.io) (kostenlos) oder ein eigenes
+  Uptime Kuma: Check anlegen (Periode 5 Minuten, Grace 10 Minuten) und die Ping-URL als `drucktool_monitor_ping_url`
+  eintragen. Der Server ruft dann alle 5 Minuten seine öffentliche Adresse auf, prüft, dass das TLS-Zertifikat noch
+  mindestens 14 Tage gilt, und meldet sich. Fällt der Server aus, bleibt die Meldung aus und der Dienst schlägt Alarm;
+  bei einem Fehler kommt die Meldung mit Grund (`<url>/fail`). Von Hand: `sudo drucktool-monitor`.
+
 ## CI
 
 `.github/workflows/ci.yml` läuft bei jedem Pull Request und jedem Push auf `main`:
@@ -434,6 +463,8 @@ holt einen älteren Stand.
 | `APP_URL`                                                                           | Öffentliche URL (für Links in E-Mails)                                               |
 | `COOKIE_SECURE`                                                                     | `false` nur ohne HTTPS; Standard in Produktion ist `true`                            |
 | `TRUST_PROXY`                                                                       | `true` hinter einem Reverse Proxy, damit Client-IPs erkannt werden                   |
+| `LOG_LEVEL`, `LOG_FORMAT`                                                           | `debug`, `info` (Standard), `warn`, `error`; `json` oder `text`                      |
+| `SENTRY_DSN`                                                                        | Optional: Fehler an Sentry oder GlitchTip melden                                     |
 | `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`                                           | Legt beim ersten Start den Superadmin an                                             |
 | `CUSTOMER_EMAIL_DOMAINS`                                                            | Optional: neue Kundenkonten nur für diese Domains, z. B. `tum.de`                    |
 | `SMTP_URL`                                                                          | SMTP-Server, z. B. `smtps://user:pass@mail.example.com:465`                          |
@@ -452,6 +483,8 @@ holt einen älteren Stand.
 | `OIDC_DISPLAY_NAME`, `OIDC_NEW_USERS`, `OIDC_TRUST_EMAIL`                           | Beschriftung und Verhalten der OIDC-Anmeldung                                        |
 | `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_ROLES`, `OIDC_STAFF_ROLES`, `OIDC_ENFORCE_FOR_STAFF` | Rollen vom Anbieter, siehe oben                                                      |
 
-## Nächste Schritte
+## Mitwirken und Betrieb
 
-- Weitere offene Punkte stehen als Issues im Repository.
+- Fehler melden, Wünsche äußern und Code beitragen: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Wartung und Notfall-Ablauf für die FSMB-IT: [docs/BETRIEB.md](docs/BETRIEB.md)
+- Offene Punkte stehen als Issues im Repository.

@@ -1,4 +1,17 @@
 drucktool_dir: /opt/drucktool
+drucktool_domain: ''
+drucktool_acme_email: ''
+# Ohne Domain ist die App nur auf dem Server selbst (127.0.0.1:3000) erreichbar, z. B. per SSH-Tunnel.
+# true gibt Port 3000 ohne HTTPS nach außen frei (Docker umgeht dabei die Firewall!).
+drucktool_expose_app_port: false
+# Beispielwerte aus vault.example.yml und .env.example. Das Playbook bricht ab, wenn eines davon gesetzt ist.
+drucktool_example_passwords:
+  - bitte-ein-langes-zufaelliges-passwort
+  - bitte-aendern-mindestens-12-zeichen
+  - bitte-aendern-123
+  - drucktool
+  - changeme
+  - password
 drucktool_backup_dir: /var/backups/drucktool
 drucktool_backup_keep_days: 14
 drucktool_upload_max_mb: 500
@@ -14,6 +27,12 @@ drucktool_rejected_registration_retention_days: 30
 # Links auf Datenschutzerklärung und Impressum in der Fußzeile (leer = ausblenden)
 drucktool_privacy_url: ''
 drucktool_imprint_url: ''
+# Logs: debug, info, warn, error. Docker hält je Container höchstens max_files Dateien zu je max_size.
+drucktool_log_level: info
+drucktool_log_max_size: 10m
+drucktool_log_max_files: 5
+# Fehler-Tracking mit Sentry oder GlitchTip (leer = aus)
+drucktool_sentry_dsn: ''
 drucktool_registry_username: ''
 drucktool_registry_password: ''
 drucktool_customer_email_domains: []

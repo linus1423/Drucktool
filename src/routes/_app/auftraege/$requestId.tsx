@@ -163,8 +163,12 @@ function RequestDetailPage() {
               actions={
                 <div className="flex gap-2">
                   {canPropose && !request.proposal && !proposing ? (
-                    <Button variant="secondary" onClick={() => setProposing(true)}>
-                      Änderung vorschlagen
+                    <Button
+                      variant="secondary"
+                      title="Papier, Bindung, Auflage und alle anderen Optionen ändern; der Kunde bekommt ein neues Angebot."
+                      onClick={() => setProposing(true)}
+                    >
+                      Auftrag ändern
                     </Button>
                   ) : null}
                   {request.canEdit ? (
@@ -846,9 +850,15 @@ function describeEvent(e: Detail['events'][number]) {
       return `hat eine Änderung vorgeschlagen${total != null ? ` (neuer Preis ${formatMoney(total)})` : ''}`
     }
     case 'change_accepted':
-      return 'hat der Änderung zugestimmt'
-    case 'change_rejected':
-      return 'hat die Änderung abgelehnt'
+    case 'change_rejected': {
+      const verb = e.type === 'change_accepted' ? 'Zustimmung' : 'Ablehnung'
+      // Von Mitarbeitern für den Kunden eingetragen (Issue #113).
+      if (e.data.onBehalf === true) {
+        const note = typeof e.data.note === 'string' ? e.data.note : ''
+        return `hat die ${verb} des Kunden eingetragen${note ? ` („${note}“)` : ''}`
+      }
+      return e.type === 'change_accepted' ? 'hat der Änderung zugestimmt' : 'hat die Änderung abgelehnt'
+    }
     case 'change_withdrawn':
       return 'hat den Änderungsvorschlag zurückgezogen'
     case 'print_sheet_changed': {

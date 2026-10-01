@@ -1,0 +1,11 @@
+# Verwaltet von Ansible (Rolle hardening).
+[DEFAULT]
+# Debian 12 und Ubuntu 24.04 schreiben kein auth.log mehr, die Anmeldungen stehen im Journal.
+backend = systemd
+bantime = 1h
+findtime = 10m
+maxretry = 5
+
+[sshd]
+enabled = true
+port = {{ hardening_ssh_port }}

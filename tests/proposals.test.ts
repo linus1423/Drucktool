@@ -125,7 +125,7 @@ describe.skipIf(!url)('Änderungsvorschläge der Druckerei (Issue #50)', () => {
     const { id } = await placeOrder(customer)
     const { version } = await proposeChange(staff, await proposal(id, 1, { copies: 2 }))
     await expect(answerChange(other, { id, version, accept: true })).rejects.toThrow('Auftrag nicht gefunden')
-    await expect(answerChange(staff, { id, version, accept: true })).rejects.toThrow('Nur der Auftraggeber')
+    await expect(answerChange(staff, { id, version, accept: true })).rejects.toThrow('wie der Kunde geantwortet hat')
     await expect(changeStatus(customer, { id, version, to: 'submitted' })).rejects.toThrow('Änderungsvorschlag')
     await expect(changeStatus(staff, { id, version, to: 'confirmed' })).rejects.toThrow('Änderungsvorschlag')
 
@@ -177,5 +177,38 @@ describe.skipIf(!url)('Änderungsvorschläge der Druckerei (Issue #50)', () => {
     const d = await getRequestDetail(customer, id)
     const rows = compareOrders(d, d.proposal!)
     expect(rows.filter((r) => r.changed).map((r) => r.label)).toEqual(['Exemplare', 'Preis'])
+  })
+
+  it('lässt Mitarbeiter eine Zustimmung per Mail eintragen (Issue #113)', async () => {
+    const { id } = await placeOrder(customer)
+    const confirmed = await changeStatus(staff, { id, version: 1, to: 'confirmed' })
+    const { version } = await proposeChange(staff, await proposal(id, confirmed.version, { copies: 30 }))
+    expect((await getRequestDetail(staff, id)).canRecordAnswer).toBe(true)
+    expect((await getRequestDetail(customer, id)).canRecordAnswer).toBe(false)
+    await expect(answerChange(other, { id, version, accept: true, note: 'per Mail' })).rejects.toThrow('Auftrag nicht gefunden')
+
+    await answerChange(staff2, { id, version, accept: true, note: 'Zustimmung per Mail vom 01.10.' })
+    const after = await getRequestDetail(customer, id)
+    expect(after.status).toBe('confirmed')
+    expect(after.proposal).toBeNull()
+    expect(after.order!.spec.copies).toBe(30)
+    const event = after.events.at(-1)!
+    expect(event.type).toBe('change_accepted')
+    expect(event.data).toMatchObject({ onBehalf: true, note: 'Zustimmung per Mail vom 01.10.' })
+    expect((await mailsTo(customer)).some((m) => m.subject.startsWith('Änderung übernommen'))).toBe(true)
+    // Der Mitarbeiter, der den Vorschlag gemacht hat, erfährt davon.
+    expect((await mailsTo(staff)).some((m) => m.subject.startsWith('Änderung angenommen'))).toBe(true)
+  })
+
+  it('lässt Mitarbeiter eine Ablehnung eintragen', async () => {
+    const { id } = await placeOrder(customer)
+    const before = await getRequestDetail(staff, id)
+    const { version } = await proposeChange(staff, await proposal(id, 1, { copies: 40 }))
+    await answerChange(staff, { id, version, accept: false, note: 'Ablehnung am Telefon' })
+    const after = await getRequestDetail(staff, id)
+    expect(after.proposal).toBeNull()
+    expect(after.order).toEqual(before.order)
+    expect(after.events.at(-1)).toMatchObject({ type: 'change_rejected', data: { onBehalf: true } })
+    expect((await mailsTo(customer)).some((m) => m.subject.startsWith('Änderung verworfen'))).toBe(true)
   })
 })

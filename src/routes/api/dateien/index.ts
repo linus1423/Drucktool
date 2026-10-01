@@ -6,6 +6,7 @@ import { getSessionUser } from '~/server/auth/session.server'
 import { AttachmentTypeError, EmptyUploadError, createUpload, uploadLimit } from '~/server/files/files.server'
 import { UploadTooLargeError } from '~/server/files/storage.server'
 import { VirusFoundError, VirusScanUnavailableError } from '~/server/files/virus-scan.server'
+import { logger } from '~/server/log.server'
 
 const json = (body: unknown, status = 200) => Response.json(body, { status })
 

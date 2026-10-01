@@ -9,9 +9,15 @@ drucktool_image_tag: latest
 # production oder staging; wird in group_vars/production.yml bzw. staging.yml je Gruppe gesetzt.
 drucktool_environment: production
 
-# Domain für HTTPS über Caddy (Let's Encrypt). Leer lassen, um nur Port 3000 freizugeben.
+# Domain für HTTPS über Caddy (Let's Encrypt). Ohne Domain ist die App nur auf dem Server unter 127.0.0.1:3000
+# erreichbar (SSH-Tunnel), außer drucktool_expose_app_port ist true (Port 3000 ohne HTTPS nach außen).
 drucktool_domain: ''
 drucktool_acme_email: ''
+drucktool_expose_app_port: false
+
+# Server-Härtung: Firewall (nur SSH, HTTP, HTTPS), SSH nur mit Schlüssel und ohne Root-Login, fail2ban,
+# automatische Sicherheitsupdates. Einzelne Teile abschalten: siehe roles/hardening/defaults/main.yml.
+drucktool_hardening_enabled: true
 
 drucktool_superadmin_email: ''
 
@@ -23,6 +29,18 @@ drucktool_mail_from: 'Drucktool <noreply@example.com>'
 
 # Größte erlaubte Druckdatei in MB. Bei Caddy gibt es kein eigenes Limit.
 drucktool_upload_max_mb: 500
+
+# Logs: debug, info, warn, error. Die App schreibt eine JSON-Zeile pro Eintrag mit Request-ID
+# (ansehen mit: docker compose -f /opt/drucktool/docker-compose.yml logs app).
+drucktool_log_level: info
+
+# Fehler-Tracking mit Sentry oder GlitchTip: DSN des Projekts eintragen, z. B. https://<key>@glitchtip.example.com/1.
+drucktool_sentry_dsn: ''
+
+# Überwachung (optional, z. B. mit https://healthchecks.io): alle 5 Minuten prüft der Server /api/health über die
+# öffentliche Adresse und die Laufzeit des TLS-Zertifikats und meldet sich bei dieser URL. Bleibt die Meldung aus
+# (Server ausgefallen) oder kommt <url>/fail, schlägt der Dienst Alarm.
+drucktool_monitor_ping_url: ''
 
 # Anmeldung über OpenID Connect. Leer lassen, um sie abzuschalten.
 # Beim Anbieter als Redirect-URI eintragen: https://<drucktool_domain>/api/auth/oidc/callback

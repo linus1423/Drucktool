@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { AUDIT_ACTIONS, type AuditAction } from '~/lib/audit'
 import type { JsonObject } from '~/lib/json'
 import { getDb, schema, type Tx } from '../db/client.server'
+import { logger } from '../log.server'
 
 type Db = ReturnType<typeof getDb> | Tx
 const { auditLog, users, organisations } = schema
@@ -74,7 +75,7 @@ export async function auditLogin(
       },
     })
   } catch (error) {
-    console.error('[audit] Anmeldung konnte nicht protokolliert werden', error)
+    logger.error('Anmeldung konnte nicht im Audit-Log protokolliert werden', { err: error })
   }
 }
 

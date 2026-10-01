@@ -1,7 +1,16 @@
 # Verwaltet von Ansible – Änderungen hier werden überschrieben.
+
+# Logs je Container begrenzen (höchstens max-file Dateien zu je max-size), damit sie die Platte nicht füllen.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '{{ drucktool_log_max_size }}'
+    max-file: '{{ drucktool_log_max_files }}'
+
 services:
   db:
     image: postgres:16-alpine
+    logging: *logging
     restart: unless-stopped
     environment:
       POSTGRES_DB: drucktool
@@ -17,6 +26,7 @@ services:
 
   app:
     image: {{ drucktool_image }}:{{ drucktool_image_tag }}
+    logging: *logging
     restart: unless-stopped
     env_file: .env
     depends_on:
@@ -31,10 +41,12 @@ services:
       # Hochgeladene Druckdateien, gehört dem Benutzer node (UID 1000) im Container.
       - ./uploads:/app/uploads
     ports:
-{% if drucktool_domain %}
-      # Nur lokal erreichbar, Caddy übernimmt HTTPS.
+{% if drucktool_domain or not drucktool_expose_app_port %}
+      # Nur auf dem Server erreichbar{{ ', Caddy übernimmt HTTPS' if drucktool_domain else ' (ohne Domain z. B. per SSH-Tunnel)' }}.
+      # Docker umgeht die Firewall, deshalb nie ohne 127.0.0.1 veröffentlichen.
       - '127.0.0.1:3000:3000'
 {% else %}
+      # drucktool_expose_app_port: ohne HTTPS aus dem Internet erreichbar.
       - '3000:3000'
 {% endif %}
 
@@ -42,6 +54,7 @@ services:
   worker:
     image: {{ drucktool_image }}:{{ drucktool_image_tag }}
     command: worker
+    logging: *logging
     restart: unless-stopped
     env_file: .env
     depends_on:
@@ -67,6 +80,7 @@ services:
 
   caddy:
     image: caddy:2-alpine
+    logging: *logging
     restart: unless-stopped
     depends_on: [app]
     ports:
