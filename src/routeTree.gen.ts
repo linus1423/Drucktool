@@ -26,6 +26,7 @@ import { Route as AppAdminKatalogRouteImport } from './routes/_app/admin/katalog
 import { Route as AppAuftraegeIndexRouteImport } from './routes/_app/auftraege/index'
 import { Route as AppAuftraegeRequestIdRouteImport } from './routes/_app/auftraege/$requestId'
 import { Route as AppAuftraegeNeuRouteImport } from './routes/_app/auftraege/neu'
+import { Route as ApiAuftraegeExportRouteImport } from './routes/api/auftraege/export'
 import { Route as ApiDateienIndexRouteImport } from './routes/api/dateien/index'
 import { Route as ApiDateienFileIdRouteImport } from './routes/api/dateien/$fileId'
 import { Route as AppAdminOrganisationenIndexRouteImport } from './routes/_app/admin/organisationen/index'
@@ -118,6 +119,11 @@ const AppAuftraegeNeuRoute = AppAuftraegeNeuRouteImport.update({
   path: '/auftraege/neu',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiAuftraegeExportRoute = ApiAuftraegeExportRouteImport.update({
+  id: '/api/auftraege/export',
+  path: '/api/auftraege/export',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDateienIndexRoute = ApiDateienIndexRouteImport.update({
   id: '/api/dateien/',
   path: '/api/dateien/',
@@ -173,6 +179,7 @@ export interface FileRoutesByFullPath {
   '/admin/katalog': typeof AppAdminKatalogRoute
   '/auftraege/$requestId': typeof AppAuftraegeRequestIdRoute
   '/auftraege/neu': typeof AppAuftraegeNeuRoute
+  '/api/auftraege/export': typeof ApiAuftraegeExportRoute
   '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
   '/auftraege/': typeof AppAuftraegeIndexRoute
   '/api/dateien/': typeof ApiDateienIndexRoute
@@ -198,6 +205,7 @@ export interface FileRoutesByTo {
   '/admin/katalog': typeof AppAdminKatalogRoute
   '/auftraege/$requestId': typeof AppAuftraegeRequestIdRoute
   '/auftraege/neu': typeof AppAuftraegeNeuRoute
+  '/api/auftraege/export': typeof ApiAuftraegeExportRoute
   '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
   '/auftraege': typeof AppAuftraegeIndexRoute
   '/api/dateien': typeof ApiDateienIndexRoute
@@ -225,6 +233,7 @@ export interface FileRoutesById {
   '/_app/admin/katalog': typeof AppAdminKatalogRoute
   '/_app/auftraege/$requestId': typeof AppAuftraegeRequestIdRoute
   '/_app/auftraege/neu': typeof AppAuftraegeNeuRoute
+  '/api/auftraege/export': typeof ApiAuftraegeExportRoute
   '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
   '/_app/auftraege/': typeof AppAuftraegeIndexRoute
   '/api/dateien/': typeof ApiDateienIndexRoute
@@ -252,6 +261,7 @@ export interface FileRouteTypes {
     | '/admin/katalog'
     | '/auftraege/$requestId'
     | '/auftraege/neu'
+    | '/api/auftraege/export'
     | '/api/dateien/$fileId'
     | '/auftraege/'
     | '/api/dateien/'
@@ -277,6 +287,7 @@ export interface FileRouteTypes {
     | '/admin/katalog'
     | '/auftraege/$requestId'
     | '/auftraege/neu'
+    | '/api/auftraege/export'
     | '/api/dateien/$fileId'
     | '/auftraege'
     | '/api/dateien'
@@ -303,6 +314,7 @@ export interface FileRouteTypes {
     | '/_app/admin/katalog'
     | '/_app/auftraege/$requestId'
     | '/_app/auftraege/neu'
+    | '/api/auftraege/export'
     | '/api/dateien/$fileId'
     | '/_app/auftraege/'
     | '/api/dateien/'
@@ -322,6 +334,7 @@ export interface RootRouteChildren {
   AnfragenSplatRoute: typeof AnfragenSplatRoute
   ApiHealthRoute: typeof ApiHealthRoute
   AnfragenIndexRoute: typeof AnfragenIndexRoute
+  ApiAuftraegeExportRoute: typeof ApiAuftraegeExportRoute
   ApiDateienFileIdRoute: typeof ApiDateienFileIdRoute
   ApiDateienIndexRoute: typeof ApiDateienIndexRoute
   ApiAuthOidcCallbackRoute: typeof ApiAuthOidcCallbackRoute
@@ -449,6 +462,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAuftraegeNeuRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/auftraege/export': {
+      id: '/api/auftraege/export'
+      path: '/api/auftraege/export'
+      fullPath: '/api/auftraege/export'
+      preLoaderRoute: typeof ApiAuftraegeExportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/dateien/': {
       id: '/api/dateien/'
       path: '/api/dateien'
@@ -553,6 +573,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnfragenSplatRoute: AnfragenSplatRoute,
   ApiHealthRoute: ApiHealthRoute,
   AnfragenIndexRoute: AnfragenIndexRoute,
+  ApiAuftraegeExportRoute: ApiAuftraegeExportRoute,
   ApiDateienFileIdRoute: ApiDateienFileIdRoute,
   ApiDateienIndexRoute: ApiDateienIndexRoute,
   ApiAuthOidcCallbackRoute: ApiAuthOidcCallbackRoute,

@@ -1,0 +1,2 @@
+ALTER TABLE "requests" ADD COLUMN "reorder_of_id" uuid;--> statement-breakpoint
+ALTER TABLE "requests" ADD CONSTRAINT "requests_reorder_of_id_requests_id_fk" FOREIGN KEY ("reorder_of_id") REFERENCES "public"."requests"("id") ON DELETE set null ON UPDATE no action;

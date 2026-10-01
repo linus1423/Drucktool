@@ -41,6 +41,9 @@ export function DataTable<TData extends object>({
   emptyText = 'Keine Einträge vorhanden.',
   onRowClick,
   toolbar,
+  sorting,
+  onSortingChange,
+  footer,
 }: {
   data: TData[]
   columns: ColumnDef<DataTableFeatures, TData, any>[]
@@ -50,6 +53,10 @@ export function DataTable<TData extends object>({
   emptyText?: string
   onRowClick?: (row: TData) => void
   toolbar?: ReactNode
+  /** Serverseitige Sortierung: Zustand kommt von außen, die Zeilen werden nicht umsortiert. */
+  sorting?: SortingState
+  onSortingChange?: (sorting: SortingState) => void
+  footer?: ReactNode
 }) {
   const [globalFilter, setGlobalFilter] = useState('')
   const table = useTable({
@@ -57,7 +64,11 @@ export function DataTable<TData extends object>({
     data,
     columns,
     initialState: { sorting: initialSorting },
-    state: { globalFilter },
+    state: sorting ? { globalFilter, sorting } : { globalFilter },
+    manualSorting: !!sorting,
+    onSortingChange: onSortingChange
+      ? (updater) => onSortingChange(typeof updater === 'function' ? updater(sorting ?? []) : updater)
+      : undefined,
     onGlobalFilterChange: setGlobalFilter,
     globalFilterFn: 'includesString',
   })
@@ -140,6 +151,7 @@ export function DataTable<TData extends object>({
           </tbody>
         </table>
       </div>
+      {footer}
     </div>
   )
 }

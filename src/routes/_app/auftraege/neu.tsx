@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { z } from 'zod'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { FileUpload, type UploadedFile } from '~/components/FileUpload'
@@ -6,7 +7,7 @@ import { HelpTip } from '~/components/HelpTip'
 import { Alert, Button, Card, Field, Input, PageHeader, Select, Textarea, cx } from '~/components/ui'
 import { EMPTY_DELIVERY, deliveryAddressSchema, type DeliveryAddress } from '~/lib/address'
 import { errorMessage } from '~/lib/errors'
-import { formatMoney } from '~/lib/format'
+import { formatMoney, formatRequestNumber } from '~/lib/format'
 import {
   CUSTOM_MAX_MM,
   CUSTOM_MIN_MM,
@@ -27,9 +28,11 @@ import {
 import { calculatePrice } from '~/lib/pricing'
 import { accountQuery, activeOrganisationsQuery, orderCatalogQuery } from '~/lib/queries'
 import { isStaffRole } from '~/lib/roles'
-import { createRequestFn } from '~/server/requests/requests.functions'
+import { createRequestFn, prepareReorderFn } from '~/server/requests/requests.functions'
 
 export const Route = createFileRoute('/_app/auftraege/neu')({
+  // ?vorlage=<id>: Nachbestellung eines früheren Auftrags (Issue #10)
+  validateSearch: z.object({ vorlage: z.uuid().optional().catch(undefined) }),
   loader: ({ context }) =>
     Promise.all([context.queryClient.ensureQueryData(orderCatalogQuery), context.queryClient.ensureQueryData(accountQuery)]),
   head: () => ({ meta: [{ title: 'Neuer Auftrag · Drucktool' }] }),
@@ -135,6 +138,18 @@ function NewOrderPage() {
   const [step, setStep] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const { vorlage } = Route.useSearch()
+  // POST mit Seiteneffekt (Dateikopien), deshalb nur einmal je Vorlage und ohne Wiederholung.
+  const template = useQuery({
+    queryKey: ['reorder', vorlage],
+    queryFn: () => prepareReorderFn({ data: { id: vorlage! } }),
+    enabled: !!vorlage,
+    staleTime: Infinity,
+    gcTime: Infinity,
+    retry: false,
+    refetchOnWindowFocus: false,
+  })
+  const applied = useRef<string | null>(null)
   const [draft, setDraft] = useState<Draft>(() => ({
     mainFile: null,
     manualPages: '',
@@ -160,6 +175,40 @@ function NewOrderPage() {
   }))
 
   const update = (patch: Partial<Draft>) => setDraft((d) => normalize(catalog, { ...d, ...patch }))
+
+  useEffect(() => {
+    const t = template.data
+    if (!t || applied.current === t.source.id) return
+    applied.current = t.source.id
+    const s = t.spec
+    setDraft((d) =>
+      normalize(catalog, {
+        ...d,
+        mainFile: t.mainFile,
+        manualPages: String(s.pages),
+        formatId: s.formatId,
+        customWidth: s.customWidthMm?.toString() ?? '',
+        customHeight: s.customHeightMm?.toString() ?? '',
+        bindingId: s.bindingId,
+        duplex: s.duplex,
+        paperId: s.paperId,
+        coverEnabled: !!s.coverPaperId && !!t.coverFile,
+        coverPaperId: s.coverPaperId ?? '',
+        coverFile: t.coverFile,
+        coverManualPages: s.coverPages ?? 1,
+        coverColorId: s.coverColorId ?? '',
+        coverBackColorId: s.coverBackColorId ?? '',
+        borderless: s.borderless,
+        copies: String(s.copies),
+        title: t.title,
+        notes: t.notes,
+        delivery: s.delivery,
+        deliveryAddress: t.deliveryAddress ?? d.deliveryAddress,
+      }),
+    )
+    // Bei einer Nachbestellung ändert sich meist nur die Anzahl.
+    setStep(4)
+  }, [template.data, catalog])
   // Katalog kann sich nach "Preis geändert" neu laden; Auswahlen dann erneut prüfen.
   useEffect(() => setDraft((d) => normalize(catalog, d)), [catalog])
 
@@ -192,6 +241,7 @@ function NewOrderPage() {
           acceptTerms: true,
           expectedTotalCents: priced.price.totalCents,
           organisationId: staff ? organisationId || undefined : undefined,
+          reorderOfId: template.data?.source.id,
         },
       })
       await queryClient.invalidateQueries({ queryKey: ['requests'] })
@@ -220,6 +270,24 @@ function NewOrderPage() {
             </Link>
             .
           </Alert>
+        </div>
+      ) : null}
+
+      {vorlage ? (
+        <div className="mb-4">
+          {template.isPending ? (
+            <Alert tone="info">Die Vorlage wird geladen …</Alert>
+          ) : template.error ? (
+            <Alert>{errorMessage(template.error)}</Alert>
+          ) : template.data ? (
+            <Alert tone="info">
+              Nachbestellung von{' '}
+              <Link to="/auftraege/$requestId" params={{ requestId: template.data.source.id }} className="underline">
+                {formatRequestNumber(template.data.source.number)}
+              </Link>
+              . Optionen und Dateien sind übernommen; der Preis wird mit den aktuellen Preisen neu berechnet. Bitte alles prüfen.
+            </Alert>
+          ) : null}
         </div>
       ) : null}
 

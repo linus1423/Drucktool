@@ -92,6 +92,17 @@ das Ergebnis der PDF-Prüfung. Auch verschlüsselte oder nicht lesbare PDFs werd
 dann einen Hinweis. Hochgeladene Dateien, die nach 24 Stunden zu keinem Auftrag gehören, werden gelöscht.
 Herunterladen dürfen Mitarbeiter und der Kunde, dem der Auftrag gehört.
 
+An Nachrichten lassen sich bis zu zehn Dateien anhängen (z. B. korrigierte Druckdaten, Logos, Fotos). Sie liegen in
+derselben Ablage. Anhänge interner Notizen sehen nur Mitarbeiter.
+
+## Änderungen durch die Druckerei
+
+Mitarbeiter können Optionen und Preis eines Auftrags nicht direkt ändern, sondern schlagen über „Änderung
+vorschlagen“ einen neuen Stand vor, optional mit manuell gesetztem Preis und immer mit Begründung. Der Auftrag geht
+auf „Rückfrage“, der Kunde bekommt eine E-Mail und sieht Vorher und Nachher. Erst wenn er zustimmt, gilt der neue
+Stand samt Preis, und der Auftrag kehrt in seinen vorherigen Status zurück. Lehnt er ab, bleibt alles, wie es war.
+Solange ein Vorschlag offen ist, kann der Auftrag nur storniert oder abgelehnt werden. Alle Schritte stehen im Verlauf.
+
 ## Schutz vor gleichzeitigen Änderungen
 
 Jede Anfrage hat eine `version`. Änderungen (Status, Bearbeiten, Zuweisung) schicken die Version mit, die der
@@ -106,16 +117,21 @@ Das Tool verschickt E-Mails bei neuen Anfragen, Statuswechseln, Nachrichten, Zuw
 | Ereignis                         | Empfänger                                                                  |
 | -------------------------------- | -------------------------------------------------------------------------- |
 | Kunde reicht Auftrag ein         | Alle Mitarbeiter, dazu eine Eingangsbestätigung an den Kunden              |
-| Mitarbeiter ändert Status        | Der Kunde, der den Auftrag angelegt hat (nicht bei internen Unterstatus)   |
-| Kunde ändert Status / schreibt   | Der zuständige Mitarbeiter, ohne Zuständigen alle Mitarbeiter              |
-| Mitarbeiter schreibt Nachricht   | Der Kunde, der den Auftrag angelegt hat                                    |
-| Interne Notiz                    | Nur der zuständige Mitarbeiter                                             |
+| Statuswechsel / Nachricht        | Alle Beobachter des Auftrags; bei Aktionen des Kunden ohne Zuständigen alle Mitarbeiter |
+| Interne Notiz                    | Nur beobachtende Mitarbeiter, nie Kunden                                   |
+| Erwähnung mit `@Name`            | Der erwähnte Mitarbeiter (eigene Mail statt der allgemeinen)                |
 | Zuweisung                        | Der neu zuständige Mitarbeiter                                             |
 | Anmeldelink                      | Die angegebene Adresse (immer, unabhängig von der Einstellung)             |
 | Neue Registrierung über OIDC     | Alle Superadmins (nur bei `OIDC_NEW_USERS=pending`)                        |
 | Freigabe / Ablehnung             | Die registrierte Person (immer, unabhängig von der Einstellung)             |
 
 Wer eine Änderung selbst auslöst, bekommt keine Mail. Im Profil lassen sich Benachrichtigungen abschalten.
+
+Ersteller und Zuständiger beobachten einen Auftrag automatisch. Auf der Detailseite lässt sich das Beobachten pro
+Auftrag an- und abschalten; Mitarbeiter können so auch fremde Aufträge verfolgen und sehen, wer sonst beobachtet.
+Mitarbeiter erwähnen sich in Nachrichten und internen Notizen mit `@Name` (Auswahl unter dem Eingabefeld); Erwähnte
+beobachten den Auftrag danach. Kunden können niemanden erwähnen. Die Ansicht „Für mich“ in der Auftragsliste zeigt alle
+beobachteten Aufträge.
 
 Die Mails werden in derselben Transaktion wie die Änderung in die Tabelle `email_outbox` geschrieben und von einem
 eigenen Worker-Prozess verschickt (`pnpm mail:worker`, im Container `worker`). Scheitert der Versand, versucht der
@@ -213,11 +229,11 @@ Ist das Paket in der GitHub Container Registry privat, `drucktool_registry_usern
 | `MAIL_FROM`                               | Absender, z. B. `Druckerei Muster <auftraege@example.com>`             |
 | `UPLOAD_DIR`                              | Ablage für Druckdateien, Standard `data/uploads` (im Image `/app/uploads`) |
 | `UPLOAD_MAX_MB`                           | Größte erlaubte Druckdatei in MB, Standard 500                         |
+| `ATTACHMENT_MAX_MB`, `ATTACHMENT_TYPES`   | Anhänge an Nachrichten: Größe in MB (Standard 25), erlaubte Endungen (kommagetrennt) |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | OpenID Connect, siehe oben                                 |
 | `OIDC_DISPLAY_NAME`, `OIDC_NEW_USERS`, `OIDC_TRUST_EMAIL` | Beschriftung und Verhalten der OIDC-Anmeldung          |
 | `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_ROLES`, `OIDC_STAFF_ROLES`, `OIDC_ENFORCE_FOR_STAFF` | Rollen vom Anbieter, siehe oben |
 
 ## Nächste Schritte
 
-- Änderungen durch die Druckerei, denen der Kunde zustimmt (#50)
 - Weitere offene Punkte stehen als Issues im Repository.
