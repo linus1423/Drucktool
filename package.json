@@ -8,6 +8,7 @@
     "start": "node .output/server/index.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
@@ -31,6 +32,8 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "1.56.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.6.3",
     "@types/nodemailer": "^8.0.2",

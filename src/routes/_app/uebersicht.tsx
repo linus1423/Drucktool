@@ -219,7 +219,7 @@ function CustomerView({ data }: { data: CustomerDashboard }) {
             {data.waiting.map((r) => (
               <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
                 <Link to="/auftraege/$requestId" params={{ requestId: r.id }} className="font-medium hover:underline">
-                  <span className="mr-1 font-mono text-slate-400">{formatRequestNumber(r.number)}</span>
+                  <span className="mr-1 font-mono text-slate-500">{formatRequestNumber(r.number)}</span>
                   {r.title}
                 </Link>
                 <span className="flex gap-1">

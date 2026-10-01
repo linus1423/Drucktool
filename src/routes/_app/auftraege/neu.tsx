@@ -694,9 +694,9 @@ function PaperStep({ draft, update, catalog }: StepProps) {
             <input type="checkbox" checked={draft.coverEnabled} onChange={(e) => update({ coverEnabled: e.target.checked })} />
             Separates Deckblatt aus anderem Papier
             <HelpTip label="Deckblatt">
-              Das Deckblatt können Sie als eigene PDF mit beliebig vielen Seiten hochladen. Ohne eigene Datei nehmen
-              wir die ersten bzw. letzten zwei Seiten Ihrer Druckdatei. Jedes Deckblatt wird beidseitig auf das gewählte
-              Papier gedruckt und als ein Blatt berechnet.
+              Das Deckblatt können Sie als eigene PDF mit beliebig vielen Seiten hochladen. Ohne eigene Datei nehmen wir die
+              ersten bzw. letzten zwei Seiten Ihrer Druckdatei. Jedes Deckblatt wird beidseitig auf das gewählte Papier gedruckt
+              und als ein Blatt berechnet.
             </HelpTip>
           </label>
           {draft.coverEnabled ? (
@@ -783,8 +783,8 @@ function CoverFromMainFileNote({ draft }: { draft: Draft }) {
   return (
     <Alert tone="info">
       Ohne eigene Deckblatt-Datei drucken wir {which} aus Ihrer Druckdatei beidseitig auf das Deckblattpapier, auch bei
-      einseitigem Druck. Diese Seiten werden nicht zusätzlich im Innenteil gedruckt. Bitte legen Sie die Druckdatei
-      entsprechend an.
+      einseitigem Druck. Diese Seiten werden nicht zusätzlich im Innenteil gedruckt. Bitte legen Sie die Druckdatei entsprechend
+      an.
     </Alert>
   )
 }
@@ -948,25 +948,27 @@ function PricePreview({
       </dl>
       <div className="mt-4 border-t border-slate-100 pt-3 text-sm">
         {priced?.ok ? (
-          <dl className="space-y-1">
-            <div className="flex justify-between">
-              <dt>Druckkosten</dt>
-              <dd>{formatMoney(priced.price.printCents)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt>Lieferkosten</dt>
-              <dd>{formatMoney(priced.price.deliveryCents)}</dd>
-            </div>
-            <div className="flex justify-between text-base font-semibold" data-testid="price-total">
-              <dt>Gesamt</dt>
-              <dd>{formatMoney(priced.price.totalCents)}</dd>
-            </div>
+          <>
+            <dl className="space-y-1">
+              <div className="flex justify-between">
+                <dt>Druckkosten</dt>
+                <dd>{formatMoney(priced.price.printCents)}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt>Lieferkosten</dt>
+                <dd>{formatMoney(priced.price.deliveryCents)}</dd>
+              </div>
+              <div className="flex justify-between text-base font-semibold" data-testid="price-total">
+                <dt>Gesamt</dt>
+                <dd>{formatMoney(priced.price.totalCents)}</dd>
+              </div>
+            </dl>
             {priced.price.lines.some((l) => l.key === 'minimum') ? (
-              <p className="text-xs text-slate-500">
+              <p className="mt-1 text-xs text-slate-500">
                 Enthält den Mindestpreis von {formatMoney(catalog.pricing.minimumOrderCents)}.
               </p>
             ) : null}
-          </dl>
+          </>
         ) : priced && !priced.ok ? (
           <ul className="list-disc space-y-1 pl-4 text-rose-700">
             {priced.errors.map((e) => (

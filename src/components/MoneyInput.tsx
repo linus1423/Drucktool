@@ -55,7 +55,7 @@ export function MoneyInput({
           if (r.ok) setText(toText(r.cents))
         }}
       />
-      <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-sm text-slate-400">€</span>
+      <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-sm text-slate-500">€</span>
     </div>
   )
 }

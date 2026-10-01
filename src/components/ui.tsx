@@ -33,7 +33,7 @@ export function Button({
 }
 
 const inputBase =
-  'block rounded-md border-0 bg-white px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 ring-inset placeholder:text-slate-400 focus:ring-2 focus:ring-slate-900 focus:outline-none disabled:bg-slate-100'
+  'block rounded-md border-0 bg-white px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 ring-inset placeholder:text-slate-500 focus:ring-2 focus:ring-slate-900 focus:outline-none disabled:bg-slate-100'
 
 // Volle Breite, außer der Aufrufer gibt selbst eine Breite vor.
 function inputClass(className?: string) {
