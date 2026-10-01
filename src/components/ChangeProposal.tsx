@@ -192,6 +192,8 @@ export function ProposeChangeForm({
   const size = format ? formatSize(format, spec) : null
   const binding = catalog.bindings.find((b) => b.id === spec.bindingId)
   const paper = catalog.papers.find((p) => p.id === spec.paperId)
+  const coverPaper = catalog.papers.find((p) => p.id === spec.coverPaperId)
+  const coverColors = coverColorChoices(catalog, binding, coverPaper)
   const duplex = duplexChoice(format, binding)
   const borderless = borderlessChoice(format, binding, paper, size)
   const priced = calculatePrice(catalog, spec)
@@ -364,7 +366,7 @@ export function ProposeChangeForm({
                 onChange={(e) => set({ coverColorId: e.target.value || null })}
               >
                 <option value="">Standard</option>
-                {coverColorChoices(catalog, binding).map((c) => option(c.item.id, c.item.name, c.allowed, c.reason))}
+                {coverColors.map((c) => option(c.item.id, c.item.name, c.allowed, c.reason))}
               </Select>
             </Field>
             {binding.allowsSplitCover ? (
@@ -375,7 +377,7 @@ export function ProposeChangeForm({
                   onChange={(e) => set({ coverBackColorId: e.target.value || null })}
                 >
                   <option value="">wie vorne</option>
-                  {coverColorChoices(catalog, binding).map((c) => option(c.item.id, c.item.name, c.allowed, c.reason))}
+                  {coverColors.map((c) => option(c.item.id, c.item.name, c.allowed, c.reason))}
                 </Select>
               </Field>
             ) : null}

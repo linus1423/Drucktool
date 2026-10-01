@@ -69,6 +69,20 @@ describe('Auswahlregeln', () => {
     expect(errors({ bindingId: 'loose', coverColorId: COLOR.white })[0]).toContain('keine Coverfarbe')
   })
 
+  it('erlaubt nur Coverfarben, die es auf dem Deckblattpapier gibt', () => {
+    const cover = { bindingId: 'plastic_comb', coverPages: 1 }
+    expect(errors({ ...cover, coverPaperId: PAPER.card, coverColorId: COLOR.white })).toEqual([])
+    expect(errors({ ...cover, coverPaperId: PAPER.card, coverColorId: COLOR.blue })).toEqual([
+      'Dunkelblau gibt es nicht auf Karton 300 g/m².',
+    ])
+    expect(errors({ ...cover, coverPaperId: PAPER.card, coverColorId: COLOR.white, coverBackColorId: COLOR.clear })[0]).toContain(
+      'Durchsichtig gibt es nicht auf Karton',
+    )
+    expect(errors({ ...cover, coverPaperId: PAPER.thick, coverColorId: COLOR.blue, coverBackColorId: COLOR.clear })).toEqual([])
+    // Ohne separates Deckblatt gilt nur die Bindung.
+    expect(errors({ bindingId: 'plastic_comb', coverColorId: COLOR.blue })).toEqual([])
+  })
+
   it('prüft Papier gegen Zweck und größtes Format', () => {
     expect(errors({ paperId: PAPER.card })[0]).toContain('Nur für Deckblätter')
     expect(errors({ formatId: 'custom', customWidthMm: 320, customHeightMm: 450 })[0]).toContain('Höchstens A3')
