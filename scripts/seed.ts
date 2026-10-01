@@ -5,6 +5,7 @@ import { eq, sql } from 'drizzle-orm'
 import postgres from 'postgres'
 import * as schema from '../src/server/db/schema'
 import { hashPassword } from '../src/server/auth/password.server'
+import { splitName } from '../src/lib/name'
 
 const url = process.env.DATABASE_URL
 if (!url) throw new Error('DATABASE_URL ist nicht gesetzt')
@@ -40,7 +41,7 @@ if (existing.length > 0) {
   } else {
     await db.insert(schema.users).values({
       email,
-      name: process.env.SUPERADMIN_NAME ?? 'Superadmin',
+      ...splitName(process.env.SUPERADMIN_NAME ?? 'Superadmin'),
       passwordHash: await hashPassword(password),
       role: 'superadmin',
       status: 'active',
