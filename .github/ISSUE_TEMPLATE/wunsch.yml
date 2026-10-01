@@ -1,0 +1,37 @@
+name: Wunsch oder Idee
+description: Etwas fehlt oder könnte einfacher gehen.
+title: 'Wunsch: '
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: Danke für die Idee! Am wichtigsten ist, welches Problem gelöst werden soll, nicht wie.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Was ist heute umständlich oder fehlt?
+      placeholder: Bei Sammelaufträgen muss ich jeden Auftrag einzeln auf „Fertig“ setzen.
+    validations:
+      required: true
+  - type: textarea
+    id: vorschlag
+    attributes:
+      label: Wie stellen Sie sich das vor?
+      placeholder: Mehrere Aufträge in der Liste anhaken und gemeinsam auf „Fertig“ setzen.
+  - type: dropdown
+    id: wer
+    attributes:
+      label: Wen betrifft es?
+      multiple: true
+      options:
+        - Kunden
+        - Mitarbeiter der Druckerei
+        - Admins
+  - type: dropdown
+    id: dringlichkeit
+    attributes:
+      label: Wie wichtig ist es?
+      options:
+        - Wäre schön
+        - Spart regelmäßig Zeit
+        - Ohne geht es kaum

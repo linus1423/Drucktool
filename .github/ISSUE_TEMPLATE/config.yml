@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Drucktool ausgefallen oder dringend
+    url: https://github.com/linus1423/Drucktool/blob/main/docs/BETRIEB.md#kontakte
+    about: Bei einem Ausfall bitte die FSMB-IT direkt kontaktieren, nicht nur ein Issue anlegen.
