@@ -9,7 +9,7 @@ import { RequestFields, useRequestForm } from '~/components/RequestFields'
 import { Alert, Badge, Button, Card, Field, Input, Select, StatusBadge, Textarea, cx } from '~/components/ui'
 import { errorMessage, isConflictError } from '~/lib/errors'
 import { formatDate, formatDateTime, formatMoney, formatRequestNumber } from '~/lib/format'
-import { DELIVERY_LABELS } from '~/lib/order'
+import { DELIVERY_LABELS, coverPagesFromMainFile } from '~/lib/order'
 import { describeOrder } from '~/lib/snapshot'
 import { assignableStaffQuery, requestDetailQuery } from '~/lib/queries'
 import { isStaffRole } from '~/lib/roles'
@@ -805,6 +805,8 @@ const PDF_STATUS_TEXT = {
 
 function Files({ request, staff }: { request: Detail; staff: boolean }) {
   if (request.files.length === 0) return null
+  // Ohne eigene Deckblatt-Datei kommt das Deckblatt aus der Druckdatei (Issue #85).
+  const coverFromMain = request.order?.coverPaper ? coverPagesFromMainFile(request.order.spec) : null
   return (
     <Card title="Dateien">
       <ul className="divide-y divide-slate-100 text-sm">
@@ -830,6 +832,12 @@ function Files({ request, staff }: { request: Detail; staff: boolean }) {
           )
         })}
       </ul>
+      {coverFromMain ? (
+        <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Keine separate Deckblatt-Datei: Das Deckblatt wird aus der Druckdatei gedruckt, vorne {coverFromMain.front}
+          {coverFromMain.back ? `, hinten ${coverFromMain.back}` : ''}.
+        </p>
+      ) : null}
     </Card>
   )
 }

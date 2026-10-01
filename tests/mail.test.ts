@@ -72,20 +72,20 @@ describe.skipIf(!url)('Benachrichtigungen (Integration)', async () => {
     const rows = await db
       .insert(schema.users)
       .values([
-        { email: email('staff'), name: 'Staff', role: 'staff', status: 'active' },
-        { email: email('staff2'), name: 'Staff 2', role: 'staff', status: 'active' },
+        { email: email('staff'), lastName: 'Staff', role: 'staff', status: 'active' },
+        { email: email('staff2'), firstName: 'Staff', lastName: '2', role: 'staff', status: 'active' },
         {
           email: email('kunde'),
-          name: 'Kunde',
+          lastName: 'Kunde',
           role: 'customer',
           status: 'active',
           organisationId: org,
           billingAddress: BILLING,
         },
-        { email: email('kollege'), name: 'Kollege', role: 'customer', status: 'active', organisationId: org },
+        { email: email('kollege'), lastName: 'Kollege', role: 'customer', status: 'active', organisationId: org },
         {
           email: email('stumm'),
-          name: 'Stumm',
+          lastName: 'Stumm',
           role: 'customer',
           status: 'active',
           organisationId: org,

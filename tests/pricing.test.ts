@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { borderlessChoice, bindingChoices, findFormat, impose, piecesPerSheet, resolveOrder, suggestFormat } from '~/lib/order'
+import {
+  borderlessChoice,
+  bindingChoices,
+  findFormat,
+  formatSize,
+  impose,
+  paperChoices,
+  piecesPerSheet,
+  resolveOrder,
+  suggestFormat,
+} from '~/lib/order'
 import { calculatePrice } from '~/lib/pricing'
 import { CATALOG, COLOR, PAPER, spec } from './order-catalog'
 
@@ -69,11 +79,39 @@ describe('Auswahlregeln', () => {
     expect(errors({ bindingId: 'loose', coverColorId: COLOR.white })[0]).toContain('keine Coverfarbe')
   })
 
+  it('erlaubt nur Coverfarben, die es auf dem Deckblattpapier gibt', () => {
+    const cover = { bindingId: 'plastic_comb', coverPages: 1 }
+    expect(errors({ ...cover, coverPaperId: PAPER.card, coverColorId: COLOR.white })).toEqual([])
+    expect(errors({ ...cover, coverPaperId: PAPER.card, coverColorId: COLOR.blue })).toEqual([
+      'Dunkelblau gibt es nicht auf Karton 300 g/m².',
+    ])
+    expect(errors({ ...cover, coverPaperId: PAPER.card, coverColorId: COLOR.white, coverBackColorId: COLOR.clear })[0]).toContain(
+      'Durchsichtig gibt es nicht auf Karton',
+    )
+    expect(errors({ ...cover, coverPaperId: PAPER.thick, coverColorId: COLOR.blue, coverBackColorId: COLOR.clear })).toEqual([])
+    // Ohne separates Deckblatt gilt nur die Bindung.
+    expect(errors({ bindingId: 'plastic_comb', coverColorId: COLOR.blue })).toEqual([])
+  })
+
   it('prüft Papier gegen Zweck und größtes Format', () => {
     expect(errors({ paperId: PAPER.card })[0]).toContain('Nur für Deckblätter')
     expect(errors({ formatId: 'custom', customWidthMm: 320, customHeightMm: 450 })[0]).toContain('Höchstens A3')
     expect(errors({ formatId: 'custom', customWidthMm: 330, customHeightMm: 450 })[0]).toContain('höchstens 320 × 450')
     expect(errors({ formatId: 'custom' })[0]).toContain('Breite und Höhe')
+  })
+
+  it('blendet reine Plotterpapiere bei normalen Formaten ganz aus', () => {
+    const a4 = findFormat(CATALOG, 'A4')!
+    const ids = (purpose: 'inner' | 'cover') => paperChoices(CATALOG, a4, formatSize(a4), purpose).map((c) => c.item.id)
+    expect(ids('inner')).not.toContain(PAPER.plot)
+    expect(ids('cover')).not.toContain(PAPER.plot)
+    const a1 = findFormat(CATALOG, 'A1')!
+    const plot = paperChoices(CATALOG, a1, formatSize(a1), 'inner').find((c) => c.item.id === PAPER.plot)
+    expect(plot?.allowed).toBe(true)
+    expect(errors({ paperId: PAPER.plot })).toEqual(['Plotterpapier: Nur für den Plotter.'])
+    expect(errors({ bindingId: 'glue', coverPaperId: PAPER.plot, coverPages: 1 })).toEqual([
+      'Plotterpapier: Nur für den Plotter.',
+    ])
   })
 
   it('verlangt die Deckblatt-Datei, wenn ein Deckblatt gewählt ist', () => {
@@ -83,6 +121,14 @@ describe('Auswahlregeln', () => {
     expect(errors({ bindingId: 'loose', coverPaperId: PAPER.card, coverPages: 1 })[0]).toContain(
       'Ein separates Deckblatt gibt es bei Lose nicht',
     )
+  })
+
+  it('erlaubt ein Deckblatt ohne eigene Datei aus der Druckdatei', () => {
+    const cover = { bindingId: 'plastic_comb', coverPaperId: PAPER.card, coverFromMainFile: true }
+    expect(errors({ ...cover, pages: 10, coverPages: 2 })).toEqual([])
+    expect(errors({ ...cover, pages: 10 })).toContain('Bitte angeben, ob das Deckblatt nur vorne oder vorne und hinten ist.')
+    expect(errors({ ...cover, pages: 4, duplex: true, coverPages: 2 })[0]).toContain('mehr als 4 Seiten')
+    expect(errors({ coverFromMainFile: true, coverPages: 1, pages: 4 })).toContain('Ein Deckblatt ist nicht ausgewählt.')
   })
 
   it('schlägt das Format anhand der PDF-Seitengröße vor', () => {
@@ -161,5 +207,20 @@ describe('Preise', () => {
     expect(amount(p, 'cover_paper')).toBe(1 * 15)
     expect(amount(p, 'binding')).toBe(200)
     expect(p.totalCents).toBe(445)
+  })
+
+  it('Deckblatt aus der Druckdatei: Seiten nicht doppelt berechnen', () => {
+    const cover = { bindingId: 'plastic_comb', coverPaperId: PAPER.card, coverFromMainFile: true }
+    // Doppelseitig: Seiten 1–2 und 19–20 auf Karton, 16 Seiten im Innenteil.
+    const p = price({ ...cover, pages: 20, duplex: true, coverPages: 2 })
+    expect(amount(p, 'print')).toBe(16 * 10)
+    expect(amount(p, 'paper')).toBe(4 * 2)
+    expect(amount(p, 'cover_print')).toBe(4 * 10)
+    expect(amount(p, 'cover_paper')).toBe(1 * 15)
+    expect(p.totalCents).toBe(160 + 8 + 40 + 15 + 200)
+    // Einseitig: nur Seite 1 auf Karton.
+    const single = price({ ...cover, pages: 10, coverPages: 1 })
+    expect(amount(single, 'print')).toBe(9 * 10)
+    expect(amount(single, 'cover_print')).toBe(1 * 10)
   })
 })

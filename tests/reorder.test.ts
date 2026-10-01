@@ -45,9 +45,9 @@ describe.skipIf(!url)('Nachbestellung (Issue #10)', async () => {
     const rows = await getDb()
       .insert(schema.users)
       .values([
-        { email: `r-kunde-${stamp}@test`, name: 'Kundin', role: 'customer', status: 'active', billingAddress: BILLING },
-        { email: `r-fremd-${stamp}@test`, name: 'Fremd', role: 'customer', status: 'active', billingAddress: BILLING },
-        { email: `r-staff-${stamp}@test`, name: 'Staff', role: 'staff', status: 'active' },
+        { email: `r-kunde-${stamp}@test`, lastName: 'Kundin', role: 'customer', status: 'active', billingAddress: BILLING },
+        { email: `r-fremd-${stamp}@test`, lastName: 'Fremd', role: 'customer', status: 'active', billingAddress: BILLING },
+        { email: `r-staff-${stamp}@test`, lastName: 'Staff', role: 'staff', status: 'active' },
       ])
       .returning()
     customer = { id: rows[0]!.id, role: 'customer', organisationId: null }
