@@ -1,5 +1,5 @@
 import * as client from 'openid-client'
-import { safeRedirect } from '~/lib/redirect'
+import { firstLoginProfileUrl, safeRedirect } from '~/lib/redirect'
 import { eq } from 'drizzle-orm'
 import { deleteCookie, getCookie, setCookie } from '@tanstack/react-start/server'
 import { getDb, schema } from '../db/client.server'
@@ -149,5 +149,5 @@ export async function finishOidcLogin(request: Request, provider: OidcProvider =
     .where(eq(schema.users.id, result.userId))
     .returning({ role: schema.users.role, billingAddress: schema.users.billingAddress })
   // Kunden ohne Rechnungsadresse landen zuerst im Profil, wie beim Anmeldelink.
-  return redirectTo(user?.role === 'customer' && !user.billingAddress ? '/profil?neu=1' : pending.redirect)
+  return redirectTo(user?.role === 'customer' && !user.billingAddress ? firstLoginProfileUrl(pending.redirect) : pending.redirect)
 }

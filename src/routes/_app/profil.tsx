@@ -8,6 +8,7 @@ import { Alert, Button, Card, Field, Input, PageHeader, fieldError } from '~/com
 import { EMPTY_BILLING, EMPTY_DELIVERY } from '~/lib/address'
 import { errorMessage } from '~/lib/errors'
 import { formatDateTime } from '~/lib/format'
+import { safeRedirect } from '~/lib/redirect'
 import { accountQuery, currentUserQuery } from '~/lib/queries'
 import { ROLE_LABELS } from '~/lib/roles'
 import {
@@ -19,7 +20,11 @@ import {
 } from '~/server/account/account.functions'
 
 export const Route = createFileRoute('/_app/profil')({
-  validateSearch: z.object({ neu: z.coerce.boolean().optional().catch(undefined) }),
+  validateSearch: z.object({
+    neu: z.coerce.boolean().optional().catch(undefined),
+    // Ziel nach dem ersten Speichern, z. B. eine Einladung (Issue #137).
+    weiter: z.string().max(500).optional().catch(undefined),
+  }),
   loader: ({ context }) => context.queryClient.ensureQueryData(accountQuery),
   head: () => ({ meta: [{ title: 'Profil · Drucktool' }] }),
   component: ProfilePage,
@@ -27,16 +32,19 @@ export const Route = createFileRoute('/_app/profil')({
 
 function ProfilePage() {
   const { data: account } = useSuspenseQuery(accountQuery)
-  const { neu } = Route.useSearch()
+  const { neu, weiter } = Route.useSearch()
   const customer = account.role === 'customer'
 
   return (
     <div className="max-w-3xl space-y-6">
       <PageHeader title="Profil" description={`${account.email} · ${ROLE_LABELS[account.role]}`} />
       {neu && customer && !account.billingAddress ? (
-        <Alert tone="info">Willkommen! Bitte hinterlegen Sie Ihre Rechnungsadresse, bevor Sie den ersten Auftrag aufgeben.</Alert>
+        <Alert tone="info">
+          Willkommen! Bitte hinterlegen Sie Ihre Rechnungsadresse, bevor Sie den ersten Auftrag aufgeben.
+          {weiter ? ' Nach dem Speichern geht es weiter, wohin Sie wollten.' : ''}
+        </Alert>
       ) : null}
-      <ProfileForm account={account} />
+      <ProfileForm account={account} next={neu && weiter ? safeRedirect(weiter) : null} />
       {customer ? <OrganisationsCard account={account} /> : null}
       <NotificationsCard initial={account.emailNotifications} customer={customer} />
       <SessionsCard sessions={account.sessions} />
@@ -75,7 +83,7 @@ const deliveryFields = [
   { name: 'note', label: 'Hinweis für die Hauspost (optional)', span: true },
 ] as const
 
-function ProfileForm({ account }: { account: Account }) {
+function ProfileForm({ account, next }: { account: Account; next: string | null }) {
   const queryClient = useQueryClient()
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
@@ -107,6 +115,10 @@ function ProfileForm({ account }: { account: Account }) {
         // Der Name steht auch in der Kopfzeile.
         await queryClient.invalidateQueries({ queryKey: currentUserQuery.queryKey })
         await router.invalidate()
+        if (next) {
+          await router.navigate({ href: next })
+          return
+        }
         setSaved(true)
       } catch (e) {
         setError(errorMessage(e))
