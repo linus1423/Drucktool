@@ -62,7 +62,8 @@ test('Neuer Kunde meldet sich per Link an und ergänzt sein Profil', async ({ pa
 
 test('Kunde öffnet keinen fremden Auftrag', async ({ page }) => {
   await loginAsCustomer(page, stranger)
-  await page.goto(requestPath)
+  const response = await page.goto(requestPath)
+  expect(response?.status()).toBe(404)
   await expect(page.getByText('Auftrag nicht gefunden')).toBeVisible()
   await expect(page.getByText(title)).toHaveCount(0)
   await check(page, 'Fremder Auftrag')
@@ -70,6 +71,9 @@ test('Kunde öffnet keinen fremden Auftrag', async ({ page }) => {
   await page.goto('/auftraege')
   await page.waitForLoadState('networkidle')
   await expect(page.getByText(title)).toHaveCount(0)
+  // Auch eine unsinnige Adresse ergibt 404 statt eines Fehlers.
+  expect((await page.goto('/auftraege/kein-auftrag'))?.status()).toBe(404)
+  await expect(page.getByText('Auftrag nicht gefunden')).toBeVisible()
 })
 
 test('Verwaltung ist nur für Admins erreichbar', async ({ browser }) => {
