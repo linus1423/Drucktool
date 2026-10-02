@@ -765,6 +765,9 @@ export async function answerChange(user: Principal, input: z.infer<typeof answer
     const p = current.proposal
     if (!p) throw new Error('Es gibt keinen offenen Änderungsvorschlag')
 
+    // Der gewählte Druckbogen gilt nur für das Papier, für das er ausgesucht wurde (Issue #131).
+    const resetSheet = input.accept && !!current.printSheet && current.order?.paper.id !== p.order.paper.id
+    const resetCoverSheet = input.accept && !!current.coverPrintSheet && current.order?.coverPaper?.id !== p.order.coverPaper?.id
     const values: Partial<typeof requests.$inferInsert> = input.accept
       ? {
           proposal: null,
@@ -775,9 +778,25 @@ export async function answerChange(user: Principal, input: z.infer<typeof answer
           deliveryAddress: p.deliveryAddress,
           status: p.returnStatus,
           statusChangedAt: new Date(),
+          ...(resetSheet ? { printSheet: null } : {}),
+          ...(resetCoverSheet ? { coverPrintSheet: null } : {}),
         }
       : { proposal: null }
     const updated = await updateWithVersion(tx, input.id, input.version, values)
+    if (resetSheet || resetCoverSheet) {
+      await tx.insert(requestEvents).values({
+        requestId: input.id,
+        // Keine Entscheidung des Kunden, sondern eine Folge des neuen Papiers; erscheint als „System“.
+        actorId: null,
+        type: 'print_sheet_changed',
+        internal: true,
+        data: {
+          sheet: updated.printSheet?.label ?? null,
+          coverSheet: updated.coverPrintSheet?.label ?? null,
+          reason: 'paper_changed',
+        },
+      })
+    }
     await tx.insert(requestEvents).values({
       requestId: input.id,
       actorId: user.id,

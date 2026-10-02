@@ -900,6 +900,7 @@ function describeEvent(e: Detail['events'][number]) {
       return 'hat den Änderungsvorschlag zurückgezogen'
     case 'print_sheet_changed': {
       const name = (v: unknown) => (typeof v === 'string' ? v : 'wie berechnet')
+      if (e.data.reason === 'paper_changed') return 'hat den Druckbogen zurückgesetzt, weil sich das Papier geändert hat'
       return 'coverSheet' in e.data && e.data.coverSheet !== null
         ? `hat den Druckbogen auf ${name(e.data.sheet)}, Deckblatt ${name(e.data.coverSheet)} gesetzt`
         : `hat den Druckbogen auf ${name(e.data.sheet)} gesetzt`
