@@ -126,6 +126,25 @@ describe.skipIf(!url)('Übergabe an Lexware', async () => {
     expect((await getRequestDetail(customer, ids[0]!)).invoiceExportedAt).toBeNull()
   })
 
+  it('überspringt Aufträge ohne Rechnungsadresse, statt den ganzen Export abzubrechen (Issue #130)', async () => {
+    // Mitarbeiter dürfen ohne Rechnungsadresse bestellen.
+    const own = await placeOrder(staff, { title: 'Ohne Adresse' })
+    const customers = await placeOrder(customer, { title: 'Mit Adresse' })
+    await getDb()
+      .update(schema.requests)
+      .set({ status: 'completed' })
+      .where(inArray(schema.requests.id, [own.id, customers.id]))
+
+    const result = await exportForLexware(staff.id)
+    expect(result.skipped).toContain(own.number)
+    expect(result.numbers).toContain(customers.number)
+    expect(result.numbers).not.toContain(own.number)
+    const [row] = await getDb().select().from(schema.requests).where(eq(schema.requests.id, own.id))
+    expect(row!.invoiceExportedAt).toBeNull()
+    // Gezielt angefordert bleibt es ein Fehler.
+    await expect(exportForLexware(staff.id, [own.id])).rejects.toBeInstanceOf(LexwareExportError)
+  })
+
   it('exportiert einzelne Aufträge erneut, aber nur fertige', async () => {
     const again = await exportForLexware(staff.id, [ids[0]!])
     expect(again.count).toBe(1)

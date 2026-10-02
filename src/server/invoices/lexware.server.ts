@@ -157,9 +157,16 @@ type Row = {
   email: string
 }
 
+/** Warum ein Auftrag nicht an Lexware gehen kann, oder null. */
+function missingForLexware(r: Pick<Row, 'number' | 'totalCents' | 'billingAddress'>) {
+  if (r.totalCents == null) return `Auftrag ${formatRequestNumber(r.number)} hat keinen Preis.`
+  if (!r.billingAddress) return `Auftrag ${formatRequestNumber(r.number)} hat keine Rechnungsadresse.`
+  return null
+}
+
 function toLexwareOrder(r: Row): LexwareOrder {
-  if (r.totalCents == null) throw new LexwareExportError(`Auftrag ${formatRequestNumber(r.number)} hat keinen Preis.`)
-  if (!r.billingAddress) throw new LexwareExportError(`Auftrag ${formatRequestNumber(r.number)} hat keine Rechnungsadresse.`)
+  const missing = missingForLexware(r)
+  if (missing || r.totalCents == null || !r.billingAddress) throw new LexwareExportError(missing ?? '')
   return {
     number: r.number,
     title: r.title,
@@ -197,7 +204,9 @@ export async function pendingLexwareCount() {
 
 /**
  * Erstellt die Importdatei und merkt sich die enthaltenen Aufträge als übergeben. Ohne ids: alle fertigen, noch nicht
- * übergebenen Aufträge. Mit ids: genau diese (auch erneut), solange sie fertig sind.
+ * übergebenen Aufträge; wer keinen Preis oder keine Rechnungsadresse hat (z. B. von Mitarbeitern angelegt), wird
+ * übersprungen und in `skipped` genannt, damit ein einzelner Auftrag nicht den ganzen Export blockiert (Issue #130).
+ * Mit ids: genau diese (auch erneut), solange sie fertig und vollständig sind.
  */
 export async function exportForLexware(actorId: string, ids?: string[]) {
   return getDb().transaction(async (tx) => {
@@ -213,18 +222,25 @@ export async function exportForLexware(actorId: string, ids?: string[]) {
       .for('update', { of: requests })
     if (ids && rows.length !== new Set(ids).size)
       throw new LexwareExportError('Nur fertige Aufträge können an Lexware übergeben werden.')
-    const orders = rows.map(toLexwareOrder)
-    if (rows.length) {
+    const skipped = ids ? [] : rows.filter((r) => missingForLexware(r)).map((r) => r.number)
+    const exported = ids ? rows : rows.filter((r) => !missingForLexware(r))
+    const orders = exported.map(toLexwareOrder)
+    if (exported.length) {
       await tx
         .update(requests)
         .set({ invoiceExportedAt: new Date(), invoiceExportedById: actorId })
         .where(
           inArray(
             requests.id,
-            rows.map((r) => r.id),
+            exported.map((r) => r.id),
           ),
         )
     }
-    return { count: rows.length, numbers: rows.map((r) => r.number), xml: lexwareXml(orders) }
+    return {
+      count: exported.length,
+      numbers: exported.map((r) => r.number),
+      skipped,
+      xml: lexwareXml(orders),
+    }
   })
 }

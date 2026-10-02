@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
+import { formatRequestNumber } from '~/lib/format'
 import { isStaffRole } from '~/lib/roles'
 import { getSessionUser } from '~/server/auth/session.server'
 import { exportForLexware, LexwareExportError } from '~/server/invoices/lexware.server'
@@ -20,7 +21,15 @@ export const Route = createFileRoute('/api/rechnungen/lexware')({
         if (!parsed.success) return Response.json({ error: 'Ungültige Auswahl' }, { status: 400 })
         try {
           const result = await exportForLexware(user.id, parsed.data.ids)
-          if (!result.count) return Response.json({ error: 'Keine fertigen Aufträge zu übergeben.' }, { status: 404 })
+          const skippedText = result.skipped.length
+            ? `Ohne Rechnungsadresse oder Preis, bitte von Hand in Lexware erfassen: ${result.skipped.map(formatRequestNumber).join(', ')}.`
+            : null
+          if (!result.count) {
+            return Response.json(
+              { error: skippedText ? `Keine Aufträge übergeben. ${skippedText}` : 'Keine fertigen Aufträge zu übergeben.' },
+              { status: 404 },
+            )
+          }
           logger.info('Aufträge für Lexware exportiert', { userId: user.id, numbers: result.numbers })
           const day = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date())
           const name = result.count === 1 ? `lexware-auftrag-${result.numbers[0]}.xml` : `lexware-auftraege-${day}.xml`
@@ -31,6 +40,8 @@ export const Route = createFileRoute('/api/rechnungen/lexware')({
               'X-Content-Type-Options': 'nosniff',
               'Cache-Control': 'private, no-store',
               'X-Exported-Count': String(result.count),
+              // Header nur ASCII: die Nummern, den Text baut der Browser.
+              ...(result.skipped.length ? { 'X-Skipped-Numbers': result.skipped.join(',') } : {}),
             },
           })
         } catch (e) {
