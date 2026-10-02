@@ -192,8 +192,9 @@ function ScriptForm({
         stock: Number.parseInt(values.stock, 10) || 0,
         notes: values.notes,
       }
-      if (script) await updateScriptFn({ data: { ...common, id: script.id, archived: values.archived } })
-      else await createScriptFn({ data: { ...common, organisationId: values.organisationId } })
+      if (script) {
+        await updateScriptFn({ data: { ...common, id: script.id, archived: values.archived, previousStock: script.stock } })
+      } else await createScriptFn({ data: { ...common, organisationId: values.organisationId } })
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['scripts'] })
