@@ -93,6 +93,13 @@ describe.skipIf(!url)('Skripte der SVK (Issue #59)', async () => {
     ).rejects.toThrow('Keine Berechtigung')
   })
 
+  it('zeigt SVK-Mitgliedern die SVK als mitlesbare Organisation in der Auftragsliste (Issue #138)', async () => {
+    const { listReadableOrganisations } = await import('~/server/organisations/org-admin.server')
+    expect(await listReadableOrganisations(ben)).toEqual([{ id: svk, name: `SVK ${stamp}` }])
+    expect(await listReadableOrganisations(fremd)).toEqual([{ id: andere, name: `Lehrstuhl ${stamp}` }])
+    expect(await listReadableOrganisations(staff)).toEqual([])
+  })
+
   it('bestellt ein Skript, Kollegen bestellen nach und der Bestand wächst mit fertigen Aufträgen', async () => {
     const { id: scriptId } = await scriptsModule.createScript(anna, {
       ...base,

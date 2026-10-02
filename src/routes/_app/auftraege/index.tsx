@@ -8,7 +8,7 @@ import { LexwarePending } from '~/components/LexwareExport'
 import { AttentionBadge } from '~/components/AttentionBadge'
 import { formatDate, formatDateTime, formatMoney, formatRequestNumber } from '~/lib/format'
 import { DELIVERY_LABELS } from '~/lib/order'
-import { activeOrganisationsQuery, assignableStaffQuery, managedOrganisationsQuery, requestListQuery } from '~/lib/queries'
+import { activeOrganisationsQuery, assignableStaffQuery, readableOrganisationsQuery, requestListQuery } from '~/lib/queries'
 import { isStaffRole } from '~/lib/roles'
 import { INTERNAL_STATUS_LABELS, INTERNAL_STATUS_TONES, REQUEST_STATUSES, STATUS_LABELS } from '~/lib/status'
 
@@ -92,10 +92,10 @@ function RequestListPage() {
   const staff = isStaffRole(user.role)
   const { data } = useSuspenseQuery(requestListQuery(toFilter(search)))
   const organisations = useQuery({ ...activeOrganisationsQuery, enabled: staff })
-  // Verwalter einer Organisation sehen auch die Aufträge ihrer Kollegen (Issue #12).
-  const managed = useQuery({ ...managedOrganisationsQuery, enabled: !staff })
-  const orgAdmin = !staff && !!managed.data?.length
-  const orgOptions = staff ? organisations.data : managed.data
+  // Verwalter einer Organisation und SVK-Mitglieder sehen auch die Aufträge ihrer Kollegen (Issues #12, #59, #138).
+  const readable = useQuery({ ...readableOrganisationsQuery, enabled: !staff })
+  const seesColleagues = !staff && !!readable.data?.length
+  const orgOptions = staff ? organisations.data : readable.data
   const staffList = useQuery({ ...assignableStaffQuery, enabled: staff })
   const pages = Math.max(1, Math.ceil(data.total / data.pageSize))
   // Filteränderungen springen auf Seite 1 zurück.
@@ -127,7 +127,7 @@ function RequestListPage() {
           </Link>
         ),
       }),
-      ...(staff || orgAdmin
+      ...(staff || seesColleagues
         ? [
             col.accessor('creatorName', {
               header: staff ? 'Kunde' : 'Angelegt von',
@@ -193,7 +193,7 @@ function RequestListPage() {
         cell: (info) => formatDateTime(info.getValue()),
       }),
     ],
-    [staff, orgAdmin],
+    [staff, seesColleagues],
   )
 
   return (
@@ -201,7 +201,7 @@ function RequestListPage() {
       <PageHeader
         title="Aufträge"
         description={
-          staff ? 'Alle Aufträge der Kunden' : orgAdmin ? 'Ihre Aufträge und die Ihrer Organisationen' : 'Ihre Aufträge'
+          staff ? 'Alle Aufträge der Kunden' : seesColleagues ? 'Ihre Aufträge und die Ihrer Organisationen' : 'Ihre Aufträge'
         }
         actions={
           <div className="flex gap-2">
@@ -318,7 +318,7 @@ function RequestListPage() {
                 </option>
               ))}
             </Select>
-            {staff || orgAdmin ? (
+            {staff || seesColleagues ? (
               <Select
                 aria-label="Organisation"
                 value={search.org ?? ''}
