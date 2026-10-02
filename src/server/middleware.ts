@@ -7,6 +7,16 @@ function newRequestId() {
   return Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
+export function isClientAbort(request: Request, error: unknown) {
+  if (request.signal.aborted) return true
+  // Node meldet den Abbruch als Error('aborted') mit code ECONNRESET, h3 verpackt ihn manchmal noch einmal.
+  for (let e = error as { code?: unknown; message?: unknown; cause?: unknown } | null, i = 0; e && i < 3; i++) {
+    if (e.code === 'ECONNRESET' && e.message === 'aborted') return true
+    e = e.cause as typeof e
+  }
+  return false
+}
+
 /** Vergibt jeder Anfrage eine Request-ID und protokolliert Methode, Pfad, Status und Dauer. */
 export const requestLogMiddleware = createMiddleware().server(async ({ request, pathname, next }) => {
   const incoming = request.headers.get('x-request-id')
@@ -28,12 +38,10 @@ export const requestLogMiddleware = createMiddleware().server(async ({ request, 
       }
       return result
     } catch (error) {
-      logger.error('Unbehandelter Fehler', {
-        method: request.method,
-        path: pathname,
-        durationMs: Math.round(performance.now() - start),
-        err: error,
-      })
+      const fields = { method: request.method, path: pathname, durationMs: Math.round(performance.now() - start) }
+      // Schließt der Browser die Verbindung vorzeitig (Seite verlassen, Neu laden), ist das kein Fehler der App.
+      if (isClientAbort(request, error)) logger.info('Verbindung vom Browser abgebrochen', fields)
+      else logger.error('Unbehandelter Fehler', { ...fields, err: error })
       throw error
     }
   })

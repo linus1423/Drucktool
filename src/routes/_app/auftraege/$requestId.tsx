@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, notFound } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { formatBillingAddress, formatDeliveryAddress } from '~/lib/address'
 import { formatBytes, uploadFile, type UploadedFile } from '~/components/FileUpload'
@@ -38,7 +38,10 @@ import {
 } from '~/server/requests/requests.functions'
 
 export const Route = createFileRoute('/_app/auftraege/$requestId')({
-  loader: ({ context, params }) => context.queryClient.ensureQueryData(requestDetailQuery(params.requestId)),
+  loader: ({ context, params }) => {
+    if (!UUID.test(params.requestId)) throw notFound()
+    return context.queryClient.ensureQueryData(requestDetailQuery(params.requestId))
+  },
   head: ({ loaderData }) => ({
     meta: [
       { title: loaderData ? `${formatRequestNumber(loaderData.number)} ${loaderData.title} · Drucktool` : 'Auftrag · Drucktool' },
@@ -52,8 +55,18 @@ export const Route = createFileRoute('/_app/auftraege/$requestId')({
       </Link>
     </div>
   ),
+  notFoundComponent: () => (
+    <div className="space-y-4">
+      <Alert>Auftrag nicht gefunden</Alert>
+      <Link to="/auftraege" className="text-sm underline">
+        Zurück zur Übersicht
+      </Link>
+    </div>
+  ),
   component: RequestDetailPage,
 })
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 type Detail = Awaited<ReturnType<NonNullable<ReturnType<typeof requestDetailQuery>['queryFn']>>>
 

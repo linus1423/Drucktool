@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { isUnexpectedError, logger, requestContext, serializeError } from '~/server/log.server'
 import { buildEnvelope, parseDsn, parseStack } from '~/server/error-reporting.server'
+import { isClientAbort } from '~/server/middleware'
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -66,6 +67,20 @@ describe('isUnexpectedError', () => {
   it('lässt fachliche Meldungen durch', () => {
     expect(isUnexpectedError(new Error('E-Mail-Adresse oder Passwort ist falsch'))).toBe(false)
     expect(isUnexpectedError({ isRedirect: true })).toBe(false)
+  })
+})
+
+describe('isClientAbort', () => {
+  it('erkennt vom Browser abgebrochene Verbindungen', () => {
+    const aborted = Object.assign(new Error('aborted'), { code: 'ECONNRESET' })
+    expect(isClientAbort(new Request('http://localhost/'), aborted)).toBe(true)
+    expect(isClientAbort(new Request('http://localhost/'), new Error('aborted', { cause: aborted }))).toBe(true)
+    const controller = new AbortController()
+    controller.abort()
+    expect(isClientAbort(new Request('http://localhost/', { signal: controller.signal }), new Error('egal'))).toBe(true)
+    expect(isClientAbort(new Request('http://localhost/'), new TypeError('kaputt'))).toBe(false)
+    const dbReset = Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' })
+    expect(isClientAbort(new Request('http://localhost/'), dbReset)).toBe(false)
   })
 })
 

@@ -56,8 +56,16 @@ function actorOf(user: Principal) {
   return isStaffRole(user.role) ? ('staff' as const) : ('customer' as const)
 }
 
+/** Auftrag existiert nicht oder ist für diesen Nutzer nicht sichtbar; beides sieht von außen gleich aus. */
+export class RequestNotFoundError extends Error {
+  constructor() {
+    super('Auftrag nicht gefunden')
+    this.name = 'RequestNotFoundError'
+  }
+}
+
 function notFound(): never {
-  throw new Error('Auftrag nicht gefunden')
+  throw new RequestNotFoundError()
 }
 
 /** Kunden sehen nur ihre eigenen Aufträge (Lastenheft: Organisationen sind optional). */
@@ -279,7 +287,7 @@ export async function getRequestDetail(user: Principal, id: string) {
     .leftJoin(confirmer, eq(confirmer.id, requests.confirmedById))
     .where(and(eq(requests.id, id), visibilityFilter(user)))
     .limit(1)
-  if (!found) throw new Error('Auftrag nicht gefunden')
+  if (!found) notFound()
 
   const comments = await db
     .select({

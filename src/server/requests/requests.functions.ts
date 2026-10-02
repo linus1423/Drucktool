@@ -1,3 +1,4 @@
+import { notFound } from '@tanstack/react-router'
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { requireStaff, requireUser } from '../auth/guards.server'
@@ -20,6 +21,7 @@ import {
   createRequest,
   createRequestSchema,
   getRequestDetail,
+  RequestNotFoundError,
   internalStatusSchema,
   setInternalStatus,
   listAssignableStaff,
@@ -43,7 +45,16 @@ export const listRequestsFn = createServerFn({ method: 'GET' })
 
 export const getRequestFn = createServerFn({ method: 'GET' })
   .validator(z.object({ id: z.uuid() }))
-  .handler(async ({ data }) => getRequestDetail(await requireUser(), data.id))
+  .handler(async ({ data }) => {
+    const user = await requireUser()
+    try {
+      return await getRequestDetail(user, data.id)
+    } catch (e) {
+      // Als notFound weitergeben, damit die Seite mit HTTP 404 statt 500 antwortet.
+      if (e instanceof RequestNotFoundError) throw notFound()
+      throw e
+    }
+  })
 
 export const createRequestFn = createServerFn({ method: 'POST' })
   .validator(createRequestSchema)
