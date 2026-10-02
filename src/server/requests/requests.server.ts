@@ -360,6 +360,9 @@ export async function getRequestDetail(user: Principal, id: string) {
     // Druckbogen ist rein intern (Issue #88).
     printSheet: isStaff ? r.printSheet : null,
     coverPrintSheet: isStaff ? r.coverPrintSheet : null,
+    // Übergabe an Lexware (Issue #53) ist intern.
+    invoiceExportedAt: isStaff ? r.invoiceExportedAt : null,
+    invoiceExportedById: null,
     printSheetOptions: isStaff ? await printSheetOptions(db, r.order) : { inner: [], cover: [] },
     reorderOf: reorderOf ?? null,
     attention: attentionFor({ ...r, internalDueDate }, deadlines),

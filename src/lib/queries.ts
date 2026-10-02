@@ -12,6 +12,7 @@ import {
   listUsersFn,
 } from '~/server/admin/admin.functions'
 import { getDashboardFn } from '~/server/requests/dashboard.functions'
+import { pendingLexwareCountFn } from '~/server/invoices/lexware.functions'
 import { listAuditLogFn } from '~/server/audit/audit.functions'
 import { getAppInfoFn } from '~/server/app-info.functions'
 import { listMailTemplatesFn } from '~/server/mail/mail-templates.functions'
@@ -66,6 +67,12 @@ export const requestDetailQuery = (id: string) =>
     queryKey: ['requests', 'detail', id],
     queryFn: () => getRequestFn({ data: { id } }),
   })
+
+// Unter 'requests', damit „Fertig“ und der Export die Zahl auffrischen (Issue #53).
+export const pendingLexwareQuery = queryOptions({
+  queryKey: ['requests', 'lexware-pending'],
+  queryFn: () => pendingLexwareCountFn(),
+})
 
 export const assignableStaffQuery = queryOptions({
   queryKey: ['staff', 'assignable'],

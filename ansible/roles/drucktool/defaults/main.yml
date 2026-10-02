@@ -77,3 +77,6 @@ drucktool_restic_keep_monthly: 12
 # Monatlich das neueste Backup (außer Haus, falls eingerichtet) in eine Wegwerf-Datenbank einspielen und prüfen.
 drucktool_restore_test_enabled: true
 drucktool_restore_test_healthcheck_url: ''
+# Übergabe an Lexware (Issue #53): Stammartikel in Lexware und Steuersatz in Prozent
+drucktool_lexware_article_number: DRUCK
+drucktool_lexware_tax_rate: 19

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tansta
 import { formatBillingAddress, formatDeliveryAddress } from '~/lib/address'
 import { formatBytes, uploadFile, type UploadedFile } from '~/components/FileUpload'
 import { AttentionBadge } from '~/components/AttentionBadge'
+import { LexwareExportButton } from '~/components/LexwareExport'
 import { ProposalCard, ProposeChangeForm } from '~/components/ChangeProposal'
 import { RequestFields, useRequestForm } from '~/components/RequestFields'
 import { Alert, Badge, Button, Card, Field, Input, Select, StatusBadge, Textarea, cx } from '~/components/ui'
@@ -244,6 +245,7 @@ function RequestDetailPage() {
         <div className="space-y-6">
           <PriceCard request={request} staff={staff} />
           <StatusActions request={request} staff={staff} />
+          {staff && request.status === 'completed' ? <InvoiceCard request={request} /> : null}
           {staff && hasInternalStatus(request.status) ? <InternalStatusCard request={request} /> : null}
           {staff && !TERMINAL_STATUSES.has(request.status) ? <DatesCard request={request} /> : null}
           {staff && request.order ? <PrintSheetCard request={request} /> : null}
@@ -934,6 +936,24 @@ function Files({ request, staff }: { request: Detail; staff: boolean }) {
           {coverFromMain.back ? `, hinten ${coverFromMain.back}` : ''}.
         </p>
       ) : null}
+    </Card>
+  )
+}
+
+function InvoiceCard({ request }: { request: Detail }) {
+  return (
+    <Card title="Rechnung">
+      <div className="space-y-3 text-sm">
+        <p>
+          {request.invoiceExportedAt
+            ? `Am ${formatDateTime(request.invoiceExportedAt)} an Lexware übergeben.`
+            : 'Noch nicht an Lexware übergeben.'}
+        </p>
+        <LexwareExportButton
+          ids={[request.id]}
+          label={request.invoiceExportedAt ? 'Erneut für Lexware exportieren' : 'Für Lexware exportieren'}
+        />
+      </div>
     </Card>
   )
 }
