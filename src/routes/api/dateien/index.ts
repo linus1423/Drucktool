@@ -3,7 +3,13 @@ import { Readable } from 'node:stream'
 import type { ReadableStream as NodeWebStream } from 'node:stream/web'
 import { assertRateLimit } from '~/server/auth/rate-limit.server'
 import { getSessionUser } from '~/server/auth/session.server'
-import { AttachmentTypeError, EmptyUploadError, createUpload, uploadLimit } from '~/server/files/files.server'
+import {
+  AttachmentTypeError,
+  EmptyUploadError,
+  PendingUploadsFullError,
+  createUpload,
+  uploadLimit,
+} from '~/server/files/files.server'
 import { UploadTooLargeError } from '~/server/files/storage.server'
 import { logger } from '~/server/log.server'
 import { VirusFoundError, VirusScanUnavailableError } from '~/server/files/virus-scan.server'
@@ -38,7 +44,7 @@ export const Route = createFileRoute('/api/dateien/')({
           })
           return json(file, 201)
         } catch (e) {
-          if (e instanceof UploadTooLargeError) return json({ error: e.message }, 413)
+          if (e instanceof UploadTooLargeError || e instanceof PendingUploadsFullError) return json({ error: e.message }, 413)
           if (e instanceof EmptyUploadError || e instanceof AttachmentTypeError) return json({ error: e.message }, 400)
           if (e instanceof VirusFoundError) return json({ error: e.message }, 422)
           if (e instanceof VirusScanUnavailableError) return json({ error: e.message }, 503)

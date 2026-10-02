@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, lt, or } from 'drizzle-orm'
+import { and, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import { isStaffRole } from '~/lib/roles'
 import { getDb, schema, type Tx } from '../db/client.server'
 import { managedOrganisationIds } from '../organisations/org-admin.server'
@@ -7,7 +7,16 @@ import type { Principal } from '../requests/requests.server'
 import { writeAudit } from '../audit/audit.server'
 import { logger } from '../log.server'
 import { analysePdf } from './pdf.server'
-import { maxAttachmentBytes, maxUploadBytes, openStored, removeStored, storagePath, storeStream } from './storage.server'
+import {
+  maxAttachmentBytes,
+  maxPendingUploadBytes,
+  maxUploadBytes,
+  openStored,
+  removeStored,
+  storagePath,
+  storeStream,
+  UploadTooLargeError,
+} from './storage.server'
 import { scanFile, VirusFoundError, VirusScanUnavailableError } from './virus-scan.server'
 
 const { requestFiles, requests, requestComments } = schema
@@ -39,6 +48,35 @@ export function uploadLimit(role: FileRole) {
 export class EmptyUploadError extends Error {
   constructor() {
     super('Die Datei ist leer.')
+  }
+}
+
+export class PendingUploadsFullError extends Error {
+  constructor() {
+    super(
+      'Sie haben zu viele noch nicht abgeschickte Dateien hochgeladen. Bitte schicken Sie den Auftrag ab oder versuchen Sie es morgen erneut.',
+    )
+  }
+}
+
+/** Platz, der dem Benutzer für weitere, noch nicht abgeschickte Uploads bleibt (Issue #140). */
+async function pendingUploadRoom(userId: string) {
+  const [row] = await getDb()
+    .select({ bytes: sql<string>`coalesce(sum(${requestFiles.sizeBytes}), 0)` })
+    .from(requestFiles)
+    .where(and(eq(requestFiles.ownerId, userId), isNull(requestFiles.requestId)))
+  const room = maxPendingUploadBytes() - Number(row?.bytes ?? 0)
+  if (room <= 0) throw new PendingUploadsFullError()
+  return room
+}
+
+/** Speichert mit dem kleineren der beiden Limits; reißt erst das Kontingent, kommt dessen Meldung. */
+async function storeWithinRoom(body: Parameters<typeof storeStream>[0], limit: number, room: number) {
+  try {
+    return await storeStream(body, Math.min(limit, room))
+  } catch (e) {
+    if (e instanceof UploadTooLargeError && room < limit) throw new PendingUploadsFullError()
+    throw e
   }
 }
 
@@ -78,7 +116,7 @@ export async function createUpload(
     const ext = input.filename.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1]
     if (!ext || !attachmentTypes().includes(ext)) throw new AttachmentTypeError()
   }
-  const stored = await storeStream(input.body, uploadLimit(input.role))
+  const stored = await storeWithinRoom(input.body, uploadLimit(input.role), await pendingUploadRoom(user.id))
   if (stored.sizeBytes === 0) {
     await removeStored(stored.key)
     throw new EmptyUploadError()
@@ -179,7 +217,30 @@ export async function fileForDownload(user: Principal, id: string) {
  * Die Kopie liegt getrennt auf der Platte, damit das Löschen eines Auftrags die andere nicht berührt.
  */
 export async function copyAsUpload(user: Principal, source: typeof requestFiles.$inferSelect) {
-  const stored = await storeStream(openStored(source.storageKey), Number.MAX_SAFE_INTEGER)
+  // Der Wizard lädt die Vorlage bei jedem Öffnen neu: eine schon vorhandene, freie Kopie wiederverwenden (Issue #140).
+  const [free] = await getDb()
+    .select({ id: requestFiles.id })
+    .from(requestFiles)
+    .where(
+      and(
+        eq(requestFiles.ownerId, user.id),
+        isNull(requestFiles.requestId),
+        eq(requestFiles.role, source.role),
+        eq(requestFiles.sha256, source.sha256),
+        eq(requestFiles.filename, source.filename),
+      ),
+    )
+    .limit(1)
+  // Frisch datiert, damit das Aufräumen sie nicht löscht, während der Wizard offen ist.
+  const [existing] = free
+    ? await getDb()
+        .update(requestFiles)
+        .set({ createdAt: new Date() })
+        .where(and(eq(requestFiles.id, free.id), isNull(requestFiles.requestId)))
+        .returning()
+    : []
+  if (existing) return publicFile(existing)
+  const stored = await storeWithinRoom(openStored(source.storageKey), Number.MAX_SAFE_INTEGER, await pendingUploadRoom(user.id))
   try {
     const { id: _id, requestId: _r, ownerId: _o, storageKey: _k, createdAt: _c, ...rest } = source
     const [row] = await getDb()

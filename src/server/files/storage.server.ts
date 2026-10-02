@@ -23,6 +23,15 @@ export function maxAttachmentBytes() {
   return (Number.isFinite(mb) && mb > 0 ? mb : 25) * 1024 * 1024
 }
 
+/**
+ * Obergrenze für alle noch nicht abgeschickten Uploads eines Benutzers zusammen (Issue #140), damit niemand die
+ * Platte füllen kann. Standard: dreimal UPLOAD_MAX_MB, das reicht für Druckdatei, Deckblatt und Anhänge.
+ */
+export function maxPendingUploadBytes() {
+  const mb = Number(process.env.UPLOAD_PENDING_MAX_MB || 0)
+  return Number.isFinite(mb) && mb > 0 ? mb * 1024 * 1024 : 3 * maxUploadBytes()
+}
+
 export class UploadTooLargeError extends Error {
   constructor(limit: number) {
     super(`Die Datei ist zu groß (höchstens ${Math.round(limit / 1024 / 1024)} MB).`)

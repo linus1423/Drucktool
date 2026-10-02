@@ -522,34 +522,35 @@ holt einen älteren Stand.
 
 ## Umgebungsvariablen
 
-| Variable                                                                            | Bedeutung                                                                            |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `DATABASE_URL`                                                                      | PostgreSQL-Verbindung                                                                |
-| `APP_URL`                                                                           | Öffentliche URL (für Links in E-Mails)                                               |
-| `COOKIE_SECURE`                                                                     | `false` nur ohne HTTPS; Standard in Produktion ist `true`                            |
-| `TRUST_PROXY`                                                                       | `true` hinter einem Reverse Proxy, damit Client-IPs erkannt werden                   |
-| `LOG_LEVEL`, `LOG_FORMAT`                                                           | `debug`, `info` (Standard), `warn`, `error`; `json` oder `text`                      |
-| `SENTRY_DSN`                                                                        | Optional: Fehler an Sentry oder GlitchTip melden                                     |
-| `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`                                           | Legt beim ersten Start den Superadmin an                                             |
-| `CUSTOMER_EMAIL_DOMAINS`                                                            | Optional: neue Kundenkonten nur für diese Domains, z. B. `tum.de`                    |
-| `SMTP_URL`                                                                          | SMTP-Server, z. B. `smtps://user:pass@mail.example.com:465`                          |
-| `MAIL_FROM`                                                                         | Absender, z. B. `Druckerei Muster <auftraege@example.com>`                           |
-| `MAIL_REDIRECT_TO`                                                                  | Testsystem: alle Mails an diese Adresse, Empfänger steht im Betreff                  |
-| `APP_ENVIRONMENT`                                                                   | `production`, `staging` (Banner „Testsystem“) oder `development`                     |
-| `UPLOAD_DIR`                                                                        | Ablage für Druckdateien, Standard `data/uploads` (im Image `/app/uploads`)           |
-| `UPLOAD_MAX_MB`                                                                     | Größte erlaubte Druckdatei in MB, Standard 500                                       |
-| `CLAMAV_HOST`, `CLAMAV_PORT`                                                        | Virenprüfung mit clamd; Compose/Ansible: `clamav`, leer = keine Prüfung              |
-| `LEXWARE_ARTICLE_NUMBER`, `LEXWARE_TAX_RATE`                                        | Lexware-Export: Stammartikel (Standard `DRUCK`) und Steuersatz in % (Standard 19)    |
-| `ATTACHMENT_MAX_MB`, `ATTACHMENT_TYPES`                                             | Anhänge an Nachrichten: Größe in MB (Standard 25), erlaubte Endungen (kommagetrennt) |
-| `AUDIT_LOG_RETENTION_DAYS`                                                          | Aufbewahrung des Audit-Logs in Tagen, Standard 365, `0` = unbegrenzt                 |
-| `SESSION_IP_RETENTION_DAYS`                                                         | IP-Adressen an Sitzungen nach so vielen Tagen löschen, Standard 30                   |
-| `REJECTED_REGISTRATION_RETENTION_DAYS`                                              | Abgelehnte Registrierungen nach so vielen Tagen löschen, Standard 30                 |
-| `PRIVACY_URL`, `IMPRINT_URL`                                                        | Links auf Datenschutzerklärung und Impressum in der Fußzeile                         |
-| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`                               | OpenID Connect, siehe oben                                                           |
-| `OIDC_DISPLAY_NAME`, `OIDC_NEW_USERS`, `OIDC_TRUST_EMAIL`                           | Beschriftung und Verhalten der OIDC-Anmeldung                                        |
-| `CUSTOMER_OIDC_ISSUER`, `CUSTOMER_OIDC_CLIENT_ID`, `CUSTOMER_OIDC_CLIENT_SECRET`    | Kunden-Anmeldung über den TUM-Keycloak, siehe oben                                   |
-| `CUSTOMER_OIDC_DISPLAY_NAME`, `CUSTOMER_OIDC_TRUST_EMAIL`                           | Beschriftung und E-Mail-Vertrauen der Kunden-Anmeldung                               |
-| `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_ROLES`, `OIDC_STAFF_ROLES`, `OIDC_ENFORCE_FOR_STAFF` | Rollen vom Anbieter, siehe oben                                                      |
+| Variable                                                                            | Bedeutung                                                                               |
+| ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                                                      | PostgreSQL-Verbindung                                                                   |
+| `APP_URL`                                                                           | Öffentliche URL (für Links in E-Mails)                                                  |
+| `COOKIE_SECURE`                                                                     | `false` nur ohne HTTPS; Standard in Produktion ist `true`                               |
+| `TRUST_PROXY`                                                                       | `true` hinter einem Reverse Proxy, damit Client-IPs erkannt werden                      |
+| `LOG_LEVEL`, `LOG_FORMAT`                                                           | `debug`, `info` (Standard), `warn`, `error`; `json` oder `text`                         |
+| `SENTRY_DSN`                                                                        | Optional: Fehler an Sentry oder GlitchTip melden                                        |
+| `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`                                           | Legt beim ersten Start den Superadmin an                                                |
+| `CUSTOMER_EMAIL_DOMAINS`                                                            | Optional: neue Kundenkonten nur für diese Domains, z. B. `tum.de`                       |
+| `SMTP_URL`                                                                          | SMTP-Server, z. B. `smtps://user:pass@mail.example.com:465`                             |
+| `MAIL_FROM`                                                                         | Absender, z. B. `Druckerei Muster <auftraege@example.com>`                              |
+| `MAIL_REDIRECT_TO`                                                                  | Testsystem: alle Mails an diese Adresse, Empfänger steht im Betreff                     |
+| `APP_ENVIRONMENT`                                                                   | `production`, `staging` (Banner „Testsystem“) oder `development`                        |
+| `UPLOAD_DIR`                                                                        | Ablage für Druckdateien, Standard `data/uploads` (im Image `/app/uploads`)              |
+| `UPLOAD_MAX_MB`                                                                     | Größte erlaubte Druckdatei in MB, Standard 500                                          |
+| `UPLOAD_PENDING_MAX_MB`                                                             | Noch nicht abgeschickte Uploads pro Person zusammen in MB, Standard 3 × `UPLOAD_MAX_MB` |
+| `CLAMAV_HOST`, `CLAMAV_PORT`                                                        | Virenprüfung mit clamd; Compose/Ansible: `clamav`, leer = keine Prüfung                 |
+| `LEXWARE_ARTICLE_NUMBER`, `LEXWARE_TAX_RATE`                                        | Lexware-Export: Stammartikel (Standard `DRUCK`) und Steuersatz in % (Standard 19)       |
+| `ATTACHMENT_MAX_MB`, `ATTACHMENT_TYPES`                                             | Anhänge an Nachrichten: Größe in MB (Standard 25), erlaubte Endungen (kommagetrennt)    |
+| `AUDIT_LOG_RETENTION_DAYS`                                                          | Aufbewahrung des Audit-Logs in Tagen, Standard 365, `0` = unbegrenzt                    |
+| `SESSION_IP_RETENTION_DAYS`                                                         | IP-Adressen an Sitzungen nach so vielen Tagen löschen, Standard 30                      |
+| `REJECTED_REGISTRATION_RETENTION_DAYS`                                              | Abgelehnte Registrierungen nach so vielen Tagen löschen, Standard 30                    |
+| `PRIVACY_URL`, `IMPRINT_URL`                                                        | Links auf Datenschutzerklärung und Impressum in der Fußzeile                            |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`                               | OpenID Connect, siehe oben                                                              |
+| `OIDC_DISPLAY_NAME`, `OIDC_NEW_USERS`, `OIDC_TRUST_EMAIL`                           | Beschriftung und Verhalten der OIDC-Anmeldung                                           |
+| `CUSTOMER_OIDC_ISSUER`, `CUSTOMER_OIDC_CLIENT_ID`, `CUSTOMER_OIDC_CLIENT_SECRET`    | Kunden-Anmeldung über den TUM-Keycloak, siehe oben                                      |
+| `CUSTOMER_OIDC_DISPLAY_NAME`, `CUSTOMER_OIDC_TRUST_EMAIL`                           | Beschriftung und E-Mail-Vertrauen der Kunden-Anmeldung                                  |
+| `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_ROLES`, `OIDC_STAFF_ROLES`, `OIDC_ENFORCE_FOR_STAFF` | Rollen vom Anbieter, siehe oben                                                         |
 
 ## Mitwirken und Betrieb
 

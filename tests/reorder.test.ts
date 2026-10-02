@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -17,7 +17,7 @@ describe.skipIf(!url)('Nachbestellung (Issue #10)', async () => {
   const { getDb, schema } = await import('~/server/db/client.server')
   const { createRequest, getRequestDetail, prepareReorder, addComment, assignRequest } =
     await import('~/server/requests/requests.server')
-  const { createUpload } = await import('~/server/files/files.server')
+  const { createUpload, PendingUploadsFullError } = await import('~/server/files/files.server')
   type Principal = import('~/server/requests/requests.server').Principal
   let customer: Principal
   let other: Principal
@@ -98,5 +98,50 @@ describe.skipIf(!url)('Nachbestellung (Issue #10)', async () => {
     await expect(createRequest(other, { ...input, reorderOfId: original.id })).rejects.toThrow('Auftrag nicht gefunden')
     // Mitarbeiter dürfen jeden Auftrag nachbestellen.
     expect((await prepareReorder(staff, original.id)).mainFile).not.toBeNull()
+  })
+
+  it('kopiert bei erneutem Öffnen der Vorlage nicht noch einmal (Issue #140)', async () => {
+    const original = await orderWithFile(customer)
+    const first = await prepareReorder(customer, original.id)
+    const second = await prepareReorder(customer, original.id)
+    expect(second.mainFile!.id).toBe(first.mainFile!.id)
+    const copies = await getDb()
+      .select()
+      .from(schema.requestFiles)
+      .where(
+        eq(
+          schema.requestFiles.sha256,
+          (await getDb().select().from(schema.requestFiles).where(eq(schema.requestFiles.id, first.mainFile!.id)))[0]!.sha256,
+        ),
+      )
+    expect(copies.filter((f) => f.requestId === null && f.ownerId === customer.id)).toHaveLength(1)
+  })
+
+  it('begrenzt nicht abgeschickte Uploads pro Benutzer (Issue #140)', async () => {
+    const stamp = Date.now()
+    const [row] = await getDb()
+      .insert(schema.users)
+      .values({ email: `r-voll-${stamp}@test`, lastName: 'Voll', role: 'customer', status: 'active', billingAddress: BILLING })
+      .returning()
+    const user: Principal = { id: row!.id, role: 'customer' }
+    const original = await orderWithFile(user)
+    const size = (await getDb().select().from(schema.requestFiles).where(eq(schema.requestFiles.requestId, original.id)))[0]!
+      .sizeBytes
+    // Die Vorlage aus orderInput bleibt sonst als offener Upload liegen.
+    await getDb()
+      .delete(schema.requestFiles)
+      .where(and(eq(schema.requestFiles.ownerId, user.id), isNull(schema.requestFiles.requestId)))
+    // Platz für genau eine weitere Datei dieser Größe.
+    process.env.UPLOAD_PENDING_MAX_MB = String((size * 1.5) / 1024 / 1024)
+    try {
+      await prepareReorder(user, original.id)
+      await expect(
+        createUpload(user, { role: 'main', filename: 'noch.pdf', mimeType: 'application/pdf', body: await pdf(2) }),
+      ).rejects.toBeInstanceOf(PendingUploadsFullError)
+      // Die schon vorhandene Kopie wird weiter angeboten.
+      expect((await prepareReorder(user, original.id)).mainFile).not.toBeNull()
+    } finally {
+      delete process.env.UPLOAD_PENDING_MAX_MB
+    }
   })
 })
