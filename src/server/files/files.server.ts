@@ -3,6 +3,7 @@ import { isStaffRole } from '~/lib/roles'
 import { getDb, schema, type Tx } from '../db/client.server'
 import type { Principal } from '../requests/requests.server'
 import { writeAudit } from '../audit/audit.server'
+import { logger } from '../log.server'
 import { analysePdf } from './pdf.server'
 import { maxAttachmentBytes, maxUploadBytes, openStored, removeStored, storagePath, storeStream } from './storage.server'
 import { scanFile, VirusFoundError, VirusScanUnavailableError } from './virus-scan.server'
@@ -113,11 +114,11 @@ async function assertNoVirus(user: Principal, key: string, filename: string) {
   try {
     result = await scanFile(storagePath(key))
   } catch (e) {
-    if (e instanceof VirusScanUnavailableError) console.error('Virenprüfung nicht möglich:', e.reason)
+    if (e instanceof VirusScanUnavailableError) logger.error('Virenprüfung nicht möglich', { reason: e.reason })
     throw e
   }
   if (result.status !== 'infected') return
-  console.warn(`Schadsoftware in Upload von Benutzer ${user.id}: ${result.signature}`)
+  logger.warn('Schadsoftware in Upload gefunden', { userId: user.id, signature: result.signature })
   await writeAudit(getDb(), {
     actorId: user.id,
     action: 'file.virus_found',
