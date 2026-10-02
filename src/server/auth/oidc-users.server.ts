@@ -22,11 +22,15 @@ export type ResolveOptions = {
   trustEmail?: boolean
   /** Rollen aus einem Claim des Anbieters ableiten (z. B. Entra-App-Rollen oder Gruppen). */
   roles?: RoleMapping | null
+  /** Nur Kunden dürfen sich anmelden (Kunden-Anbieter wie der TUM-Keycloak, Issue #60). */
+  customersOnly?: boolean
 }
 
 const { users, organisationMembers, oidcAccounts, sessions } = schema
 
 const INACTIVE = 'Ihr Konto ist nicht aktiv. Bitte wenden Sie sich an die Druckerei.'
+const STAFF_ELSEWHERE =
+  'Mitarbeiter der Druckerei melden sich bitte über die Mitarbeiter-Anmeldung an, nicht mit der Kunden-Anmeldung.'
 const NO_ROLE = 'Ihr Firmenkonto ist nicht (mehr) für das Drucktool freigeschaltet. Bitte wenden Sie sich an die IT.'
 
 const claimText = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
@@ -56,6 +60,7 @@ async function decide(userId: string, claims: OidcClaims, options: ResolveOption
   const db = getDb()
   const [row] = await db.select({ status: users.status, role: users.role }).from(users).where(eq(users.id, userId))
   if (!row) return { kind: 'denied', message: INACTIVE }
+  if (options.customersOnly && row.role !== 'customer') return { kind: 'denied', message: STAFF_ELSEWHERE }
 
   // Die Rollen der Mitarbeiter kommen bei jeder Anmeldung neu vom Anbieter. Der Superadmin
   // (lokaler Notfallzugang) wird nie angefasst.
@@ -112,9 +117,13 @@ export async function resolveOidcUser(issuer: string, claims: OidcClaims, option
   }
 
   const [existing] = await db
-    .select({ id: users.id })
+    .select({ id: users.id, role: users.role })
     .from(users)
     .where(sql`lower(${users.email}) = ${email}`)
+  // Ein Mitarbeiterkonto wird nie mit dem Kunden-Anbieter verknüpft.
+  if (existing && options.customersOnly && existing.role !== 'customer') {
+    return { kind: 'denied', message: STAFF_ELSEWHERE }
+  }
   if (existing) {
     await db.insert(oidcAccounts).values({ userId: existing.id, issuer, subject: claims.sub }).onConflictDoNothing()
     return decide(existing.id, claims, options)
@@ -130,7 +139,8 @@ export async function resolveOidcUser(issuer: string, claims: OidcClaims, option
   }
 
   const role = mapped ?? (options.policy === 'staff' ? 'staff' : 'customer')
-  const status = role === 'customer' ? 'pending' : 'active'
+  // Lastenheft V2: Kunden über den Kunden-Anbieter sind sofort aktiv, wie beim Anmeldelink.
+  const status = role === 'customer' && options.policy !== 'customer' ? 'pending' : 'active'
   const personName = nameFromClaims(claims, email)
   const created = await db.transaction(async (tx) => {
     const [user] = await tx

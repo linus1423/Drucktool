@@ -282,6 +282,23 @@ Mitarbeiter oder Admin die Rolle, wird die Anmeldung abgelehnt und seine Sitzung
 nie verändert und bleibt als lokaler Notfallzugang mit Passwort erhalten. Mit `OIDC_ENFORCE_FOR_STAFF=true` können sich
 Mitarbeiter und Admins nur noch über den Anbieter anmelden.
 
+### Kunden-Anmeldung über den TUM-Keycloak
+
+Kunden können sich zusätzlich über einen eigenen OIDC-Anbieter anmelden, gedacht für den Federated TUM Keycloak
+(Shibboleth der TUM über Keycloak). Er ist vom Mitarbeiter-Anbieter oben unabhängig und wird mit
+`CUSTOMER_OIDC_ISSUER`, `CUSTOMER_OIDC_CLIENT_ID` und `CUSTOMER_OIDC_CLIENT_SECRET` eingeschaltet (Ansible:
+`drucktool_customer_oidc_*`). Die Login-Seite zeigt dann oben „Anmelden mit TUM-Kennung“ (`CUSTOMER_OIDC_DISPLAY_NAME`),
+darunter weiter die Anmeldung per E-Mail-Link für Externe.
+
+- Beim Keycloak als Client (Confidential, Standard Flow mit PKCE) registrieren, Redirect-URI
+  `<APP_URL>/api/auth/kunden-sso/callback`, Scopes `openid email profile`.
+- Unbekannte Personen werden sofort als aktive Kunden angelegt, wie beim ersten Anmeldelink, und landen zuerst im
+  Profil, um ihre Rechnungsadresse einzutragen.
+- Bestehende Kundenkonten aus der E-Mail-Anmeldung werden über die bestätigte E-Mail-Adresse verknüpft (ohne
+  `email_verified` nur mit `CUSTOMER_OIDC_TRUST_EMAIL=true`).
+- Mitarbeiter und Admins kommen über diesen Weg nicht herein, ihre Konten werden auch nicht verknüpft. Der Anbieter
+  vergibt nie Rollen.
+
 ## Datenschutz
 
 - **Anonymisieren statt Löschen:** In der Benutzerverwaltung lässt sich ein Konto anonymisieren. Name wird zu
@@ -509,6 +526,8 @@ holt einen älteren Stand.
 | `PRIVACY_URL`, `IMPRINT_URL`                                                        | Links auf Datenschutzerklärung und Impressum in der Fußzeile                         |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`                               | OpenID Connect, siehe oben                                                           |
 | `OIDC_DISPLAY_NAME`, `OIDC_NEW_USERS`, `OIDC_TRUST_EMAIL`                           | Beschriftung und Verhalten der OIDC-Anmeldung                                        |
+| `CUSTOMER_OIDC_ISSUER`, `CUSTOMER_OIDC_CLIENT_ID`, `CUSTOMER_OIDC_CLIENT_SECRET`    | Kunden-Anmeldung über den TUM-Keycloak, siehe oben                                   |
+| `CUSTOMER_OIDC_DISPLAY_NAME`, `CUSTOMER_OIDC_TRUST_EMAIL`                           | Beschriftung und E-Mail-Vertrauen der Kunden-Anmeldung                               |
 | `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_ROLES`, `OIDC_STAFF_ROLES`, `OIDC_ENFORCE_FOR_STAFF` | Rollen vom Anbieter, siehe oben                                                      |
 
 ## Mitwirken und Betrieb

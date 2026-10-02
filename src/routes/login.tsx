@@ -27,6 +27,7 @@ export const Route = createFileRoute('/login')({
 function LoginPage() {
   const search = Route.useSearch()
   const options = Route.useLoaderData()
+  const redirectQuery = search.redirect ? `?redirect=${encodeURIComponent(search.redirect)}` : ''
 
   return (
     <AuthLayout title="Anmelden" subtitle="Druckaufträge aufgeben und ihren Stand verfolgen.">
@@ -37,6 +38,21 @@ function LoginPage() {
           </Alert>
         ) : null}
         {search.fehler ? <Alert>{search.fehler}</Alert> : null}
+        {options.customerOidc ? (
+          <>
+            <a
+              href={`/api/auth/kunden-sso/login${redirectQuery}`}
+              className="flex w-full items-center justify-center rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
+            >
+              Anmelden mit {options.customerOidc.displayName}
+            </a>
+            <div className="flex items-center gap-3 text-xs text-slate-500 uppercase">
+              <span className="h-px flex-1 bg-slate-200" />
+              oder per E-Mail
+              <span className="h-px flex-1 bg-slate-200" />
+            </div>
+          </>
+        ) : null}
         <LinkLogin redirect={search.redirect ?? null} />
         <div className="flex items-center gap-3 text-xs text-slate-500 uppercase">
           <span className="h-px flex-1 bg-slate-200" />
@@ -45,7 +61,7 @@ function LoginPage() {
         </div>
         {options.oidc ? (
           <a
-            href={`/api/auth/oidc/login${search.redirect ? `?redirect=${encodeURIComponent(search.redirect)}` : ''}`}
+            href={`/api/auth/oidc/login${redirectQuery}`}
             className="flex w-full items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-900 ring-1 ring-slate-300 hover:bg-slate-100"
           >
             Anmelden mit {options.oidc.displayName}

@@ -175,6 +175,55 @@ describe.skipIf(!url)('OpenID Connect: Benutzerzuordnung (Integration)', async (
     expect(after!.role).toBe('superadmin')
   })
 
+  describe('Kunden-Anmeldung über den TUM-Keycloak (Issue #60)', () => {
+    const KC = 'https://login.tum.test/realms/tum'
+    const customer = { policy: 'customer' as const, customersOnly: true }
+
+    it('legt neue Kunden sofort aktiv an', async () => {
+      const result = await resolveOidcUser(
+        KC,
+        { sub: `kc-neu-${stamp}`, email: email('studi'), email_verified: true, given_name: 'Sam', family_name: 'Studi' },
+        customer,
+      )
+      expect(result.kind).toBe('login')
+      const [u] = await getDb()
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.email, email('studi')))
+      expect(u).toMatchObject({ role: 'customer', status: 'active', firstName: 'Sam', lastName: 'Studi' })
+    })
+
+    it('verknüpft bestehende Kunden aus der E-Mail-Anmeldung über die Adresse', async () => {
+      const [u] = await getDb()
+        .insert(schema.users)
+        .values({ email: email('kunde'), lastName: 'Kunde', role: 'customer', status: 'active' })
+        .returning()
+      const result = await resolveOidcUser(KC, { sub: `kc-k-${stamp}`, email: email('kunde'), email_verified: true }, customer)
+      expect(result).toEqual({ kind: 'login', userId: u!.id })
+    })
+
+    it('meldet keine Mitarbeiter an und verknüpft ihre Konten nicht', async () => {
+      await getDb()
+        .insert(schema.users)
+        .values({ email: email('ma-kc'), lastName: 'Ma', role: 'admin', status: 'active' })
+      const result = await resolveOidcUser(KC, { sub: `kc-ma-${stamp}`, email: email('ma-kc'), email_verified: true }, customer)
+      expect(result.kind).toBe('denied')
+      const links = await getDb()
+        .select()
+        .from(schema.oidcAccounts)
+        .where(eq(schema.oidcAccounts.subject, `kc-ma-${stamp}`))
+      expect(links).toHaveLength(0)
+    })
+
+    it('lässt gesperrte Kunden nicht herein', async () => {
+      await getDb()
+        .insert(schema.users)
+        .values({ email: email('gesperrt'), lastName: 'Gesperrt', role: 'customer', status: 'disabled' })
+      const result = await resolveOidcUser(KC, { sub: `kc-g-${stamp}`, email: email('gesperrt'), email_verified: true }, customer)
+      expect(result.kind).toBe('denied')
+    })
+  })
+
   it('erlaubt nur relative Weiterleitungen', () => {
     expect(safeRedirect('/konto')).toBe('/konto')
     expect(safeRedirect('//evil.example')).toBe('/uebersicht')

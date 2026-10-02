@@ -39,6 +39,8 @@ import { Route as AppAdminOrganisationenIndexRouteImport } from './routes/_app/a
 import { Route as AppAdminOrganisationenOrganisationIdRouteImport } from './routes/_app/admin/organisationen/$organisationId'
 import { Route as AppAdminOrganisationenNeuRouteImport } from './routes/_app/admin/organisationen/neu'
 import { Route as ApiAdminDatenauskunftUserIdRouteImport } from './routes/api/admin/datenauskunft/$userId'
+import { Route as ApiAuthKundenSsoCallbackRouteImport } from './routes/api/auth/kunden-sso/callback'
+import { Route as ApiAuthKundenSsoLoginRouteImport } from './routes/api/auth/kunden-sso/login'
 import { Route as ApiAuthOidcCallbackRouteImport } from './routes/api/auth/oidc/callback'
 import { Route as ApiAuthOidcLoginRouteImport } from './routes/api/auth/oidc/login'
 
@@ -196,6 +198,17 @@ const ApiAdminDatenauskunftUserIdRoute =
     path: '/api/admin/datenauskunft/$userId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiAuthKundenSsoCallbackRoute =
+  ApiAuthKundenSsoCallbackRouteImport.update({
+    id: '/api/auth/kunden-sso/callback',
+    path: '/api/auth/kunden-sso/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAuthKundenSsoLoginRoute = ApiAuthKundenSsoLoginRouteImport.update({
+  id: '/api/auth/kunden-sso/login',
+  path: '/api/auth/kunden-sso/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthOidcCallbackRoute = ApiAuthOidcCallbackRouteImport.update({
   id: '/api/auth/oidc/callback',
   path: '/api/auth/oidc/callback',
@@ -236,6 +249,8 @@ export interface FileRoutesByFullPath {
   '/admin/organisationen/$organisationId': typeof AppAdminOrganisationenOrganisationIdRoute
   '/admin/organisationen/neu': typeof AppAdminOrganisationenNeuRoute
   '/api/admin/datenauskunft/$userId': typeof ApiAdminDatenauskunftUserIdRoute
+  '/api/auth/kunden-sso/callback': typeof ApiAuthKundenSsoCallbackRoute
+  '/api/auth/kunden-sso/login': typeof ApiAuthKundenSsoLoginRoute
   '/api/auth/oidc/callback': typeof ApiAuthOidcCallbackRoute
   '/api/auth/oidc/login': typeof ApiAuthOidcLoginRoute
   '/admin/organisationen/': typeof AppAdminOrganisationenIndexRoute
@@ -269,6 +284,8 @@ export interface FileRoutesByTo {
   '/admin/organisationen/$organisationId': typeof AppAdminOrganisationenOrganisationIdRoute
   '/admin/organisationen/neu': typeof AppAdminOrganisationenNeuRoute
   '/api/admin/datenauskunft/$userId': typeof ApiAdminDatenauskunftUserIdRoute
+  '/api/auth/kunden-sso/callback': typeof ApiAuthKundenSsoCallbackRoute
+  '/api/auth/kunden-sso/login': typeof ApiAuthKundenSsoLoginRoute
   '/api/auth/oidc/callback': typeof ApiAuthOidcCallbackRoute
   '/api/auth/oidc/login': typeof ApiAuthOidcLoginRoute
   '/admin/organisationen': typeof AppAdminOrganisationenIndexRoute
@@ -304,6 +321,8 @@ export interface FileRoutesById {
   '/_app/admin/organisationen/$organisationId': typeof AppAdminOrganisationenOrganisationIdRoute
   '/_app/admin/organisationen/neu': typeof AppAdminOrganisationenNeuRoute
   '/api/admin/datenauskunft/$userId': typeof ApiAdminDatenauskunftUserIdRoute
+  '/api/auth/kunden-sso/callback': typeof ApiAuthKundenSsoCallbackRoute
+  '/api/auth/kunden-sso/login': typeof ApiAuthKundenSsoLoginRoute
   '/api/auth/oidc/callback': typeof ApiAuthOidcCallbackRoute
   '/api/auth/oidc/login': typeof ApiAuthOidcLoginRoute
   '/_app/admin/organisationen/': typeof AppAdminOrganisationenIndexRoute
@@ -339,6 +358,8 @@ export interface FileRouteTypes {
     | '/admin/organisationen/$organisationId'
     | '/admin/organisationen/neu'
     | '/api/admin/datenauskunft/$userId'
+    | '/api/auth/kunden-sso/callback'
+    | '/api/auth/kunden-sso/login'
     | '/api/auth/oidc/callback'
     | '/api/auth/oidc/login'
     | '/admin/organisationen/'
@@ -372,6 +393,8 @@ export interface FileRouteTypes {
     | '/admin/organisationen/$organisationId'
     | '/admin/organisationen/neu'
     | '/api/admin/datenauskunft/$userId'
+    | '/api/auth/kunden-sso/callback'
+    | '/api/auth/kunden-sso/login'
     | '/api/auth/oidc/callback'
     | '/api/auth/oidc/login'
     | '/admin/organisationen'
@@ -406,6 +429,8 @@ export interface FileRouteTypes {
     | '/_app/admin/organisationen/$organisationId'
     | '/_app/admin/organisationen/neu'
     | '/api/admin/datenauskunft/$userId'
+    | '/api/auth/kunden-sso/callback'
+    | '/api/auth/kunden-sso/login'
     | '/api/auth/oidc/callback'
     | '/api/auth/oidc/login'
     | '/_app/admin/organisationen/'
@@ -425,6 +450,8 @@ export interface RootRouteChildren {
   ApiRechnungenLexwareRoute: typeof ApiRechnungenLexwareRoute
   ApiDateienIndexRoute: typeof ApiDateienIndexRoute
   ApiAdminDatenauskunftUserIdRoute: typeof ApiAdminDatenauskunftUserIdRoute
+  ApiAuthKundenSsoCallbackRoute: typeof ApiAuthKundenSsoCallbackRoute
+  ApiAuthKundenSsoLoginRoute: typeof ApiAuthKundenSsoLoginRoute
   ApiAuthOidcCallbackRoute: typeof ApiAuthOidcCallbackRoute
   ApiAuthOidcLoginRoute: typeof ApiAuthOidcLoginRoute
 }
@@ -641,6 +668,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminDatenauskunftUserIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/kunden-sso/callback': {
+      id: '/api/auth/kunden-sso/callback'
+      path: '/api/auth/kunden-sso/callback'
+      fullPath: '/api/auth/kunden-sso/callback'
+      preLoaderRoute: typeof ApiAuthKundenSsoCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/kunden-sso/login': {
+      id: '/api/auth/kunden-sso/login'
+      path: '/api/auth/kunden-sso/login'
+      fullPath: '/api/auth/kunden-sso/login'
+      preLoaderRoute: typeof ApiAuthKundenSsoLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/oidc/callback': {
       id: '/api/auth/oidc/callback'
       path: '/api/auth/oidc/callback'
@@ -725,6 +766,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiRechnungenLexwareRoute: ApiRechnungenLexwareRoute,
   ApiDateienIndexRoute: ApiDateienIndexRoute,
   ApiAdminDatenauskunftUserIdRoute: ApiAdminDatenauskunftUserIdRoute,
+  ApiAuthKundenSsoCallbackRoute: ApiAuthKundenSsoCallbackRoute,
+  ApiAuthKundenSsoLoginRoute: ApiAuthKundenSsoLoginRoute,
   ApiAuthOidcCallbackRoute: ApiAuthOidcCallbackRoute,
   ApiAuthOidcLoginRoute: ApiAuthOidcLoginRoute,
 }

@@ -3,14 +3,14 @@ import { safeRedirect } from '~/lib/redirect'
 import { eq } from 'drizzle-orm'
 import { deleteCookie, getCookie, setCookie } from '@tanstack/react-start/server'
 import { getDb, schema } from '../db/client.server'
-import { getOidcClient, getOidcSettings } from './oidc.server'
+import { getOidcClient, getOidcSettings, type OidcProvider, type OidcSettings } from './oidc.server'
 import { resolveOidcUser } from './oidc-users.server'
 import { assertRateLimit } from './rate-limit.server'
 import { auditLogin } from '../audit/audit.server'
 import { createSession, destroyCurrentSession } from './session.server'
 import { logger } from '../log.server'
 
-const FLOW_COOKIE = 'drucktool_oidc'
+const flowCookie = (settings: OidcSettings) => (settings.provider === 'staff' ? 'drucktool_oidc' : 'drucktool_oidc_kunde')
 
 type PendingLogin = { state: string; nonce: string; verifier: string; redirect: string }
 
@@ -31,8 +31,8 @@ function loginError(message: string) {
 export { safeRedirect }
 
 /** Leitet zum Anbieter weiter. State, Nonce und PKCE-Verifier landen in einem kurzlebigen Cookie. */
-export async function startOidcLogin(request: Request) {
-  const settings = getOidcSettings()
+export async function startOidcLogin(request: Request, provider: OidcProvider = 'staff') {
+  const settings = getOidcSettings(provider)
   if (!settings) return loginError('Die Anmeldung über OpenID Connect ist nicht eingerichtet.')
   let config: client.Configuration
   try {
@@ -48,11 +48,11 @@ export async function startOidcLogin(request: Request) {
     verifier: client.randomPKCECodeVerifier(),
     redirect: safeRedirect(new URL(request.url).searchParams.get('redirect')),
   }
-  setCookie(FLOW_COOKIE, Buffer.from(JSON.stringify(pending)).toString('base64url'), {
+  setCookie(flowCookie(settings), Buffer.from(JSON.stringify(pending)).toString('base64url'), {
     httpOnly: true,
     secure: secure(),
     sameSite: 'lax',
-    path: '/api/auth/oidc',
+    path: settings.basePath,
     maxAge: 600,
   })
 
@@ -67,8 +67,8 @@ export async function startOidcLogin(request: Request) {
   return redirectTo(url.href)
 }
 
-function readPending(): PendingLogin | null {
-  const raw = getCookie(FLOW_COOKIE)
+function readPending(settings: OidcSettings): PendingLogin | null {
+  const raw = getCookie(flowCookie(settings))
   if (!raw) return null
   try {
     const parsed = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as Partial<PendingLogin>
@@ -82,13 +82,13 @@ function readPending(): PendingLogin | null {
 }
 
 /** Rückkehr vom Anbieter: Code einlösen, Benutzer zuordnen, Sitzung anlegen. */
-export async function finishOidcLogin(request: Request) {
-  const settings = getOidcSettings()
+export async function finishOidcLogin(request: Request, provider: OidcProvider = 'staff') {
+  const settings = getOidcSettings(provider)
   if (!settings) return loginError('Die Anmeldung über OpenID Connect ist nicht eingerichtet.')
   await assertRateLimit('oidc-callback', 30, 60_000)
 
-  const pending = readPending()
-  deleteCookie(FLOW_COOKIE, { path: '/api/auth/oidc' })
+  const pending = readPending(settings)
+  deleteCookie(flowCookie(settings), { path: settings.basePath })
   if (!pending) return loginError('Die Anmeldung ist abgelaufen. Bitte versuchen Sie es erneut.')
 
   const incoming = new URL(request.url)
@@ -128,6 +128,7 @@ export async function finishOidcLogin(request: Request) {
     policy: settings.newUsers,
     trustEmail: settings.trustEmail,
     roles: settings.roles,
+    customersOnly: settings.customersOnly,
   })
   const email = typeof claims.email === 'string' ? claims.email.toLowerCase() : null
   if (result.kind === 'pending') {
@@ -142,6 +143,11 @@ export async function finishOidcLogin(request: Request) {
   await destroyCurrentSession()
   await createSession(result.userId)
   await auditLogin('succeeded', { userId: result.userId, method: 'oidc' })
-  await getDb().update(schema.users).set({ lastLoginAt: new Date() }).where(eq(schema.users.id, result.userId))
-  return redirectTo(pending.redirect)
+  const [user] = await getDb()
+    .update(schema.users)
+    .set({ lastLoginAt: new Date() })
+    .where(eq(schema.users.id, result.userId))
+    .returning({ role: schema.users.role, billingAddress: schema.users.billingAddress })
+  // Kunden ohne Rechnungsadresse landen zuerst im Profil, wie beim Anmeldelink.
+  return redirectTo(user?.role === 'customer' && !user.billingAddress ? '/profil?neu=1' : pending.redirect)
 }
