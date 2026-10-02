@@ -185,6 +185,26 @@ auf „Rückfrage“, der Kunde bekommt eine E-Mail und sieht Vorher und Nachher
 Stand samt Preis, und der Auftrag kehrt in seinen vorherigen Status zurück. Lehnt er ab, bleibt alles, wie es war.
 Solange ein Vorschlag offen ist, kann der Auftrag nur storniert oder abgelehnt werden. Alle Schritte stehen im Verlauf.
 
+## Rechnungen mit Lexware
+
+Rechnungen entstehen in Lexware financial office, nicht im Drucktool. Fertige Aufträge übergibt die Druckerei als
+Datei im Format openTRANS 1.0, das die Standard-Shopschnittstelle von Lexware importiert. So muss niemand Adressen
+oder Preise abtippen.
+
+- **Exportieren:** In der Auftragsliste zeigt ein Hinweis, wie viele fertige Aufträge noch auf die Rechnung warten;
+  „Für Lexware exportieren“ lädt alle in einer Datei herunter und merkt sie als übergeben. Auf der Detailseite eines
+  fertigen Auftrags lässt er sich einzeln (auch erneut) exportieren. Nur Mitarbeiter sehen beides.
+- **Inhalt je Auftrag:** Rechnungsadresse und E-Mail des Kunden, Auftragsnummer als Bestellnummer, eine Position mit
+  dem Lexware-Artikel `LEXWARE_ARTICLE_NUMBER` (Standard `DRUCK`), Bezeichnung „#Nummer Titel“, Druckoptionen als
+  Positionstext und dem eingefrorenen Endpreis als Bruttopreis. Lieferkosten gehen als Versandkosten mit.
+- **Einmalig in Lexware:** einen Stammartikel mit der Artikelnummer `DRUCK` anlegen (Steuersatz wie
+  `LEXWARE_TAX_RATE`, Standard 19 %). Ohne ihn lehnt Lexware die Position ab.
+- **Importieren:** in Lexware über die Shopschnittstelle (Menü eCommerce bzw. „Ebusiness – Standard Shopschnittstelle
+  – Importieren“) die Datei wählen und als Belegart „Rechnung“ einstellen. Unbekannte Kunden legt Lexware aus der
+  Rechnungsadresse an, bekannte schlägt es zur Zuordnung vor.
+- Aufträge, die beim Einspielen dieser Version schon fertig waren, gelten als übergeben und lassen sich bei Bedarf
+  einzeln exportieren.
+
 ## Schutz vor gleichzeitigen Änderungen
 
 Jede Anfrage hat eine `version`. Änderungen (Status, Bearbeiten, Zuweisung) schicken die Version mit, die der
@@ -481,6 +501,7 @@ holt einen älteren Stand.
 | `UPLOAD_DIR`                                                                        | Ablage für Druckdateien, Standard `data/uploads` (im Image `/app/uploads`)           |
 | `UPLOAD_MAX_MB`                                                                     | Größte erlaubte Druckdatei in MB, Standard 500                                       |
 | `CLAMAV_HOST`, `CLAMAV_PORT`                                                        | Virenprüfung mit clamd; Compose/Ansible: `clamav`, leer = keine Prüfung              |
+| `LEXWARE_ARTICLE_NUMBER`, `LEXWARE_TAX_RATE`                                        | Lexware-Export: Stammartikel (Standard `DRUCK`) und Steuersatz in % (Standard 19)    |
 | `ATTACHMENT_MAX_MB`, `ATTACHMENT_TYPES`                                             | Anhänge an Nachrichten: Größe in MB (Standard 25), erlaubte Endungen (kommagetrennt) |
 | `AUDIT_LOG_RETENTION_DAYS`                                                          | Aufbewahrung des Audit-Logs in Tagen, Standard 365, `0` = unbegrenzt                 |
 | `SESSION_IP_RETENTION_DAYS`                                                         | IP-Adressen an Sitzungen nach so vielen Tagen löschen, Standard 30                   |

@@ -34,6 +34,7 @@ import { Route as AppAuftraegeNeuRouteImport } from './routes/_app/auftraege/neu
 import { Route as ApiAuftraegeExportRouteImport } from './routes/api/auftraege/export'
 import { Route as ApiDateienIndexRouteImport } from './routes/api/dateien/index'
 import { Route as ApiDateienFileIdRouteImport } from './routes/api/dateien/$fileId'
+import { Route as ApiRechnungenLexwareRouteImport } from './routes/api/rechnungen/lexware'
 import { Route as AppAdminOrganisationenIndexRouteImport } from './routes/_app/admin/organisationen/index'
 import { Route as AppAdminOrganisationenOrganisationIdRouteImport } from './routes/_app/admin/organisationen/$organisationId'
 import { Route as AppAdminOrganisationenNeuRouteImport } from './routes/_app/admin/organisationen/neu'
@@ -166,6 +167,11 @@ const ApiDateienFileIdRoute = ApiDateienFileIdRouteImport.update({
   path: '/api/dateien/$fileId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiRechnungenLexwareRoute = ApiRechnungenLexwareRouteImport.update({
+  id: '/api/rechnungen/lexware',
+  path: '/api/rechnungen/lexware',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppAdminOrganisationenIndexRoute =
   AppAdminOrganisationenIndexRouteImport.update({
     id: '/organisationen/',
@@ -224,6 +230,7 @@ export interface FileRoutesByFullPath {
   '/auftraege/neu': typeof AppAuftraegeNeuRoute
   '/api/auftraege/export': typeof ApiAuftraegeExportRoute
   '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
+  '/api/rechnungen/lexware': typeof ApiRechnungenLexwareRoute
   '/auftraege/': typeof AppAuftraegeIndexRoute
   '/api/dateien/': typeof ApiDateienIndexRoute
   '/admin/organisationen/$organisationId': typeof AppAdminOrganisationenOrganisationIdRoute
@@ -256,6 +263,7 @@ export interface FileRoutesByTo {
   '/auftraege/neu': typeof AppAuftraegeNeuRoute
   '/api/auftraege/export': typeof ApiAuftraegeExportRoute
   '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
+  '/api/rechnungen/lexware': typeof ApiRechnungenLexwareRoute
   '/auftraege': typeof AppAuftraegeIndexRoute
   '/api/dateien': typeof ApiDateienIndexRoute
   '/admin/organisationen/$organisationId': typeof AppAdminOrganisationenOrganisationIdRoute
@@ -290,6 +298,7 @@ export interface FileRoutesById {
   '/_app/auftraege/neu': typeof AppAuftraegeNeuRoute
   '/api/auftraege/export': typeof ApiAuftraegeExportRoute
   '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
+  '/api/rechnungen/lexware': typeof ApiRechnungenLexwareRoute
   '/_app/auftraege/': typeof AppAuftraegeIndexRoute
   '/api/dateien/': typeof ApiDateienIndexRoute
   '/_app/admin/organisationen/$organisationId': typeof AppAdminOrganisationenOrganisationIdRoute
@@ -324,6 +333,7 @@ export interface FileRouteTypes {
     | '/auftraege/neu'
     | '/api/auftraege/export'
     | '/api/dateien/$fileId'
+    | '/api/rechnungen/lexware'
     | '/auftraege/'
     | '/api/dateien/'
     | '/admin/organisationen/$organisationId'
@@ -356,6 +366,7 @@ export interface FileRouteTypes {
     | '/auftraege/neu'
     | '/api/auftraege/export'
     | '/api/dateien/$fileId'
+    | '/api/rechnungen/lexware'
     | '/auftraege'
     | '/api/dateien'
     | '/admin/organisationen/$organisationId'
@@ -389,6 +400,7 @@ export interface FileRouteTypes {
     | '/_app/auftraege/neu'
     | '/api/auftraege/export'
     | '/api/dateien/$fileId'
+    | '/api/rechnungen/lexware'
     | '/_app/auftraege/'
     | '/api/dateien/'
     | '/_app/admin/organisationen/$organisationId'
@@ -410,6 +422,7 @@ export interface RootRouteChildren {
   AnfragenIndexRoute: typeof AnfragenIndexRoute
   ApiAuftraegeExportRoute: typeof ApiAuftraegeExportRoute
   ApiDateienFileIdRoute: typeof ApiDateienFileIdRoute
+  ApiRechnungenLexwareRoute: typeof ApiRechnungenLexwareRoute
   ApiDateienIndexRoute: typeof ApiDateienIndexRoute
   ApiAdminDatenauskunftUserIdRoute: typeof ApiAdminDatenauskunftUserIdRoute
   ApiAuthOidcCallbackRoute: typeof ApiAuthOidcCallbackRoute
@@ -593,6 +606,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDateienFileIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/rechnungen/lexware': {
+      id: '/api/rechnungen/lexware'
+      path: '/api/rechnungen/lexware'
+      fullPath: '/api/rechnungen/lexware'
+      preLoaderRoute: typeof ApiRechnungenLexwareRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/admin/organisationen/': {
       id: '/_app/admin/organisationen/'
       path: '/organisationen'
@@ -702,6 +722,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnfragenIndexRoute: AnfragenIndexRoute,
   ApiAuftraegeExportRoute: ApiAuftraegeExportRoute,
   ApiDateienFileIdRoute: ApiDateienFileIdRoute,
+  ApiRechnungenLexwareRoute: ApiRechnungenLexwareRoute,
   ApiDateienIndexRoute: ApiDateienIndexRoute,
   ApiAdminDatenauskunftUserIdRoute: ApiAdminDatenauskunftUserIdRoute,
   ApiAuthOidcCallbackRoute: ApiAuthOidcCallbackRoute,

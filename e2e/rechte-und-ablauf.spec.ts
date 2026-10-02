@@ -129,6 +129,15 @@ test('Mitarbeiter schließt den Auftrag ab, der Kunde sieht „Fertig“', async
   await expect(statusBadge(page)).toHaveText('Fertig')
   await expect(page.getByText('Nächster Schritt')).toHaveCount(0)
 
+  // Übergabe an Lexware (Issue #53): Datei herunterladen, danach gilt der Auftrag als übergeben.
+  await expect(page.getByText('Noch nicht an Lexware übergeben.')).toBeVisible()
+  const downloading = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Für Lexware exportieren' }).click()
+  const download = await downloading
+  expect(download.suggestedFilename()).toMatch(/^lexware-auftrag-\d+\.xml$/)
+  await expect(page.getByText(/An Lexware übergeben|Am .* an Lexware übergeben/)).toBeVisible()
+  await check(page, 'Rechnung an Lexware')
+
   const customerPage = await newSession(browser)
   await loginAsCustomer(customerPage, owner)
   await customerPage.goto(requestPath)

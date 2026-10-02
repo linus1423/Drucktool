@@ -50,6 +50,8 @@ services:
       # Uploads werden vom clamav-Container geprüft. CLAMAV_HOST= (leer, z. B. in .env) schaltet die Prüfung ab.
       CLAMAV_HOST: ${CLAMAV_HOST-clamav}
       CLAMAV_PORT: ${CLAMAV_PORT:-3310}
+      LEXWARE_ARTICLE_NUMBER: ${LEXWARE_ARTICLE_NUMBER:-DRUCK}
+      LEXWARE_TAX_RATE: ${LEXWARE_TAX_RATE:-19}
     volumes:
       - uploads:/app/uploads
     ports:

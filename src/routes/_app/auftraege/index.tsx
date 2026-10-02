@@ -4,6 +4,7 @@ import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
 import { z } from 'zod'
 import { DataTable, dataColumnHelper } from '~/components/DataTable'
 import { Badge, Button, Input, PageHeader, Select, StatusBadge, cx } from '~/components/ui'
+import { LexwarePending } from '~/components/LexwareExport'
 import { AttentionBadge } from '~/components/AttentionBadge'
 import { formatDate, formatDateTime, formatMoney, formatRequestNumber } from '~/lib/format'
 import { DELIVERY_LABELS } from '~/lib/order'
@@ -215,6 +216,7 @@ function RequestListPage() {
           </div>
         }
       />
+      {staff ? <LexwarePending /> : null}
       <DataTable
         data={data.rows}
         columns={columns}

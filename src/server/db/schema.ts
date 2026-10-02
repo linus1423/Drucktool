@@ -240,6 +240,9 @@ export const requests = pgTable(
     // Die Druckerei nimmt einen Auftrag immer durch einen Mitarbeiter an.
     confirmedById: uuid('confirmed_by_id').references(() => users.id, { onDelete: 'set null' }),
     confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+    // Übergabe an Lexware zur Rechnungsstellung (Issue #53); null heißt noch nicht übergeben.
+    invoiceExportedAt: timestamp('invoice_exported_at', { withTimezone: true }),
+    invoiceExportedById: uuid('invoice_exported_by_id').references(() => users.id, { onDelete: 'set null' }),
     // Optimistic Locking: jede Änderung erhöht die Version, Updates prüfen die erwartete Version.
     version: integer('version').notNull().default(1),
     ...timestamps,
@@ -249,6 +252,9 @@ export const requests = pgTable(
     index('requests_created_by_idx').on(t.createdById),
     index('requests_status_idx').on(t.status),
     index('requests_assignee_idx').on(t.assigneeId),
+    index('requests_invoice_pending_idx')
+      .on(t.status)
+      .where(sql`invoice_exported_at is null`),
   ],
 )
 
