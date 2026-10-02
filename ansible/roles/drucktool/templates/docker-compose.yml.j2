@@ -33,7 +33,8 @@ services:
       db:
         condition: service_healthy
 {% if drucktool_clamav_enabled %}
-      # Nur Startreihenfolge: bis clamd seine Signaturen geladen hat, lehnt die App Uploads mit einem Hinweis ab.
+      # Nur Startreihenfolge, nicht auf "healthy" warten: der erste Download der Signaturen dauert einige Minuten.
+      # Bis clamd bereit ist, lehnt die App Uploads mit einem Hinweis ab.
       clamav:
         condition: service_started
 {% endif %}
@@ -64,9 +65,11 @@ services:
       disable: true
 {% if drucktool_clamav_enabled %}
 
-  # Virenscanner für Uploads (Issue #99). Nicht von außen erreichbar, nur im Compose-Netz.
+  # Virenscanner für Uploads (Issue #99, #120). Nicht von außen erreichbar, nur im Compose-Netz.
+  # freshclam im Container hält die Signaturen aktuell.
   clamav:
     image: {{ drucktool_clamav_image }}
+    logging: *logging
     restart: unless-stopped
     environment:
       # Ohne diese Grenzen prüft clamd nur die ersten 25 MB bzw. lässt große Dateien ungeprüft durch.
@@ -74,7 +77,15 @@ services:
       CLAMD_CONF_MaxFileSize: '{{ drucktool_upload_max_mb }}M'
       CLAMD_CONF_MaxScanSize: '{{ drucktool_upload_max_mb }}M'
     volumes:
+      # Signaturen bleiben über Neustarts und Updates erhalten.
       - clamav-db:/var/lib/clamav
+    healthcheck:
+      # clamdcheck.sh liegt im Image und fragt clamd per PING ab.
+      test: ['CMD', 'clamdcheck.sh']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10m
 {% endif %}
 {% if drucktool_domain %}
 

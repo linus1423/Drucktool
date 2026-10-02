@@ -40,7 +40,7 @@ Bitte aktuell halten. Bei Änderungen diese Datei per Pull Request anpassen.
 
 1. `https://<domain>/api/health` aufrufen. Antwortet es, liegt das Problem eher beim Netz oder beim Browser.
 2. Per SSH auf den Server, dann in `/opt/drucktool`:
-   - `docker compose ps`: laufen `app`, `db` und ggf. `caddy`?
+   - `docker compose ps`: laufen `app`, `db`, `clamav` und ggf. `caddy`?
    - `docker compose logs --tail 200 app`: Fehlermeldungen mit Zeitpunkt und Request-ID.
    - `df -h`: ist die Platte voll?
 3. Neustart versuchen: `docker compose up -d`. Hilft das nicht, `docker compose restart app`.

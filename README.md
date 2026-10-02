@@ -62,9 +62,15 @@ Im Profil sieht jeder seine angemeldeten Geräte und kann sie einzeln oder alle 
 - **Virenprüfung:** Jede hochgeladene Datei (Druckdatei, Deckblatt, Anhang) geht vor der Auswertung an ClamAV. Die
   App schickt sie per TCP an clamd (`CLAMAV_HOST`, `CLAMAV_PORT`, Standard 3310). Ein Fund wird abgelehnt, nicht
   gespeichert und im Protokoll vermerkt („Schadsoftware in Upload gefunden“). Ist clamd eingerichtet, aber nicht
-  erreichbar, werden Uploads abgelehnt statt ungeprüft angenommen. Das Ansible-Playbook startet clamd als eigenen
-  Container (`drucktool_clamav_enabled`, braucht etwa 1,5 GB RAM, die Signaturen aktualisiert er selbst). Lokal:
-  `docker compose --profile virenscanner up -d` und `CLAMAV_HOST=clamav`. Ohne `CLAMAV_HOST` wird nicht geprüft.
+  erreichbar, werden Uploads abgelehnt statt ungeprüft angenommen. clamd läuft standardmäßig als eigener Container
+  `clamav` mit, sowohl mit `docker compose up` als auch beim Ausrollen mit Ansible; die App ist dafür schon
+  eingerichtet (`CLAMAV_HOST=clamav`). Der Container braucht etwa 1,5 GB RAM, legt die Signaturen im Volume
+  `clamav-db` ab und hält sie selbst aktuell. Beim ersten Start lädt er sie herunter, das dauert einige Minuten. Die
+  App wartet darauf nicht, lehnt Uploads in dieser Zeit aber mit dem Hinweis ab, es gleich noch einmal zu versuchen
+  (Status: `docker compose ps clamav` zeigt `healthy`, sobald clamd bereit ist). Abschalten lässt sich die Prüfung
+  in Ansible mit `drucktool_clamav_enabled: false`, mit Docker Compose über ein leeres `CLAMAV_HOST=` in `.env`
+  (den Container dann mit `docker compose up -d --scale clamav=0` weglassen). Bei `pnpm dev` wird ohne
+  `CLAMAV_HOST` nicht geprüft.
 - **Aufräumen:** Der Worker löscht beim Start und dann stündlich abgelaufene Sitzungen, Anmeldelinks,
   Rate-Limit-Zähler und alte Audit-Einträge, dazu die Daten mit Löschfrist (siehe Datenschutz). Die Löschungen sind idempotent, mehrere Worker stören sich nicht.
 - **Server-Härtung (Ansible-Rolle `hardening`):** Firewall `ufw` lässt eingehend nur SSH, HTTP und HTTPS zu. Weil
@@ -309,7 +315,8 @@ SUPERADMIN_EMAIL=admin@example.com SUPERADMIN_PASSWORD='mindestens-12-zeichen' d
 
 Der Container spielt beim Start die Migrationen ein und legt den Superadmin an, falls noch keiner existiert
 (`RUN_MIGRATIONS=false` schaltet das ab). Healthcheck: `GET /api/health`. Der Dienst `worker` nutzt dasselbe Image
-und verschickt die E-Mails. Druckdateien liegen im Volume `uploads`.
+und verschickt die E-Mails. Druckdateien liegen im Volume `uploads`. Der Dienst `clamav` prüft die Uploads auf
+Schadsoftware und startet automatisch mit (siehe Virenprüfung unter Sicherheit).
 
 ## Logs und Überwachung
 
@@ -473,7 +480,7 @@ holt einen älteren Stand.
 | `APP_ENVIRONMENT`                                                                   | `production`, `staging` (Banner „Testsystem“) oder `development`                     |
 | `UPLOAD_DIR`                                                                        | Ablage für Druckdateien, Standard `data/uploads` (im Image `/app/uploads`)           |
 | `UPLOAD_MAX_MB`                                                                     | Größte erlaubte Druckdatei in MB, Standard 500                                       |
-| `CLAMAV_HOST`, `CLAMAV_PORT`                                                        | Virenprüfung der Uploads mit clamd, leer = keine Prüfung                             |
+| `CLAMAV_HOST`, `CLAMAV_PORT`                                                        | Virenprüfung mit clamd; Compose/Ansible: `clamav`, leer = keine Prüfung              |
 | `ATTACHMENT_MAX_MB`, `ATTACHMENT_TYPES`                                             | Anhänge an Nachrichten: Größe in MB (Standard 25), erlaubte Endungen (kommagetrennt) |
 | `AUDIT_LOG_RETENTION_DAYS`                                                          | Aufbewahrung des Audit-Logs in Tagen, Standard 365, `0` = unbegrenzt                 |
 | `SESSION_IP_RETENTION_DAYS`                                                         | IP-Adressen an Sitzungen nach so vielen Tagen löschen, Standard 30                   |

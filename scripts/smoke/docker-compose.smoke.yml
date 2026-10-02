@@ -2,7 +2,15 @@
 services:
   app:
     image: ${APP_IMAGE:-drucktool:local}
+    # Der Smoke-Test lädt nichts hoch und braucht keinen Virenscanner (spart Download und RAM in der CI).
+    depends_on: !override
+      db:
+        condition: service_healthy
+    environment:
+      CLAMAV_HOST: ''
     ports: !override
       - '127.0.0.1:${APP_PORT:-3200}:3000'
   worker:
     image: ${APP_IMAGE:-drucktool:local}
+  clamav:
+    profiles: [virenscanner]
