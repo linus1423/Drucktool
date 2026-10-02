@@ -32,6 +32,13 @@ import {
 } from '../files/files.server'
 import { getDb, schema, type Tx } from '../db/client.server'
 import { managedOrganisationIds } from '../organisations/org-admin.server'
+import {
+  addPrintedCopies,
+  isScriptTemplate,
+  linkOrderToScript,
+  scriptForOrder,
+  svkOrganisationIds,
+} from '../scripts/scripts.server'
 import { isActiveMember } from '../organisations/organisations.server'
 import { markRead, markReadSchema, readAtFor, unreadExpression } from './reads.server'
 import { addWatchers, clearMute, listWatchers, resolveMentions, setWatching, watchedBy, watcherIds } from './watchers.server'
@@ -81,7 +88,12 @@ function visibilityFilter(user: Principal): SQL | undefined {
  */
 function readVisibilityFilter(user: Principal): SQL | undefined {
   if (isStaffRole(user.role)) return undefined
-  return or(eq(requests.createdById, user.id), inArray(requests.organisationId, managedOrganisationIds(getDb(), user.id)))
+  return or(
+    eq(requests.createdById, user.id),
+    inArray(requests.organisationId, managedOrganisationIds(getDb(), user.id)),
+    // Die SVK arbeitet gemeinsam an ihren Skripten und sieht alle Aufträge der SVK (Issue #59).
+    inArray(requests.organisationId, svkOrganisationIds(getDb(), user.id)),
+  )
 }
 
 async function loadForUpdate(tx: Tx, user: Principal, id: string) {
@@ -430,6 +442,8 @@ export const createRequestSchema = z.object({
   organisationId: z.uuid().optional(),
   /** Auftrag, der als Vorlage diente (Nachbestellung). */
   reorderOfId: z.uuid().optional(),
+  /** Skript der SVK, für das bestellt wird (Issue #59). */
+  scriptId: z.uuid().optional(),
 })
 
 export const PRICE_CHANGED_MESSAGE =
@@ -447,8 +461,10 @@ export async function createRequest(user: Principal, input: z.infer<typeof creat
     if (!isStaffRole(user.role) && !me?.billingAddress) {
       throw new Error('Bitte hinterlegen Sie zuerst eine Rechnungsadresse in Ihrem Profil.')
     }
+    // Ein Skript bestellt immer die SVK, der es gehört (Issue #59).
+    const script = input.scriptId ? await scriptForOrder(tx, user, input.scriptId) : null
     // Kunden wählen eine ihrer Organisationen oder bestellen ohne (Issue #68).
-    const organisationId = input.organisationId ?? null
+    const organisationId = script?.organisationId ?? input.organisationId ?? null
     if (organisationId && !isStaffRole(user.role) && !(await isActiveMember(tx, user.id, organisationId))) {
       throw new Error('Sie gehören dieser Organisation nicht (mehr) an.')
     }
@@ -479,7 +495,13 @@ export async function createRequest(user: Principal, input: z.infer<typeof creat
       const [source] = await tx
         .select({ id: requests.id, number: requests.number })
         .from(requests)
-        .where(and(eq(requests.id, input.reorderOfId), visibilityFilter(user)))
+        .where(
+          and(
+            eq(requests.id, input.reorderOfId),
+            // Die Vorlage eines Skripts darf jedes Mitglied der SVK nachbestellen, nicht nur wer sie angelegt hat.
+            script?.templateRequestId === input.reorderOfId ? undefined : visibilityFilter(user),
+          ),
+        )
       reorderOf = source ?? notFound()
     }
 
@@ -505,8 +527,10 @@ export async function createRequest(user: Principal, input: z.infer<typeof creat
         termsAcceptedAt: new Date(),
         termsVersion: termsVersion(catalog.texts.terms),
         reorderOfId: reorderOf?.id ?? null,
+        scriptId: script?.id ?? null,
       })
       .returning({ id: requests.id, number: requests.number })
+    if (script) await linkOrderToScript(tx, script.id, created!.id)
 
     const files = await claimFiles(tx, user, created!.id, { main: input.mainFileId, cover: input.coverFileId })
     // Lesbare PDFs geben die Seitenzahl vor; nur bei unlesbaren Dateien zählt die Angabe des Kunden.
@@ -534,12 +558,13 @@ export async function createRequest(user: Principal, input: z.infer<typeof creat
  * Auftrags, dazu Kopien seiner Dateien als neue Uploads. Preis, Zuständigkeit und Nachrichten werden nicht
  * übernommen; den Preis rechnet der Wizard mit dem aktuellen Katalog neu.
  */
-export async function prepareReorder(user: Principal, id: string) {
+export async function prepareReorder(user: Principal, id: string, scriptId?: string) {
   const db = getDb()
+  const fromScript = scriptId ? await isScriptTemplate(db, user, scriptId, id) : false
   const [source] = await db
     .select()
     .from(requests)
-    .where(and(eq(requests.id, id), visibilityFilter(user)))
+    .where(and(eq(requests.id, id), fromScript ? undefined : visibilityFilter(user)))
   if (!source) notFound()
   if (!source.order) throw new Error('Aufträge aus der Zeit vor dem Bestell-Wizard können nicht nachbestellt werden.')
   const files = await db.select().from(schema.requestFiles).where(eq(schema.requestFiles.requestId, id))
@@ -623,6 +648,10 @@ export async function changeStatus(user: Principal, input: z.infer<typeof change
     }
 
     const updated = await updateWithVersion(tx, input.id, input.version, values)
+    // Fertig gedruckte Skripte kommen in den Bestand der SVK (Issue #59).
+    if (input.to === 'completed' && current.scriptId && current.quantity) {
+      await addPrintedCopies(tx, current.scriptId, current.quantity)
+    }
     await tx.insert(requestEvents).values({
       requestId: input.id,
       actorId: user.id,

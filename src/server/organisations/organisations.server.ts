@@ -22,6 +22,7 @@ export async function listMemberships(db: Db, userId: string, { onlyActive = fal
       name: organisations.name,
       status: organisations.status,
       isAdmin: organisationMembers.isAdmin,
+      isSvk: organisations.isSvk,
     })
     .from(organisationMembers)
     .innerJoin(organisations, eq(organisations.id, organisationMembers.organisationId))

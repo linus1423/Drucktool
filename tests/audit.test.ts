@@ -140,6 +140,7 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
       country: 'de',
       vatId: '',
       costCenter: '',
+      isSvk: false,
     }
     const { id } = await admin.saveOrganisation(admin1, { ...base, status: 'active' })
     await admin.saveOrganisation(admin1, { ...base, id, status: 'disabled' })

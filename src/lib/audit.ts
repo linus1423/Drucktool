@@ -83,4 +83,5 @@ export const AUDIT_FIELD_LABELS: Record<string, string> = {
   vatId: 'USt-IdNr.',
   costCenter: 'Kostenstelle',
   isAdmin: 'Verwalter',
+  isSvk: 'Skriptenverkauf (SVK)',
 }

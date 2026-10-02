@@ -89,6 +89,21 @@ Im Profil sieht jeder seine angemeldeten Geräte und kann sie einzeln oder alle 
   einzeln abschaltbar, siehe `ansible/roles/hardening/defaults/main.yml`, oder ganz mit
   `drucktool_hardening_enabled: false`. Prüfen nach dem Ausrollen: `nmap -Pn <server>` zeigt nur 22, 80 und 443.
 
+## Skripte der SVK
+
+Der Skriptenverkauf (SVK) ist eine Organisation, bei der ein Admin den Haken „Skriptenverkauf (SVK)“ setzt. Ihre
+Mitglieder sehen den Menüpunkt „Skripte“ und dort:
+
+- **Skriptenannahme:** „Neues Skript“ mit Titel, Dozent/Lehrstuhl, Semester und Bestand. „Erste Bestellung“ öffnet den
+  normalen Wizard; der Auftrag gehört der SVK und wird zur Vorlage des Skripts.
+- **Nachbestellen:** übernimmt Dateien und Optionen des letzten Auftrags des Skripts in den Wizard, meist ändert sich
+  nur die Anzahl. Jeder neue Auftrag wird zur neuen Vorlage. Preise und Bedingungen bestätigt die SVK wie jeder Kunde.
+- **Bestand:** Fertig gedruckte Aufträge erhöhen den Bestand automatisch; Verkäufe trägt die SVK von Hand ein. Die
+  Übersicht zeigt je Skript Bestand, Exemplare in Arbeit, gedruckte Exemplare und den letzten Auftrag, gefiltert nach
+  Semester. „Für neues Semester kopieren“ übernimmt die Vorlage, alte Skripte lassen sich archivieren.
+
+Alle SVK-Mitglieder sehen die Aufträge der SVK (nur lesend, ändern kann der Besteller). Mitarbeiter sehen alle Skripte.
+
 ## Status eines Auftrags
 
 ```

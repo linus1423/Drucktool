@@ -42,6 +42,11 @@ function AppLayout() {
       <Link to="/auftraege" className={navLink} activeProps={navActive}>
         Aufträge
       </Link>
+      {isStaffRole(user.role) || user.organisations.some((o) => o.isSvk) ? (
+        <Link to="/skripte" className={navLink} activeProps={navActive}>
+          Skripte
+        </Link>
+      ) : null}
       {user.role === 'superadmin' ? (
         <Link to="/admin/freigaben" className={navLink} activeProps={navActive}>
           Freigaben

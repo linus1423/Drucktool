@@ -33,11 +33,12 @@ export const organisationSchema = z.object({
   country: z.string().trim().min(2).max(2),
   vatId: optionalText(50),
   costCenter: optionalText(100),
+  isSvk: z.boolean(),
   status: z.enum(['pending', 'active', 'disabled']),
 })
 
 /** Was Verwalter einer Organisation selbst pflegen dürfen (Issue #12); Name und Status bleiben bei der Druckerei. */
-export const organisationDetailsSchema = organisationSchema.omit({ name: true, status: true })
+export const organisationDetailsSchema = organisationSchema.omit({ name: true, status: true, isSvk: true })
 
 export const requestInputSchema = z.object({
   title: requiredText('Titel'),

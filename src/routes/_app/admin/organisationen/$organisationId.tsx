@@ -48,6 +48,7 @@ function OrganisationPage() {
                 country: org.country,
                 vatId: org.vatId ?? '',
                 costCenter: org.costCenter ?? '',
+                isSvk: org.isSvk,
                 status: org.status,
               }}
               submitLabel="Speichern"

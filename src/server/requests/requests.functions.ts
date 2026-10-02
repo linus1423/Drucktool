@@ -102,8 +102,8 @@ export const setDatesFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => setDates(await requireStaff(), data))
 
 export const prepareReorderFn = createServerFn({ method: 'POST' })
-  .validator(z.object({ id: z.uuid() }))
-  .handler(async ({ data }) => prepareReorder(await requireUser(), data.id))
+  .validator(z.object({ id: z.uuid(), scriptId: z.uuid().optional() }))
+  .handler(async ({ data }) => prepareReorder(await requireUser(), data.id, data.scriptId))
 
 export const setWatchingFn = createServerFn({ method: 'POST' })
   .validator(watchSchema)

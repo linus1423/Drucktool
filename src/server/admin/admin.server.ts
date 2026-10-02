@@ -14,7 +14,19 @@ const { users, organisations, organisationMembers, requests, sessions } = schema
 
 // Felder, die im Audit-Log festgehalten werden (keine Passwörter oder Hashes).
 const USER_AUDIT_FIELDS = ['firstName', 'lastName', 'email', 'role', 'status', 'organisationIds'] as const
-const ORG_AUDIT_FIELDS = ['name', 'email', 'phone', 'street', 'zip', 'city', 'country', 'vatId', 'costCenter', 'status'] as const
+const ORG_AUDIT_FIELDS = [
+  'name',
+  'email',
+  'phone',
+  'street',
+  'zip',
+  'city',
+  'country',
+  'vatId',
+  'costCenter',
+  'isSvk',
+  'status',
+] as const
 
 // ---------------------------------------------------------------------------
 // Freigabe von Registrierungen (nur Superadmin)
@@ -249,6 +261,7 @@ export async function saveOrganisation(actor: Principal, input: z.infer<typeof s
     country: input.country.toUpperCase(),
     vatId: input.vatId || null,
     costCenter: input.costCenter || null,
+    isSvk: input.isSvk,
     status: input.status,
   }
   return getDb().transaction(async (tx) => {

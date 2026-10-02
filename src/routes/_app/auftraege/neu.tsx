@@ -34,10 +34,15 @@ import { calculatePrice } from '~/lib/pricing'
 import { accountQuery, activeOrganisationsQuery, orderCatalogQuery } from '~/lib/queries'
 import { isStaffRole } from '~/lib/roles'
 import { createRequestFn, prepareReorderFn } from '~/server/requests/requests.functions'
+import { describeScriptFn } from '~/server/scripts/scripts.functions'
 
 export const Route = createFileRoute('/_app/auftraege/neu')({
-  // ?vorlage=<id>: Nachbestellung eines früheren Auftrags (Issue #10)
-  validateSearch: z.object({ vorlage: z.uuid().optional().catch(undefined) }),
+  // ?vorlage=<id>: Nachbestellung eines früheren Auftrags (Issue #10); ?skript=<id>: Bestellung für ein Skript der SVK
+  // (Issue #59), mit Vorlage als Nachbestellung, ohne als erste Bestellung.
+  validateSearch: z.object({
+    vorlage: z.uuid().optional().catch(undefined),
+    skript: z.uuid().optional().catch(undefined),
+  }),
   loader: ({ context }) =>
     Promise.all([context.queryClient.ensureQueryData(orderCatalogQuery), context.queryClient.ensureQueryData(accountQuery)]),
   head: () => ({ meta: [{ title: 'Neuer Auftrag · Drucktool' }] }),
@@ -157,11 +162,17 @@ function NewOrderPage() {
   const [step, setStep] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const { vorlage } = Route.useSearch()
+  const { vorlage, skript } = Route.useSearch()
+  const script = useQuery({
+    queryKey: ['scripts', 'order', skript],
+    queryFn: () => describeScriptFn({ data: { id: skript! } }),
+    enabled: !!skript,
+    retry: false,
+  })
   // POST mit Seiteneffekt (Dateikopien), deshalb nur einmal je Vorlage und ohne Wiederholung.
   const template = useQuery({
     queryKey: ['reorder', vorlage],
-    queryFn: () => prepareReorderFn({ data: { id: vorlage! } }),
+    queryFn: () => prepareReorderFn({ data: { id: vorlage!, scriptId: skript } }),
     enabled: !!vorlage,
     staleTime: Infinity,
     gcTime: Infinity,
@@ -235,6 +246,11 @@ function NewOrderPage() {
     // Bei einer Nachbestellung ändert sich meist nur die Anzahl.
     setStep(4)
   }, [template.data, catalog])
+  // Erste Bestellung eines Skripts: Titel aus dem Skript übernehmen.
+  const scriptTitle = script.data && !vorlage ? `${script.data.title} (${script.data.semester})` : null
+  useEffect(() => {
+    if (scriptTitle) setDraft((d) => (d.title ? d : { ...d, title: scriptTitle }))
+  }, [scriptTitle])
   // Katalog kann sich nach "Preis geändert" neu laden; Auswahlen dann erneut prüfen.
   useEffect(() => setDraft((d) => normalize(catalog, d)), [catalog])
 
@@ -266,8 +282,9 @@ function NewOrderPage() {
           deliveryAddress: draft.delivery === 'house_post' ? draft.deliveryAddress : null,
           acceptTerms: true,
           expectedTotalCents: priced.price.totalCents,
-          organisationId: organisationId || undefined,
+          organisationId: script.data?.organisationId ?? (organisationId || undefined),
           reorderOfId: template.data?.source.id,
+          scriptId: script.data?.id,
         },
       })
       await queryClient.invalidateQueries({ queryKey: ['requests'] })
@@ -299,6 +316,21 @@ function NewOrderPage() {
         </div>
       ) : null}
 
+      {skript ? (
+        <div className="mb-4">
+          {script.error ? (
+            <Alert>{errorMessage(script.error)}</Alert>
+          ) : script.data ? (
+            <Alert tone="info">
+              Bestellung für das Skript{' '}
+              <Link to="/skripte" className="underline">
+                {script.data.title} ({script.data.semester})
+              </Link>
+              . Fertig gedruckte Exemplare kommen in den Bestand der SVK.
+            </Alert>
+          ) : null}
+        </div>
+      ) : null}
       {vorlage ? (
         <div className="mb-4">
           {template.isPending ? (
@@ -358,7 +390,11 @@ function NewOrderPage() {
                   update={update}
                   catalog={catalog}
                   organisationField={
-                    staff || organisations.length > 0 ? (
+                    script.data ? (
+                      <p className="text-sm text-slate-600">
+                        Bestellt für die SVK <strong>{script.data.organisationName}</strong>.
+                      </p>
+                    ) : staff || organisations.length > 0 ? (
                       <Field label="Organisation (optional)" htmlFor="organisationId">
                         <Select
                           id="organisationId"

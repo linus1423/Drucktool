@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull, lt, or } from 'drizzle-orm'
 import { isStaffRole } from '~/lib/roles'
 import { getDb, schema, type Tx } from '../db/client.server'
 import { managedOrganisationIds } from '../organisations/org-admin.server'
+import { svkOrganisationIds } from '../scripts/scripts.server'
 import type { Principal } from '../requests/requests.server'
 import { writeAudit } from '../audit/audit.server'
 import { logger } from '../log.server'
@@ -163,7 +164,10 @@ export async function fileForDownload(user: Principal, id: string) {
   if (row.requestCreatorId === user.id) return row.file
   if (!row.requestOrganisationId) return null
   const [managed] = await managedOrganisationIds(getDb(), user.id, row.requestOrganisationId)
-  return managed ? row.file : null
+  if (managed) return row.file
+  // Druckdaten von SVK-Aufträgen sieht die ganze SVK (Issue #59).
+  const svk = await svkOrganisationIds(getDb(), user.id)
+  return svk.some((o) => o.id === row.requestOrganisationId) ? row.file : null
 }
 
 /**
