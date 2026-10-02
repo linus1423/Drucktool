@@ -15,6 +15,7 @@ import {
   COVER_FROM_MAIN_FILE,
   COVER_FROM_MAIN_FILE_LABELS,
   coverPagesFromMainFile,
+  customSizeFields,
   bindingChoices,
   bookletWarning,
   borderlessChoice,
@@ -83,14 +84,14 @@ function coverPagesOf(d: Draft) {
 }
 
 /** Baut aus dem Entwurf eine Bestellung, sobald alle Pflichtangaben da sind. */
-function toSpec(d: Draft): OrderSpec | null {
+function toSpec(catalog: OrderCatalog, d: Draft): OrderSpec | null {
   const pages = pagesOf(d)
   const copies = int(d.copies)
   if (!d.formatId || !d.bindingId || !d.paperId || !pages || !copies) return null
   return {
     formatId: d.formatId,
-    customWidthMm: int(d.customWidth),
-    customHeightMm: int(d.customHeight),
+    // Maße aus einem früher gewählten Sonderformat nicht mitschicken (Issue #117).
+    ...customSizeFields(findFormat(catalog, d.formatId), int(d.customWidth), int(d.customHeight)),
     bindingId: d.bindingId,
     duplex: d.duplex,
     paperId: d.paperId,
@@ -192,7 +193,13 @@ function NewOrderPage() {
     acceptTerms: false,
   }))
 
-  const update = (patch: Partial<Draft>) => setDraft((d) => normalize(catalog, { ...d, ...patch }))
+  // Eine Fehlermeldung vom Absenden gilt nur für den abgeschickten Stand; sobald der Kunde etwas ändert,
+  // ist sie überholt (Issue #117). Nicht per Effekt auf den Entwurf, weil normalize() nach dem Neuladen
+  // des Katalogs ein neues Objekt liefert und die Meldung sonst sofort verschwände.
+  const update = (patch: Partial<Draft>) => {
+    setError(null)
+    setDraft((d) => normalize(catalog, { ...d, ...patch }))
+  }
 
   useEffect(() => {
     const t = template.data
@@ -237,7 +244,7 @@ function NewOrderPage() {
     : null
   const binding = catalog.bindings.find((b) => b.id === draft.bindingId)
   const paper = catalog.papers.find((p) => p.id === draft.paperId)
-  const spec = toSpec(draft)
+  const spec = toSpec(catalog, draft)
   const priced = useMemo(() => (spec ? calculatePrice(catalog, spec) : null), [catalog, spec && JSON.stringify(spec)])
 
   const blockers = stepBlockers(catalog, draft)
@@ -353,7 +360,14 @@ function NewOrderPage() {
                   organisationField={
                     staff || organisations.length > 0 ? (
                       <Field label="Organisation (optional)" htmlFor="organisationId">
-                        <Select id="organisationId" value={organisationId} onChange={(e) => setOrganisationId(e.target.value)}>
+                        <Select
+                          id="organisationId"
+                          value={organisationId}
+                          onChange={(e) => {
+                            setError(null)
+                            setOrganisationId(e.target.value)
+                          }}
+                        >
                           <option value="">Keine</option>
                           {organisations.map((o) => (
                             <option key={o.id} value={o.id}>
@@ -930,7 +944,7 @@ function PricePreview({
   size: { widthMm: number; heightMm: number } | null
 }) {
   const pages = pagesOf(draft)
-  const spec = toSpec(draft)
+  const spec = toSpec(catalog, draft)
   // Nur ein Hinweis: fehlende Seiten ergänzt die Druckerei als Leerseiten (Issue #103).
   const warning = priced?.ok && spec ? bookletWarning(spec) : null
   const rows: [string, string | undefined][] = [

@@ -121,28 +121,40 @@ export function bookletWarning(spec: Parameters<typeof bookletBlankPages>[0]): s
   return `Für ein Booklet sollte die Seitenzahl ${spec.duplex ? 'bei doppelseitigem Druck durch 4' : 'bei einseitigem Druck durch 2'} teilbar sein. Wenn das so stimmt, ergänzen wir am Ende der Datei ${blank === 1 ? 'eine Leerseite' : `${blank} Leerseiten`}.`
 }
 
+/**
+ * Ganze Zahl mit Meldungen, die das Feld nennen; der Validator des Servers liefert sie an den
+ * Kunden durch (Issue #117).
+ */
+const wholeNumber = (label: string, min: number, max: number, unit = '') =>
+  z
+    .number(`${label}: Bitte eine Zahl angeben`)
+    .int(`${label}: Bitte eine ganze Zahl angeben`)
+    .min(min, `${label}: mindestens ${min}${unit}`)
+    .max(max, `${label}: höchstens ${max}${unit}`)
+
 export const orderSpecSchema = z.object({
-  formatId: z.string().min(1, 'Bitte ein Format wählen').max(50),
-  customWidthMm: z.number().int().min(CUSTOM_MIN_MM).max(CUSTOM_MAX_MM.long).nullable(),
-  customHeightMm: z.number().int().min(CUSTOM_MIN_MM).max(CUSTOM_MAX_MM.long).nullable(),
-  bindingId: z.string().min(1, 'Bitte eine Bindung wählen').max(50),
+  formatId: z.string('Bitte ein Format wählen').min(1, 'Bitte ein Format wählen').max(50),
+  /** Nur beim Sonderformat gesetzt, sonst null. */
+  customWidthMm: wholeNumber('Breite des Sonderformats', CUSTOM_MIN_MM, CUSTOM_MAX_MM.long, ' mm').nullable(),
+  customHeightMm: wholeNumber('Höhe des Sonderformats', CUSTOM_MIN_MM, CUSTOM_MAX_MM.long, ' mm').nullable(),
+  bindingId: z.string('Bitte eine Bindung wählen').min(1, 'Bitte eine Bindung wählen').max(50),
   duplex: z.boolean(),
   paperId: z.uuid('Bitte ein Papier wählen'),
   /** Separates Deckblatt auf eigenem Papier. */
-  coverPaperId: z.uuid().nullable(),
+  coverPaperId: z.uuid('Bitte ein Papier für das Deckblatt wählen').nullable(),
   /** Seitenzahl der Deckblatt-Datei, nur zur Info: Berechnet wird immer ein beidseitig bedrucktes Blatt. */
-  coverPages: z.number().int().min(1).max(10_000).nullable(),
+  coverPages: wholeNumber('Seitenzahl des Deckblatts', 1, 10_000).nullable(),
   /**
    * Ohne eigene Deckblatt-Datei (Issue #85) kommt das Deckblatt aus der Druckdatei:
    * die ersten zwei Seiten für vorne, ggf. die letzten zwei für hinten. Fehlt in älteren Aufträgen.
    */
   coverFromMainFile: z.enum(COVER_FROM_MAIN_FILE).nullable().default(null),
-  coverColorId: z.uuid().nullable(),
-  coverBackColorId: z.uuid().nullable(),
+  coverColorId: z.uuid('Bitte eine Coverfarbe wählen').nullable(),
+  coverBackColorId: z.uuid('Bitte eine Coverfarbe für die Rückseite wählen').nullable(),
   borderless: z.boolean(),
-  copies: z.number().int().min(1, 'Mindestens ein Exemplar').max(100_000),
-  pages: z.number().int().min(1, 'Mindestens eine Seite').max(10_000),
-  delivery: z.enum(DELIVERY_METHODS),
+  copies: wholeNumber('Anzahl der Exemplare', 1, 100_000),
+  pages: wholeNumber('Seitenzahl', 1, 10_000),
+  delivery: z.enum(DELIVERY_METHODS, 'Bitte eine Lieferart wählen'),
 })
 export type OrderSpec = z.infer<typeof orderSpecSchema>
 
@@ -156,6 +168,20 @@ export function formatSize(format: CatalogFormat, spec?: Pick<OrderSpec, 'custom
   }
   if (!format.widthMm || !format.heightMm) return null
   return { widthMm: format.widthMm, heightMm: format.heightMm }
+}
+
+/**
+ * Maße für die Bestellung: nur beim Sonderformat die Eingabe des Kunden, sonst null. So blockiert eine
+ * ungültige Eingabe nicht mehr, nachdem der Kunde zu einem anderen Format gewechselt hat (Issue #117).
+ */
+export function customSizeFields(
+  format: CatalogFormat | undefined,
+  widthMm: number | null,
+  heightMm: number | null,
+): Pick<OrderSpec, 'customWidthMm' | 'customHeightMm'> {
+  return format?.kind === 'custom'
+    ? { customWidthMm: widthMm, customHeightMm: heightMm }
+    : { customWidthMm: null, customHeightMm: null }
 }
 
 const sorted = (s: Size) => [Math.min(s.widthMm, s.heightMm), Math.max(s.widthMm, s.heightMm)] as const
