@@ -113,6 +113,7 @@ describe.skipIf(!url)('Skripte der SVK (Issue #59)', async () => {
     // Ben sieht Annas Auftrag (nur lesend) und darf ihn über das Skript nachbestellen.
     const detail = await getRequestDetail(ben, first.id)
     expect(detail.canAct).toBe(false)
+    expect(detail.readOnlyAs).toBe('svk_member')
     expect((await listRequests(ben, { organisationId: svk })).rows.map((r) => r.id)).toContain(first.id)
     expect(await fileForDownload(ben, detail.files[0]!.id)).not.toBeNull()
     expect(await fileForDownload(fremd, detail.files[0]!.id)).toBeNull()

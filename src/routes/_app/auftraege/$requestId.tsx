@@ -172,8 +172,8 @@ function RequestDetailPage() {
 
       {request.canAct ? null : (
         <Alert tone="info">
-          Sie sehen diesen Auftrag als Verwalter der Organisation. Ändern, freigeben und Nachrichten schreiben kann nur{' '}
-          {request.creatorName}.
+          {`Sie sehen diesen Auftrag als ${request.readOnlyAs === 'svk_member' ? 'Mitglied der SVK' : 'Verwalter der Organisation'}. `}
+          Ändern, freigeben und Nachrichten schreiben kann nur {request.creatorName}.
         </Alert>
       )}
       <div className="grid gap-6 lg:grid-cols-3">

@@ -369,6 +369,12 @@ export async function getRequestDetail(user: Principal, id: string) {
   const internalDueDate = isStaff ? r.internalDueDate : null
   // Verwalter einer Organisation sehen die Aufträge der Kollegen nur (Issue #12).
   const canAct = isStaff || r.createdById === user.id
+  // Warum der Benutzer nur lesen darf: als Verwalter der Organisation oder als Mitglied der SVK (Issue #133).
+  const readOnlyAs: 'organisation_admin' | 'svk_member' | null = canAct
+    ? null
+    : r.organisationId && (await managedOrganisationIds(db, user.id, r.organisationId)).length
+      ? 'organisation_admin'
+      : 'svk_member'
   return {
     ...r,
     // Kunden sehen nur Druck- und Lieferkosten, nicht den internen Rechenweg (Lastenheft Schritt 7).
@@ -421,6 +427,7 @@ export async function getRequestDetail(user: Principal, id: string) {
     canRecordAnswer: !!r.proposal && isStaff && r.createdById !== user.id,
     canEdit: canAct && canEditRequest(user, r.status),
     canAct,
+    readOnlyAs,
   }
 }
 
