@@ -155,13 +155,19 @@ function RequestDetailPage() {
               Erneut bestellen
             </Link>
           ) : null}
-          <WatchButton request={request} />
+          {request.canAct ? <WatchButton request={request} /> : null}
           {staff && request.watchers.length ? (
             <span className="text-sm text-slate-600">Beobachtet von {request.watchers.map((w) => w.name).join(', ')}</span>
           ) : null}
         </div>
       </div>
 
+      {request.canAct ? null : (
+        <Alert tone="info">
+          Sie sehen diesen Auftrag als Verwalter der Organisation. Ändern, freigeben und Nachrichten schreiben kann nur{' '}
+          {request.creatorName}.
+        </Alert>
+      )}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           {proposing ? (
@@ -351,7 +357,11 @@ function StatusActions({ request, staff }: { request: Detail; staff: boolean }) 
     return (
       <Card title="Status">
         <p className="text-sm text-slate-600">
-          {staff ? 'Für diesen Status gibt es keine weiteren Schritte.' : 'Aktuell ist keine Aktion von Ihnen nötig.'}
+          {staff
+            ? 'Für diesen Status gibt es keine weiteren Schritte.'
+            : request.canAct
+              ? 'Aktuell ist keine Aktion von Ihnen nötig.'
+              : 'Nur die Person, die den Auftrag angelegt hat, kann ihn ändern.'}
         </p>
       </Card>
     )
@@ -774,67 +784,71 @@ function Comments({ request, staff, isNew }: { request: Detail; staff: boolean; 
             ))}
           </ul>
         )}
-        <form
-          className="space-y-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (canSend) mutation.mutate()
-          }}
-        >
-          {mutation.error ? <Alert>{errorMessage(mutation.error)}</Alert> : null}
-          <Textarea
-            aria-label="Nachricht"
-            rows={3}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder={staff ? 'Nachricht an den Kunden oder interne Notiz …' : 'Nachricht an die Druckerei …'}
-          />
-          {attachments.length || uploading ? (
-            <ul className="flex flex-wrap gap-2 text-xs">
-              {attachments.map((a) => (
-                <li key={a.id} className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1">
-                  📎 {a.filename}
-                  <button
-                    type="button"
-                    aria-label={`${a.filename} entfernen`}
-                    className="ml-1 text-slate-500 hover:text-slate-900"
-                    onClick={() => setAttachments((list) => list.filter((x) => x.id !== a.id))}
-                  >
-                    ×
-                  </button>
-                </li>
-              ))}
-              {uploading ? <li className="px-2 py-1 text-slate-500">{uploading} wird hochgeladen …</li> : null}
-            </ul>
-          ) : null}
-          {uploadError ? <p className="text-sm text-rose-600">{uploadError}</p> : null}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <label className="cursor-pointer text-sm text-slate-700 underline">
-              Datei anhängen
-              <input
-                type="file"
-                multiple
-                className="sr-only"
-                onChange={(e) => {
-                  void addFiles(e.target.files)
-                  e.target.value = ''
-                }}
-              />
-            </label>
-            {staff ? <MentionPicker onPick={(name) => setBody((b) => `${b}${b && !/\s$/.test(b) ? ' ' : ''}@${name} `)} /> : null}
-            {staff ? (
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} />
-                Interne Notiz (für Kunden nicht sichtbar)
+        {request.canAct ? (
+          <form
+            className="space-y-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (canSend) mutation.mutate()
+            }}
+          >
+            {mutation.error ? <Alert>{errorMessage(mutation.error)}</Alert> : null}
+            <Textarea
+              aria-label="Nachricht"
+              rows={3}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder={staff ? 'Nachricht an den Kunden oder interne Notiz …' : 'Nachricht an die Druckerei …'}
+            />
+            {attachments.length || uploading ? (
+              <ul className="flex flex-wrap gap-2 text-xs">
+                {attachments.map((a) => (
+                  <li key={a.id} className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1">
+                    📎 {a.filename}
+                    <button
+                      type="button"
+                      aria-label={`${a.filename} entfernen`}
+                      className="ml-1 text-slate-500 hover:text-slate-900"
+                      onClick={() => setAttachments((list) => list.filter((x) => x.id !== a.id))}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+                {uploading ? <li className="px-2 py-1 text-slate-500">{uploading} wird hochgeladen …</li> : null}
+              </ul>
+            ) : null}
+            {uploadError ? <p className="text-sm text-rose-600">{uploadError}</p> : null}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="cursor-pointer text-sm text-slate-700 underline">
+                Datei anhängen
+                <input
+                  type="file"
+                  multiple
+                  className="sr-only"
+                  onChange={(e) => {
+                    void addFiles(e.target.files)
+                    e.target.value = ''
+                  }}
+                />
               </label>
-            ) : (
-              <span />
-            )}
-            <Button type="submit" disabled={mutation.isPending || !canSend}>
-              Senden
-            </Button>
-          </div>
-        </form>
+              {staff ? (
+                <MentionPicker onPick={(name) => setBody((b) => `${b}${b && !/\s$/.test(b) ? ' ' : ''}@${name} `)} />
+              ) : null}
+              {staff ? (
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} />
+                  Interne Notiz (für Kunden nicht sichtbar)
+                </label>
+              ) : (
+                <span />
+              )}
+              <Button type="submit" disabled={mutation.isPending || !canSend}>
+                Senden
+              </Button>
+            </div>
+          </form>
+        ) : null}
       </div>
     </Card>
   )

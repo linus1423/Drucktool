@@ -31,6 +31,8 @@ import { Route as AppAuftraegeIndexRouteImport } from './routes/_app/auftraege/i
 import { Route as AppAuftraegeRequestIdRouteImport } from './routes/_app/auftraege/$requestId'
 import { Route as AppAuftraegeBoardRouteImport } from './routes/_app/auftraege/board'
 import { Route as AppAuftraegeNeuRouteImport } from './routes/_app/auftraege/neu'
+import { Route as AppEinladungTokenRouteImport } from './routes/_app/einladung.$token'
+import { Route as AppOrganisationenOrganisationIdRouteImport } from './routes/_app/organisationen.$organisationId'
 import { Route as ApiAuftraegeExportRouteImport } from './routes/api/auftraege/export'
 import { Route as ApiDateienIndexRouteImport } from './routes/api/dateien/index'
 import { Route as ApiDateienFileIdRouteImport } from './routes/api/dateien/$fileId'
@@ -152,6 +154,17 @@ const AppAuftraegeNeuRoute = AppAuftraegeNeuRouteImport.update({
   path: '/auftraege/neu',
   getParentRoute: () => AppRoute,
 } as any)
+const AppEinladungTokenRoute = AppEinladungTokenRouteImport.update({
+  id: '/einladung/$token',
+  path: '/einladung/$token',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOrganisationenOrganisationIdRoute =
+  AppOrganisationenOrganisationIdRouteImport.update({
+    id: '/organisationen/$organisationId',
+    path: '/organisationen/$organisationId',
+    getParentRoute: () => AppRoute,
+  } as any)
 const ApiAuftraegeExportRoute = ApiAuftraegeExportRouteImport.update({
   id: '/api/auftraege/export',
   path: '/api/auftraege/export',
@@ -228,6 +241,8 @@ export interface FileRoutesByFullPath {
   '/auftraege/$requestId': typeof AppAuftraegeRequestIdRoute
   '/auftraege/board': typeof AppAuftraegeBoardRoute
   '/auftraege/neu': typeof AppAuftraegeNeuRoute
+  '/einladung/$token': typeof AppEinladungTokenRoute
+  '/organisationen/$organisationId': typeof AppOrganisationenOrganisationIdRoute
   '/api/auftraege/export': typeof ApiAuftraegeExportRoute
   '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
   '/api/rechnungen/lexware': typeof ApiRechnungenLexwareRoute
@@ -261,6 +276,8 @@ export interface FileRoutesByTo {
   '/auftraege/$requestId': typeof AppAuftraegeRequestIdRoute
   '/auftraege/board': typeof AppAuftraegeBoardRoute
   '/auftraege/neu': typeof AppAuftraegeNeuRoute
+  '/einladung/$token': typeof AppEinladungTokenRoute
+  '/organisationen/$organisationId': typeof AppOrganisationenOrganisationIdRoute
   '/api/auftraege/export': typeof ApiAuftraegeExportRoute
   '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
   '/api/rechnungen/lexware': typeof ApiRechnungenLexwareRoute
@@ -296,6 +313,8 @@ export interface FileRoutesById {
   '/_app/auftraege/$requestId': typeof AppAuftraegeRequestIdRoute
   '/_app/auftraege/board': typeof AppAuftraegeBoardRoute
   '/_app/auftraege/neu': typeof AppAuftraegeNeuRoute
+  '/_app/einladung/$token': typeof AppEinladungTokenRoute
+  '/_app/organisationen/$organisationId': typeof AppOrganisationenOrganisationIdRoute
   '/api/auftraege/export': typeof ApiAuftraegeExportRoute
   '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
   '/api/rechnungen/lexware': typeof ApiRechnungenLexwareRoute
@@ -331,6 +350,8 @@ export interface FileRouteTypes {
     | '/auftraege/$requestId'
     | '/auftraege/board'
     | '/auftraege/neu'
+    | '/einladung/$token'
+    | '/organisationen/$organisationId'
     | '/api/auftraege/export'
     | '/api/dateien/$fileId'
     | '/api/rechnungen/lexware'
@@ -364,6 +385,8 @@ export interface FileRouteTypes {
     | '/auftraege/$requestId'
     | '/auftraege/board'
     | '/auftraege/neu'
+    | '/einladung/$token'
+    | '/organisationen/$organisationId'
     | '/api/auftraege/export'
     | '/api/dateien/$fileId'
     | '/api/rechnungen/lexware'
@@ -398,6 +421,8 @@ export interface FileRouteTypes {
     | '/_app/auftraege/$requestId'
     | '/_app/auftraege/board'
     | '/_app/auftraege/neu'
+    | '/_app/einladung/$token'
+    | '/_app/organisationen/$organisationId'
     | '/api/auftraege/export'
     | '/api/dateien/$fileId'
     | '/api/rechnungen/lexware'
@@ -585,6 +610,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAuftraegeNeuRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/einladung/$token': {
+      id: '/_app/einladung/$token'
+      path: '/einladung/$token'
+      fullPath: '/einladung/$token'
+      preLoaderRoute: typeof AppEinladungTokenRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/organisationen/$organisationId': {
+      id: '/_app/organisationen/$organisationId'
+      path: '/organisationen/$organisationId'
+      fullPath: '/organisationen/$organisationId'
+      preLoaderRoute: typeof AppOrganisationenOrganisationIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/api/auftraege/export': {
       id: '/api/auftraege/export'
       path: '/api/auftraege/export'
@@ -694,6 +733,8 @@ interface AppRouteChildren {
   AppAuftraegeRequestIdRoute: typeof AppAuftraegeRequestIdRoute
   AppAuftraegeBoardRoute: typeof AppAuftraegeBoardRoute
   AppAuftraegeNeuRoute: typeof AppAuftraegeNeuRoute
+  AppEinladungTokenRoute: typeof AppEinladungTokenRoute
+  AppOrganisationenOrganisationIdRoute: typeof AppOrganisationenOrganisationIdRoute
   AppAuftraegeIndexRoute: typeof AppAuftraegeIndexRoute
 }
 
@@ -706,6 +747,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppAuftraegeRequestIdRoute: AppAuftraegeRequestIdRoute,
   AppAuftraegeBoardRoute: AppAuftraegeBoardRoute,
   AppAuftraegeNeuRoute: AppAuftraegeNeuRoute,
+  AppEinladungTokenRoute: AppEinladungTokenRoute,
+  AppOrganisationenOrganisationIdRoute: AppOrganisationenOrganisationIdRoute,
   AppAuftraegeIndexRoute: AppAuftraegeIndexRoute,
 }
 

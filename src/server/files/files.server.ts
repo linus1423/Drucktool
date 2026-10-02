@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNull, lt, or } from 'drizzle-orm'
 import { isStaffRole } from '~/lib/roles'
 import { getDb, schema, type Tx } from '../db/client.server'
+import { managedOrganisationIds } from '../organisations/org-admin.server'
 import type { Principal } from '../requests/requests.server'
 import { writeAudit } from '../audit/audit.server'
 import { logger } from '../log.server'
@@ -138,10 +139,18 @@ export async function cleanupOrphans(now = Date.now()) {
   return rows.length
 }
 
-/** Datei für den Download: Mitarbeiter immer, Kunden nur eigene Uploads und Dateien eigener Aufträge. */
+/**
+ * Datei für den Download: Mitarbeiter immer, Kunden nur eigene Uploads, Dateien eigener Aufträge und Dateien von
+ * Aufträgen der Organisationen, die sie verwalten (Issue #12).
+ */
 export async function fileForDownload(user: Principal, id: string) {
   const [row] = await getDb()
-    .select({ file: requestFiles, requestCreatorId: requests.createdById, commentInternal: requestComments.internal })
+    .select({
+      file: requestFiles,
+      requestCreatorId: requests.createdById,
+      requestOrganisationId: requests.organisationId,
+      commentInternal: requestComments.internal,
+    })
     .from(requestFiles)
     .leftJoin(requests, eq(requests.id, requestFiles.requestId))
     .leftJoin(requestComments, eq(requestComments.id, requestFiles.commentId))
@@ -150,8 +159,11 @@ export async function fileForDownload(user: Principal, id: string) {
   if (isStaffRole(user.role)) return row.file
   // Anhänge interner Notizen sind für Kunden tabu, auch am eigenen Auftrag.
   if (row.commentInternal) return null
-  const allowed = row.file.requestId ? row.requestCreatorId === user.id : row.file.ownerId === user.id
-  return allowed ? row.file : null
+  if (!row.file.requestId) return row.file.ownerId === user.id ? row.file : null
+  if (row.requestCreatorId === user.id) return row.file
+  if (!row.requestOrganisationId) return null
+  const [managed] = await managedOrganisationIds(getDb(), user.id, row.requestOrganisationId)
+  return managed ? row.file : null
 }
 
 /**

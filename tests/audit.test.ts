@@ -130,7 +130,17 @@ describe.skipIf(!url)('Audit-Log (Integration)', async () => {
 
   it('protokolliert Organisationen', async () => {
     const admin1 = await principal('admin')
-    const base = { name: `Lehrstuhl ${stamp}`, email: '', phone: '', street: '', zip: '', city: '', country: 'de', vatId: '' }
+    const base = {
+      name: `Lehrstuhl ${stamp}`,
+      email: '',
+      phone: '',
+      street: '',
+      zip: '',
+      city: '',
+      country: 'de',
+      vatId: '',
+      costCenter: '',
+    }
     const { id } = await admin.saveOrganisation(admin1, { ...base, status: 'active' })
     await admin.saveOrganisation(admin1, { ...base, id, status: 'disabled' })
     const entries = await entriesFor(id)

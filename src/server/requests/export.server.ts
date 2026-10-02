@@ -29,7 +29,7 @@ export async function requestsCsv(user: Principal, filter: ListFilter) {
   const header = [
     'Nummer',
     'Titel',
-    ...(staff ? ['Kunde', 'E-Mail'] : []),
+    ...(staff ? ['Kunde', 'E-Mail'] : ['Angelegt von']),
     'Organisation',
     'Status',
     ...(staff ? ['Interner Status'] : []),
@@ -45,7 +45,7 @@ export async function requestsCsv(user: Principal, filter: ListFilter) {
     rows.map((r) => [
       r.number,
       r.title,
-      ...(staff ? [r.creatorName, r.creatorEmail] : []),
+      ...(staff ? [r.creatorName, r.creatorEmail] : [r.creatorName]),
       r.organisationName,
       STATUS_LABELS[r.status],
       ...(staff ? [r.internalStatus ? INTERNAL_STATUS_LABELS[r.internalStatus] : null] : []),

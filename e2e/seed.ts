@@ -16,8 +16,8 @@ export async function createStaff(tag: string) {
 }
 
 /** Auftrag eines Kunden im Status „Eingereicht“; liefert den Pfad der Detailseite. */
-export async function seedOrder(customerEmail: string, title: string) {
+export async function seedOrder(customerEmail: string, title: string, organisationId?: string) {
   const [user] = await db<{ id: string }[]>`select id from users where email = ${customerEmail}`
-  const created = await placeOrder({ id: user!.id, role: 'customer' }, { title })
+  const created = await placeOrder({ id: user!.id, role: 'customer' }, { title, organisationId })
   return `/auftraege/${created.id}`
 }

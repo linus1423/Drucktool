@@ -6,6 +6,7 @@ import { getDb, schema, type Tx } from '../db/client.server'
 import { hashPassword } from '../auth/password.server'
 import { notifyRegistrationDecision } from '../mail/notifications.server'
 import { auditSnapshot, writeAudit } from '../audit/audit.server'
+import { setAdminFlag } from '../organisations/org-admin.server'
 import { setMemberships } from '../organisations/organisations.server'
 import type { Principal } from '../requests/requests.server'
 
@@ -13,7 +14,7 @@ const { users, organisations, organisationMembers, requests, sessions } = schema
 
 // Felder, die im Audit-Log festgehalten werden (keine Passwörter oder Hashes).
 const USER_AUDIT_FIELDS = ['firstName', 'lastName', 'email', 'role', 'status', 'organisationIds'] as const
-const ORG_AUDIT_FIELDS = ['name', 'email', 'phone', 'street', 'zip', 'city', 'country', 'vatId', 'status'] as const
+const ORG_AUDIT_FIELDS = ['name', 'email', 'phone', 'street', 'zip', 'city', 'country', 'vatId', 'costCenter', 'status'] as const
 
 // ---------------------------------------------------------------------------
 // Freigabe von Registrierungen (nur Superadmin)
@@ -196,12 +197,43 @@ export async function getOrganisation(id: string) {
   const [org] = await db.select().from(organisations).where(eq(organisations.id, id))
   if (!org) throw new Error('Organisation nicht gefunden')
   const members = await db
-    .select({ id: users.id, name: users.name, email: users.email, status: users.status })
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      status: users.status,
+      isAdmin: organisationMembers.isAdmin,
+    })
     .from(organisationMembers)
     .innerJoin(users, eq(users.id, organisationMembers.userId))
     .where(eq(organisationMembers.organisationId, id))
     .orderBy(asc(users.name))
   return { ...org, members }
+}
+
+export const setOrganisationAdminSchema = z.object({ organisationId: z.uuid(), userId: z.uuid(), isAdmin: z.boolean() })
+
+/** Die Druckerei ernennt Verwalter einer Organisation (Issue #12), etwa den ersten nach dem Anlegen. */
+export async function setOrganisationAdmin(actor: Principal, input: z.infer<typeof setOrganisationAdminSchema>) {
+  return getDb().transaction(async (tx) => {
+    const [member] = await tx
+      .select({ isAdmin: organisationMembers.isAdmin })
+      .from(organisationMembers)
+      .where(and(eq(organisationMembers.organisationId, input.organisationId), eq(organisationMembers.userId, input.userId)))
+      .for('update')
+    if (!member) throw new Error('Diese Person ist kein Mitglied der Organisation.')
+    if (member.isAdmin === input.isAdmin) return
+    await setAdminFlag(tx, input.organisationId, input.userId, input.isAdmin)
+    await writeAudit(tx, {
+      actorId: actor.id,
+      action: 'organisation.admin_changed',
+      targetType: 'user',
+      targetId: input.userId,
+      organisationId: input.organisationId,
+      before: { isAdmin: member.isAdmin },
+      after: { isAdmin: input.isAdmin },
+    })
+  })
 }
 
 export const saveOrganisationSchema = organisationSchema.extend({ id: z.uuid().optional() })
@@ -216,6 +248,7 @@ export async function saveOrganisation(actor: Principal, input: z.infer<typeof s
     city: input.city || null,
     country: input.country.toUpperCase(),
     vatId: input.vatId || null,
+    costCenter: input.costCenter || null,
     status: input.status,
   }
   return getDb().transaction(async (tx) => {
