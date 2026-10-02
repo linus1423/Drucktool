@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
 import { PDFDocument } from 'pdf-lib'
-import { check, createCustomer, db, loginAsAdmin, loginAsCustomer } from './helpers'
+import { check, createCustomer, loginAsAdmin, loginAsCustomer } from './helpers'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -14,10 +14,6 @@ let requestPath = ''
 
 test.beforeAll(async () => {
   customer = await createCustomer('kern')
-})
-
-test.afterAll(async () => {
-  await db.end()
 })
 
 test('Anmeldeseiten sind barrierefrei', async ({ page }) => {

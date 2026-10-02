@@ -2,8 +2,11 @@ import AxeBuilder from '@axe-core/playwright'
 import { expect, type Page } from '@playwright/test'
 import postgres from 'postgres'
 
+// Alle Testdateien eines Workers teilen sich diese Verbindung, deshalb kein db.end() in afterAll: Sie schließt sich
+// nach kurzer Leerlaufzeit selbst.
 export const db = postgres(process.env.DATABASE_URL ?? 'postgres://drucktool:drucktool@localhost:5432/drucktool', {
   max: 1,
+  idle_timeout: 2,
   onnotice: () => {},
 })
 
@@ -33,14 +36,18 @@ export async function check(page: Page, name: string) {
   await expectNoHorizontalScroll(page, name)
 }
 
-export async function loginAsAdmin(page: Page) {
+export async function loginWithPassword(page: Page, account: { email: string; password: string }) {
   await page.goto('/login')
   await page.waitForLoadState('networkidle')
   await page.getByText('Mit Passwort anmelden').click()
-  await page.locator('#email').fill(ADMIN.email)
-  await page.locator('#password').fill(ADMIN.password)
+  await page.locator('#email').fill(account.email)
+  await page.locator('#password').fill(account.password)
   await page.getByRole('button', { name: 'Anmelden', exact: true }).click()
   await page.waitForURL('**/uebersicht')
+}
+
+export async function loginAsAdmin(page: Page) {
+  await loginWithPassword(page, ADMIN)
 }
 
 /** Kunde mit vollständigem Profil, Anmeldung per Link aus dem Mail-Ausgang. */
@@ -60,7 +67,8 @@ export async function createCustomer(tag: string) {
   return email
 }
 
-export async function loginAsCustomer(page: Page, email: string) {
+/** Fordert einen Anmeldelink an und öffnet ihn; neue Adressen legen dabei ein Kundenkonto an. */
+export async function openLoginLink(page: Page, email: string) {
   await page.goto('/login')
   await page.waitForLoadState('networkidle')
   await page.locator('#link-email').fill(email)
@@ -70,6 +78,20 @@ export async function loginAsCustomer(page: Page, email: string) {
     order by created_at desc limit 1`
   const link = mail!.text.match(/https?:\/\/\S+\/anmelden\?token=\S+/)![0]
   await page.goto(new URL(link).pathname + new URL(link).search)
+  await page.waitForLoadState('networkidle')
+  await page.getByRole('button', { name: 'Jetzt anmelden' }).click()
+  await page.waitForURL(/\/(uebersicht|auftraege|profil)/)
+}
+
+/**
+ * Anmeldung eines bestehenden Kunden mit einem Link, den das Skript direkt erzeugt. Über das Formular wären die
+ * Tests schnell am Limit von 10 Links je IP in 10 Minuten; den Formularweg prüft openLoginLink.
+ */
+export async function loginAsCustomer(page: Page, email: string) {
+  process.env.DATABASE_URL ??= 'postgres://drucktool:drucktool@localhost:5432/drucktool'
+  const { issueLoginLink } = await import('../src/server/auth/magic-link.server')
+  const token = await issueLoginLink(email, null)
+  await page.goto(`/anmelden?token=${token}`)
   await page.waitForLoadState('networkidle')
   await page.getByRole('button', { name: 'Jetzt anmelden' }).click()
   await page.waitForURL(/\/(uebersicht|auftraege|profil)/)
