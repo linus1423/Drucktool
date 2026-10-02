@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFileRoute, Link, redirect, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Link, notFound, redirect, useNavigate } from '@tanstack/react-router'
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { OrganisationForm } from '~/components/OrganisationForm'
 import { Alert, Badge, Button, Card, Input, PageHeader } from '~/components/ui'
@@ -19,10 +19,23 @@ export const Route = createFileRoute('/_app/organisationen/$organisationId')({
   beforeLoad: ({ context }) => {
     if (context.user.role !== 'customer') throw redirect({ to: '/auftraege' })
   },
-  loader: ({ context, params }) => context.queryClient.ensureQueryData(managedOrganisationQuery(params.organisationId)),
+  loader: ({ context, params }) => {
+    if (!UUID.test(params.organisationId)) throw notFound()
+    return context.queryClient.ensureQueryData(managedOrganisationQuery(params.organisationId))
+  },
   head: ({ loaderData }) => ({ meta: [{ title: `${loaderData?.name ?? 'Organisation'} · Drucktool` }] }),
+  notFoundComponent: () => (
+    <div className="space-y-4">
+      <Alert>Organisation nicht gefunden</Alert>
+      <Link to="/uebersicht" className="text-sm underline">
+        Zurück zur Übersicht
+      </Link>
+    </div>
+  ),
   component: ManageOrganisationPage,
 })
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function ManageOrganisationPage() {
   const { organisationId } = Route.useParams()

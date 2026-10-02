@@ -1,3 +1,4 @@
+import { notFound } from '@tanstack/react-router'
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { requireUser } from '../auth/guards.server'
@@ -8,6 +9,7 @@ import {
   getManagedOrganisation,
   leaveOrganisation,
   listReadableOrganisations,
+  NotOrganisationAdminError,
   memberActionSchema,
   organisationDetailsInputSchema,
   removeMember,
@@ -26,7 +28,16 @@ export const listReadableOrganisationsFn = createServerFn({ method: 'GET' }).han
 
 export const getManagedOrganisationFn = createServerFn({ method: 'GET' })
   .validator(organisationIdSchema)
-  .handler(async ({ data }) => getManagedOrganisation(await requireUser(), data.organisationId))
+  .handler(async ({ data }) => {
+    const user = await requireUser()
+    try {
+      return await getManagedOrganisation(user, data.organisationId)
+    } catch (e) {
+      // Als notFound weitergeben, damit die Seite mit HTTP 404 statt 500 antwortet (Issue #141).
+      if (e instanceof NotOrganisationAdminError) throw notFound()
+      throw e
+    }
+  })
 
 export const createInviteFn = createServerFn({ method: 'POST' })
   .validator(organisationIdSchema)

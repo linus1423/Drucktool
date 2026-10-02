@@ -61,10 +61,18 @@ export async function listReadableOrganisations(user: Principal) {
   return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, 'de'))
 }
 
+/** Der Benutzer verwaltet diese Organisation nicht, oder es gibt sie nicht; beides sieht von außen gleich aus. */
+export class NotOrganisationAdminError extends Error {
+  constructor() {
+    super(NO_PERMISSION)
+    this.name = 'NotOrganisationAdminError'
+  }
+}
+
 async function assertOrgAdmin(db: Db, user: Principal, organisationId: string) {
-  if (user.role !== 'customer') throw new Error(NO_PERMISSION)
+  if (user.role !== 'customer') throw new NotOrganisationAdminError()
   const [row] = await managedOrganisationIds(db, user.id, organisationId)
-  if (!row) throw new Error(NO_PERMISSION)
+  if (!row) throw new NotOrganisationAdminError()
 }
 
 /** Verwaltungsansicht: Stammdaten, Mitglieder und offene Einladungen. */

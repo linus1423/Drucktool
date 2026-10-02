@@ -1,6 +1,6 @@
 // Verwalter einer Organisation (Issue #12): Kollegen per Link einladen, ihre Aufträge sehen, Mitglieder entfernen.
 import { expect, test, type Browser } from '@playwright/test'
-import { check, createCustomer, db, loginAsCustomer } from './helpers'
+import { check, createCustomer, db, loginAsAdmin, loginAsCustomer } from './helpers'
 import { seedOrder } from './seed'
 
 test.describe.configure({ mode: 'serial' })
@@ -80,4 +80,21 @@ test('Verwalter entfernt den Kollegen', async ({ page }) => {
   const rows = await db`select 1 from organisation_members m join users u on u.id = m.user_id
     where m.organisation_id = ${organisationId} and u.email = ${kollege}`
   expect(rows).toHaveLength(0)
+})
+
+test('Fremde oder unbekannte Organisation ergibt 404 (Issue #141)', async ({ page, browser }) => {
+  // Der entfernte Kollege verwaltet die Organisation nicht; sie sieht für ihn aus wie eine unbekannte.
+  await loginAsCustomer(page, kollege)
+  for (const id of [organisationId, '00000000-0000-4000-8000-000000000000', 'keine-id']) {
+    expect((await page.goto(`/organisationen/${id}`))?.status()).toBe(404)
+    await expect(page.getByText('Organisation nicht gefunden')).toBeVisible()
+  }
+  await check(page, 'Unbekannte Organisation')
+
+  const admin = await newSession(browser)
+  await loginAsAdmin(admin)
+  for (const id of ['00000000-0000-4000-8000-000000000000', 'keine-id']) {
+    expect((await admin.goto(`/admin/organisationen/${id}`))?.status()).toBe(404)
+    await expect(admin.getByText('Organisation nicht gefunden')).toBeVisible()
+  }
 })
