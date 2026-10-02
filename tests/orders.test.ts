@@ -225,6 +225,17 @@ describe.skipIf(!url)('Aufträge aus dem Wizard (Integration)', () => {
     expect(leftovers).toEqual([])
   })
 
+  it('liest bei PDFs mit Beschnitt das Endformat aus der TrimBox (Issue #135)', async () => {
+    const doc = await PDFDocument.create()
+    const bleed = (3 * 72) / 25.4
+    const page = doc.addPage([595.28 + 2 * bleed, 841.89 + 2 * bleed])
+    page.setTrimBox(bleed, bleed, 595.28, 841.89)
+    const file = path.join(uploads, 'beschnitt.pdf')
+    const bytes = await doc.save()
+    await writeFile(file, bytes)
+    expect(await analysePdf(file, bytes.length)).toMatchObject({ pageCount: 1, pageWidthMm: 210, pageHeightMm: 297 })
+  })
+
   it('erkennt gemischte Seitengrößen', async () => {
     const doc = await PDFDocument.create()
     doc.addPage([595.28, 841.89])
