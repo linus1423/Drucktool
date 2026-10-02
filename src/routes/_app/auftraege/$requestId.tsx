@@ -136,6 +136,14 @@ function RequestDetailPage() {
           {request.confirmedAt
             ? ` · bestätigt von ${request.confirmedByName ?? 'der Druckerei'} am ${formatDateTime(request.confirmedAt)}`
             : ''}
+          {request.scriptId ? (
+            <>
+              {' · '}
+              <Link to="/skripte" className="underline">
+                Skript der SVK
+              </Link>
+            </>
+          ) : null}
           {request.reorderOf ? (
             <>
               {' · Nachbestellung von '}

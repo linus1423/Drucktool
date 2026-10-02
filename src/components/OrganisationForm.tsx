@@ -14,6 +14,7 @@ export type OrganisationValues = {
   country: string
   vatId: string
   costCenter: string
+  isSvk: boolean
   status: 'pending' | 'active' | 'disabled'
 }
 
@@ -27,6 +28,7 @@ export const emptyOrganisation: OrganisationValues = {
   country: 'DE',
   vatId: '',
   costCenter: '',
+  isSvk: false,
   status: 'active',
 }
 
@@ -113,6 +115,16 @@ export function OrganisationForm({
                 <option value="disabled">Deaktiviert</option>
               </Select>
             </Field>
+          )}
+        </form.Field>
+      )}
+      {forCustomer ? null : (
+        <form.Field name="isSvk">
+          {(field) => (
+            <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-700">
+              <input type="checkbox" checked={field.state.value} onChange={(e) => field.handleChange(e.target.checked)} />
+              Skriptenverkauf (SVK): Mitglieder verwalten Skripte
+            </label>
           )}
         </form.Field>
       )}

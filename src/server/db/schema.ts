@@ -49,6 +49,8 @@ export const organisations = pgTable('organisations', {
   vatId: text('vat_id'),
   // Kostenstelle für die Abrechnung, pflegen Verwalter der Organisation selbst (Issue #12).
   costCenter: text('cost_center'),
+  /** Skriptenverkauf (SVK): Mitglieder verwalten Skripte und bestellen sie nach (Issue #59). */
+  isSvk: boolean('is_svk').notNull().default(false),
   status: organisationStatus('status').notNull().default('pending'),
   ...timestamps,
 })
@@ -230,6 +232,8 @@ export const requests = pgTable(
     assigneeId: uuid('assignee_id').references(() => users.id, { onDelete: 'set null' }),
     // Nachbestellung: der Auftrag, der als Vorlage diente (Issue #10).
     reorderOfId: uuid('reorder_of_id').references((): AnyPgColumn => requests.id, { onDelete: 'set null' }),
+    /** Skript der SVK, für das dieser Auftrag gedruckt wird (Issue #59). */
+    scriptId: uuid('script_id').references((): AnyPgColumn => scripts.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
     description: text('description').notNull().default(''),
     quantity: integer('quantity'),
@@ -277,6 +281,7 @@ export const requests = pgTable(
     index('requests_created_by_idx').on(t.createdById),
     index('requests_status_idx').on(t.status),
     index('requests_assignee_idx').on(t.assigneeId),
+    index('requests_script_idx').on(t.scriptId),
     index('requests_invoice_pending_idx')
       .on(t.status)
       .where(sql`invoice_exported_at is null`),
@@ -614,3 +619,28 @@ export type Binding = typeof bindings.$inferSelect
 export type Paper = typeof papers.$inferSelect
 export type CoverColor = typeof coverColors.$inferSelect
 export type RequestFile = typeof requestFiles.$inferSelect
+
+/** Skripte der SVK als dauerhafte Vorlagen für Nachbestellungen (Issue #59). */
+export const scripts = pgTable(
+  'scripts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organisationId: uuid('organisation_id')
+      .notNull()
+      .references(() => organisations.id, { onDelete: 'restrict' }),
+    title: text('title').notNull(),
+    /** Dozent oder Lehrstuhl, von dem das Skript stammt. */
+    lecturer: text('lecturer').notNull().default(''),
+    /** z. B. „WS 2026/27“. */
+    semester: text('semester').notNull(),
+    /** Auftrag, dessen Optionen und Dateien die nächste Nachbestellung übernimmt; meist der letzte. */
+    templateRequestId: uuid('template_request_id').references((): AnyPgColumn => requests.id, { onDelete: 'set null' }),
+    /** Exemplare im Verkauf; fertige Nachbestellungen kommen automatisch dazu. */
+    stock: integer('stock').notNull().default(0),
+    notes: text('notes').notNull().default(''),
+    archived: boolean('archived').notNull().default(false),
+    createdById: uuid('created_by_id').references(() => users.id, { onDelete: 'set null' }),
+    ...timestamps,
+  },
+  (t) => [index('scripts_organisation_idx').on(t.organisationId, t.semester)],
+)

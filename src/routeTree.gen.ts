@@ -18,6 +18,7 @@ import { Route as AppAdminRouteRouteImport } from './routes/_app/admin/route'
 import { Route as AppKontoRouteImport } from './routes/_app/konto'
 import { Route as AppOrganisationsanfragenRouteImport } from './routes/_app/organisationsanfragen'
 import { Route as AppProfilRouteImport } from './routes/_app/profil'
+import { Route as AppSkripteRouteImport } from './routes/_app/skripte'
 import { Route as AppUebersichtRouteImport } from './routes/_app/uebersicht'
 import { Route as AnfragenIndexRouteImport } from './routes/anfragen/index'
 import { Route as AnfragenSplatRouteImport } from './routes/anfragen/$'
@@ -87,6 +88,11 @@ const AppOrganisationsanfragenRoute =
 const AppProfilRoute = AppProfilRouteImport.update({
   id: '/profil',
   path: '/profil',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSkripteRoute = AppSkripteRouteImport.update({
+  id: '/skripte',
+  path: '/skripte',
   getParentRoute: () => AppRoute,
 } as any)
 const AppUebersichtRoute = AppUebersichtRouteImport.update({
@@ -229,6 +235,7 @@ export interface FileRoutesByFullPath {
   '/konto': typeof AppKontoRoute
   '/organisationsanfragen': typeof AppOrganisationsanfragenRoute
   '/profil': typeof AppProfilRoute
+  '/skripte': typeof AppSkripteRoute
   '/uebersicht': typeof AppUebersichtRoute
   '/anfragen/$': typeof AnfragenSplatRoute
   '/api/health': typeof ApiHealthRoute
@@ -264,6 +271,7 @@ export interface FileRoutesByTo {
   '/konto': typeof AppKontoRoute
   '/organisationsanfragen': typeof AppOrganisationsanfragenRoute
   '/profil': typeof AppProfilRoute
+  '/skripte': typeof AppSkripteRoute
   '/uebersicht': typeof AppUebersichtRoute
   '/anfragen/$': typeof AnfragenSplatRoute
   '/api/health': typeof ApiHealthRoute
@@ -301,6 +309,7 @@ export interface FileRoutesById {
   '/_app/konto': typeof AppKontoRoute
   '/_app/organisationsanfragen': typeof AppOrganisationsanfragenRoute
   '/_app/profil': typeof AppProfilRoute
+  '/_app/skripte': typeof AppSkripteRoute
   '/_app/uebersicht': typeof AppUebersichtRoute
   '/anfragen/$': typeof AnfragenSplatRoute
   '/api/health': typeof ApiHealthRoute
@@ -338,6 +347,7 @@ export interface FileRouteTypes {
     | '/konto'
     | '/organisationsanfragen'
     | '/profil'
+    | '/skripte'
     | '/uebersicht'
     | '/anfragen/$'
     | '/api/health'
@@ -373,6 +383,7 @@ export interface FileRouteTypes {
     | '/konto'
     | '/organisationsanfragen'
     | '/profil'
+    | '/skripte'
     | '/uebersicht'
     | '/anfragen/$'
     | '/api/health'
@@ -409,6 +420,7 @@ export interface FileRouteTypes {
     | '/_app/konto'
     | '/_app/organisationsanfragen'
     | '/_app/profil'
+    | '/_app/skripte'
     | '/_app/uebersicht'
     | '/anfragen/$'
     | '/api/health'
@@ -517,6 +529,13 @@ declare module '@tanstack/react-router' {
       path: '/profil'
       fullPath: '/profil'
       preLoaderRoute: typeof AppProfilRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/skripte': {
+      id: '/_app/skripte'
+      path: '/skripte'
+      fullPath: '/skripte'
+      preLoaderRoute: typeof AppSkripteRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/uebersicht': {
@@ -729,6 +748,7 @@ interface AppRouteChildren {
   AppKontoRoute: typeof AppKontoRoute
   AppOrganisationsanfragenRoute: typeof AppOrganisationsanfragenRoute
   AppProfilRoute: typeof AppProfilRoute
+  AppSkripteRoute: typeof AppSkripteRoute
   AppUebersichtRoute: typeof AppUebersichtRoute
   AppAuftraegeRequestIdRoute: typeof AppAuftraegeRequestIdRoute
   AppAuftraegeBoardRoute: typeof AppAuftraegeBoardRoute
@@ -743,6 +763,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppKontoRoute: AppKontoRoute,
   AppOrganisationsanfragenRoute: AppOrganisationsanfragenRoute,
   AppProfilRoute: AppProfilRoute,
+  AppSkripteRoute: AppSkripteRoute,
   AppUebersichtRoute: AppUebersichtRoute,
   AppAuftraegeRequestIdRoute: AppAuftraegeRequestIdRoute,
   AppAuftraegeBoardRoute: AppAuftraegeBoardRoute,

@@ -17,7 +17,7 @@ export type SessionUser = {
   role: UserRole
   status: UserStatus
   /** Aktive Organisationen des Kunden, für die er bestellen kann; leer, wenn er keiner angehört. */
-  organisations: { id: string; name: string }[]
+  organisations: { id: string; name: string; isSvk: boolean }[]
 }
 
 function hashToken(token: string) {
@@ -103,7 +103,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   const { sessionExpiresAt: _, ...user } = row
   const organisations =
     user.role === 'customer'
-      ? (await listMemberships(db, user.id, { onlyActive: true })).map(({ id, name }) => ({ id, name }))
+      ? (await listMemberships(db, user.id, { onlyActive: true })).map(({ id, name, isSvk }) => ({ id, name, isSvk }))
       : []
   return { ...user, organisations }
 }

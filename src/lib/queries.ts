@@ -15,6 +15,7 @@ import { getDashboardFn } from '~/server/requests/dashboard.functions'
 import { pendingLexwareCountFn } from '~/server/invoices/lexware.functions'
 import { listAuditLogFn } from '~/server/audit/audit.functions'
 import { getAppInfoFn } from '~/server/app-info.functions'
+import { listScriptsFn } from '~/server/scripts/scripts.functions'
 import {
   describeInviteFn,
   getManagedOrganisationFn,
@@ -150,6 +151,10 @@ export const inviteQuery = (token: string) =>
     queryFn: () => describeInviteFn({ data: { token } }),
     staleTime: 0,
   })
+
+/** Skripte der SVK (Issue #59). */
+export const scriptsQuery = (filter: { semester?: string; archived?: boolean }) =>
+  queryOptions({ queryKey: ['scripts', filter], queryFn: () => listScriptsFn({ data: filter }) })
 
 export const accountQuery = queryOptions({ queryKey: ['account'], queryFn: () => getMyAccountFn() })
 
