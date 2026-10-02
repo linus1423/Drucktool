@@ -28,6 +28,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      # Nur Startreihenfolge, nicht auf "healthy" warten: der erste Download der Signaturen dauert einige Minuten.
+      # Bis clamd bereit ist, lehnt die App Uploads mit einem Hinweis ab ("in ein paar Minuten erneut versuchen").
+      # required: false, damit "--scale clamav=0" (Prüfung abgeschaltet) die App nicht blockiert.
+      clamav:
+        condition: service_started
+        required: false
     environment:
       DATABASE_URL: postgres://drucktool:${POSTGRES_PASSWORD:-drucktool}@db:5432/drucktool
       APP_URL: ${APP_URL:-http://localhost:3000}
@@ -41,8 +47,9 @@ services:
       PRIVACY_URL: ${PRIVACY_URL:-}
       IMPRINT_URL: ${IMPRINT_URL:-}
       APP_ENVIRONMENT: ${APP_ENVIRONMENT:-production}
-      # Mit "docker compose --profile virenscanner up" und CLAMAV_HOST=clamav werden Uploads auf Viren geprüft.
-      CLAMAV_HOST: ${CLAMAV_HOST:-}
+      # Uploads werden vom clamav-Container geprüft. CLAMAV_HOST= (leer, z. B. in .env) schaltet die Prüfung ab.
+      CLAMAV_HOST: ${CLAMAV_HOST-clamav}
+      CLAMAV_PORT: ${CLAMAV_PORT:-3310}
     volumes:
       - uploads:/app/uploads
     ports:
@@ -71,10 +78,11 @@ services:
     healthcheck:
       disable: true
 
-  # Virenscanner für Uploads (Issue #99). Lädt beim ersten Start die Signaturen, das dauert einige Minuten.
+  # Virenscanner für Uploads (Issue #99, #120). Lädt beim ersten Start die Signaturen, das dauert einige Minuten;
+  # danach hält freshclam sie im Container selbst aktuell. Braucht etwa 1,5 GB RAM.
   clamav:
     image: clamav/clamav:stable
-    profiles: [virenscanner]
+    logging: *logging
     restart: unless-stopped
     environment:
       # Ohne diese Grenzen prüft clamd nur die ersten 25 MB bzw. lässt große Dateien ungeprüft durch.
@@ -82,7 +90,15 @@ services:
       CLAMD_CONF_MaxFileSize: ${UPLOAD_MAX_MB:-500}M
       CLAMD_CONF_MaxScanSize: ${UPLOAD_MAX_MB:-500}M
     volumes:
+      # Signaturen bleiben über Neustarts erhalten, sonst lädt jeder Start sie neu herunter.
       - clamav-db:/var/lib/clamav
+    healthcheck:
+      # clamdcheck.sh liegt im Image und fragt clamd per PING ab.
+      test: ['CMD', 'clamdcheck.sh']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10m
 
 volumes:
   db-data:
