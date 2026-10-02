@@ -14,6 +14,8 @@ import {
   rejectRegistration,
   saveOrganisation,
   saveOrganisationSchema,
+  setOrganisationAdmin,
+  setOrganisationAdminSchema,
   updateUser,
   updateUserSchema,
 } from './admin.server'
@@ -54,6 +56,10 @@ export const getOrganisationFn = createServerFn({ method: 'GET' })
     await requireAdmin()
     return getOrganisation(data.id)
   })
+
+export const setOrganisationAdminFn = createServerFn({ method: 'POST' })
+  .validator(setOrganisationAdminSchema)
+  .handler(async ({ data }) => setOrganisationAdmin(await requireAdmin(), data))
 
 export const saveOrganisationFn = createServerFn({ method: 'POST' })
   .validator(saveOrganisationSchema)

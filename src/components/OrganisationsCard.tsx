@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useRouter } from '@tanstack/react-router'
+import { Link, useRouter } from '@tanstack/react-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Alert, Badge, Button, Card, Field, Input, Textarea } from '~/components/ui'
 import { errorMessage } from '~/lib/errors'
@@ -68,7 +68,8 @@ export function OrganisationsCard({ account }: { account: Pick<Account, 'members
     >
       <div className="space-y-4 text-sm">
         <p className="text-slate-600">
-          Eine Organisation ist optional. Gehören Sie einer an, können Sie sie beim Bestellen auswählen.
+          Eine Organisation ist optional. Gehören Sie einer an, können Sie sie beim Bestellen auswählen. Verwalter laden Kollegen
+          ein und sehen alle Aufträge der Organisation.
         </p>
         {error ? <Alert>{errorMessage(error)}</Alert> : null}
         {sent ? (
@@ -81,11 +82,24 @@ export function OrganisationsCard({ account }: { account: Pick<Account, 'members
         ) : (
           <ul className="divide-y divide-slate-100">
             {account.memberships.map((m) => (
-              <li key={m.id} className="flex items-center justify-between gap-2 py-2">
+              <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                 <span className="font-medium">{m.name}</span>
-                {m.status !== 'active' ? (
-                  <Badge className={ORG_STATUS[m.status].className}>{ORG_STATUS[m.status].label}</Badge>
-                ) : null}
+                <span className="flex items-center gap-2">
+                  {m.status !== 'active' ? (
+                    <Badge className={ORG_STATUS[m.status].className}>{ORG_STATUS[m.status].label}</Badge>
+                  ) : m.isAdmin ? (
+                    <>
+                      <Badge className="bg-sky-100 text-sky-800">Verwalter</Badge>
+                      <Link
+                        to="/organisationen/$organisationId"
+                        params={{ organisationId: m.id }}
+                        className="font-medium text-sky-700 hover:underline"
+                      >
+                        Verwalten
+                      </Link>
+                    </>
+                  ) : null}
+                </span>
               </li>
             ))}
           </ul>

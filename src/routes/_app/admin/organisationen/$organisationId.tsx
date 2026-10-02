@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { OrganisationForm } from '~/components/OrganisationForm'
 import { Alert, Card, PageHeader } from '~/components/ui'
 import { USER_STATUS_LABELS } from '~/lib/roles'
 import { organisationQuery } from '~/lib/queries'
-import { saveOrganisationFn } from '~/server/admin/admin.functions'
+import { errorMessage } from '~/lib/errors'
+import { saveOrganisationFn, setOrganisationAdminFn } from '~/server/admin/admin.functions'
 
 export const Route = createFileRoute('/_app/admin/organisationen/$organisationId')({
   loader: ({ context, params }) => context.queryClient.ensureQueryData(organisationQuery(params.organisationId)),
@@ -18,6 +19,10 @@ function OrganisationPage() {
   const { data: org } = useSuspenseQuery(organisationQuery(organisationId))
   const queryClient = useQueryClient()
   const [saved, setSaved] = useState(false)
+  const setAdmin = useMutation({
+    mutationFn: (data: { userId: string; isAdmin: boolean }) => setOrganisationAdminFn({ data: { ...data, organisationId } }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: organisationQuery(organisationId).queryKey }),
+  })
 
   return (
     <div className="space-y-6">
@@ -42,6 +47,7 @@ function OrganisationPage() {
                 city: org.city ?? '',
                 country: org.country,
                 vatId: org.vatId ?? '',
+                costCenter: org.costCenter ?? '',
                 status: org.status,
               }}
               submitLabel="Speichern"
@@ -56,6 +62,10 @@ function OrganisationPage() {
           </div>
         </Card>
         <Card title="Benutzer">
+          <p className="mb-2 text-sm text-slate-500">
+            Verwalter laden Kollegen selbst ein, entfernen Mitglieder und sehen alle Aufträge der Organisation.
+          </p>
+          {setAdmin.error ? <Alert>{errorMessage(setAdmin.error)}</Alert> : null}
           {org.members.length === 0 ? (
             <p className="text-sm text-slate-500">Keine Benutzer.</p>
           ) : (
@@ -66,6 +76,15 @@ function OrganisationPage() {
                   <div className="text-slate-500">
                     {m.email} · {USER_STATUS_LABELS[m.status]}
                   </div>
+                  <label className="mt-1 flex items-center gap-2 text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={m.isAdmin}
+                      disabled={setAdmin.isPending}
+                      onChange={(e) => setAdmin.mutate({ userId: m.id, isAdmin: e.target.checked })}
+                    />
+                    Verwalter
+                  </label>
                 </li>
               ))}
             </ul>

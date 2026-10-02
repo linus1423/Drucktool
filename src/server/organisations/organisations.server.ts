@@ -1,6 +1,6 @@
 // Zugehörigkeit von Kunden zu Organisationen und Organisationsanfragen.
 // Organisationen sind optional; ein Kunde kann keiner, einer oder mehreren angehören.
-import { and, asc, count, desc, eq, inArray } from 'drizzle-orm'
+import { and, asc, count, desc, eq, inArray, notInArray } from 'drizzle-orm'
 import { z } from 'zod'
 import { writeAudit } from '../audit/audit.server'
 import { getDb, schema, type Tx } from '../db/client.server'
@@ -17,7 +17,12 @@ type Db = ReturnType<typeof getDb> | Tx
 /** Organisationen eines Benutzers; mit onlyActive nur die, für die er bestellen kann. */
 export async function listMemberships(db: Db, userId: string, { onlyActive = false } = {}) {
   return db
-    .select({ id: organisations.id, name: organisations.name, status: organisations.status })
+    .select({
+      id: organisations.id,
+      name: organisations.name,
+      status: organisations.status,
+      isAdmin: organisationMembers.isAdmin,
+    })
     .from(organisationMembers)
     .innerJoin(organisations, eq(organisations.id, organisationMembers.organisationId))
     .where(and(eq(organisationMembers.userId, userId), onlyActive ? eq(organisations.status, 'active') : undefined))
@@ -47,9 +52,20 @@ export async function setMemberships(tx: Tx, userId: string, organisationIds: st
     const found = await tx.select({ id: organisations.id }).from(organisations).where(inArray(organisations.id, ids))
     if (found.length !== ids.length) throw new Error('Organisation nicht gefunden')
   }
-  await tx.delete(organisationMembers).where(eq(organisationMembers.userId, userId))
+  // Nur Änderungen schreiben, damit bestehende Mitgliedschaften ihr Verwalter-Kennzeichen behalten.
+  await tx
+    .delete(organisationMembers)
+    .where(
+      and(
+        eq(organisationMembers.userId, userId),
+        ids.length > 0 ? notInArray(organisationMembers.organisationId, ids) : undefined,
+      ),
+    )
   if (ids.length > 0) {
-    await tx.insert(organisationMembers).values(ids.map((organisationId) => ({ userId, organisationId })))
+    await tx
+      .insert(organisationMembers)
+      .values(ids.map((organisationId) => ({ userId, organisationId })))
+      .onConflictDoNothing()
   }
 }
 

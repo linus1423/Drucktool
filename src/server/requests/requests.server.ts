@@ -31,6 +31,7 @@ import {
   listRequestFiles,
 } from '../files/files.server'
 import { getDb, schema, type Tx } from '../db/client.server'
+import { managedOrganisationIds } from '../organisations/org-admin.server'
 import { isActiveMember } from '../organisations/organisations.server'
 import { markRead, markReadSchema, readAtFor, unreadExpression } from './reads.server'
 import { addWatchers, clearMute, listWatchers, resolveMentions, setWatching, watchedBy, watcherIds } from './watchers.server'
@@ -74,6 +75,15 @@ function visibilityFilter(user: Principal): SQL | undefined {
   return eq(requests.createdById, user.id)
 }
 
+/**
+ * Lesen dürfen Kunden zusätzlich alle Aufträge der Organisationen, die sie verwalten (Issue #12). Ändern bleibt bei
+ * visibilityFilter: Verwalter sehen fremde Aufträge, handeln aber nicht für die Kollegen.
+ */
+function readVisibilityFilter(user: Principal): SQL | undefined {
+  if (isStaffRole(user.role)) return undefined
+  return or(eq(requests.createdById, user.id), inArray(requests.organisationId, managedOrganisationIds(getDb(), user.id)))
+}
+
 async function loadForUpdate(tx: Tx, user: Principal, id: string) {
   const [row] = await tx
     .select()
@@ -106,7 +116,7 @@ export const listFilterSchema = z.object({
   done: z.boolean().optional(),
   assignedToMe: z.boolean().optional(),
   search: z.string().trim().max(200).optional(),
-  // Nur für Mitarbeiter wirksam
+  // Grenzt nur ein; Kunden sehen auch damit nur, was sie ohnehin sehen dürfen.
   organisationId: z.uuid().optional(),
   /** Mitarbeiter-ID oder "none" für nicht zugewiesene Aufträge. */
   assigneeId: z.union([z.uuid(), z.literal('none')]).optional(),
@@ -136,14 +146,14 @@ const assigneeAlias = alias(users, 'assignee')
 
 function listConditions(user: Principal, filter: ListFilter) {
   const staff = isStaffRole(user.role)
-  const conditions: (SQL | undefined)[] = [visibilityFilter(user)]
+  const conditions: (SQL | undefined)[] = [readVisibilityFilter(user)]
   if (filter.status) conditions.push(eq(requests.status, filter.status))
   if (filter.open) conditions.push(inArray(requests.status, OPEN_STATUSES))
   if (filter.done) conditions.push(eq(requests.status, 'completed'))
   if (filter.assignedToMe) conditions.push(eq(requests.assigneeId, user.id))
   if (filter.watching) conditions.push(watchedBy(user.id, requests))
   if (filter.unread) conditions.push(unreadExpression(user))
-  if (staff && filter.organisationId) conditions.push(eq(requests.organisationId, filter.organisationId))
+  if (filter.organisationId) conditions.push(eq(requests.organisationId, filter.organisationId))
   if (staff && filter.assigneeId) {
     conditions.push(filter.assigneeId === 'none' ? isNull(requests.assigneeId) : eq(requests.assigneeId, filter.assigneeId))
   }
@@ -168,7 +178,8 @@ function listConditions(user: Principal, filter: ListFilter) {
         ilike(organisations.name, term),
         ilike(creatorAlias.name, term),
         staff ? ilike(creatorAlias.email, term) : undefined,
-        Number.isFinite(asNumber) ? eq(requests.number, asNumber) : undefined,
+        // Größere Zahlen passen nicht in die Spalte und würden die Abfrage scheitern lassen.
+        Number.isSafeInteger(asNumber) && asNumber <= 2_147_483_647 ? eq(requests.number, asNumber) : undefined,
       ),
     )
   }
@@ -285,7 +296,7 @@ export async function getRequestDetail(user: Principal, id: string) {
     .innerJoin(creator, eq(creator.id, requests.createdById))
     .leftJoin(assignee, eq(assignee.id, requests.assigneeId))
     .leftJoin(confirmer, eq(confirmer.id, requests.confirmedById))
-    .where(and(eq(requests.id, id), visibilityFilter(user)))
+    .where(and(eq(requests.id, id), readVisibilityFilter(user)))
     .limit(1)
   if (!found) notFound()
 
@@ -340,10 +351,12 @@ export async function getRequestDetail(user: Principal, id: string) {
       ? db
           .select({ id: requests.id, number: requests.number, title: requests.title })
           .from(requests)
-          .where(and(eq(requests.id, r.reorderOfId), visibilityFilter(user)))
+          .where(and(eq(requests.id, r.reorderOfId), readVisibilityFilter(user)))
       : Promise.resolve([]),
   ])
   const internalDueDate = isStaff ? r.internalDueDate : null
+  // Verwalter einer Organisation sehen die Aufträge der Kollegen nur (Issue #12).
+  const canAct = isStaff || r.createdById === user.id
   return {
     ...r,
     // Kunden sehen nur Druck- und Lieferkosten, nicht den internen Rechenweg (Lastenheft Schritt 7).
@@ -388,11 +401,14 @@ export async function getRequestDetail(user: Principal, id: string) {
     watchers: isStaff ? watchers : [],
     events,
     // Solange ein Vorschlag offen ist, bleiben nur Stornieren und Ablehnen; der Rest läuft über den Vorschlag.
-    transitions: allowedTransitions(r.status, actorOf(user)).filter((t) => !r.proposal || t === 'cancelled' || t === 'rejected'),
+    transitions: canAct
+      ? allowedTransitions(r.status, actorOf(user)).filter((t) => !r.proposal || t === 'cancelled' || t === 'rejected')
+      : [],
     canAnswerProposal: !!r.proposal && r.createdById === user.id,
     // Antwortet der Kunde außerhalb des Tools, tragen Mitarbeiter sie ein (Issue #113).
     canRecordAnswer: !!r.proposal && isStaff && r.createdById !== user.id,
-    canEdit: canEditRequest(user, r.status),
+    canEdit: canAct && canEditRequest(user, r.status),
+    canAct,
   }
 }
 
@@ -1035,5 +1051,11 @@ export { markReadSchema }
 
 /** Merkt sich, dass der Benutzer den Auftrag gesehen hat (Issue #18). */
 export async function markRequestRead(user: Principal, input: z.infer<typeof markReadSchema>) {
-  return markRead(user, input, (id) => getDb().transaction((tx) => loadForUpdate(tx, user, id)))
+  return markRead(user, input, async (id) => {
+    const [row] = await getDb()
+      .select({ id: requests.id })
+      .from(requests)
+      .where(and(eq(requests.id, id), readVisibilityFilter(user)))
+    return row ?? notFound()
+  })
 }

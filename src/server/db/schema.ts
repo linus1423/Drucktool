@@ -47,6 +47,8 @@ export const organisations = pgTable('organisations', {
   city: text('city'),
   country: text('country').notNull().default('DE'),
   vatId: text('vat_id'),
+  // Kostenstelle für die Abrechnung, pflegen Verwalter der Organisation selbst (Issue #12).
+  costCenter: text('cost_center'),
   status: organisationStatus('status').notNull().default('pending'),
   ...timestamps,
 })
@@ -88,11 +90,34 @@ export const organisationMembers = pgTable(
     organisationId: uuid('organisation_id')
       .notNull()
       .references(() => organisations.id, { onDelete: 'cascade' }),
+    // Verwalter laden Kollegen ein, entfernen Mitglieder, pflegen die Stammdaten und sehen alle Aufträge (Issue #12).
+    isAdmin: boolean('is_admin').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     primaryKey({ columns: [t.userId, t.organisationId] }),
     index('organisation_members_organisation_idx').on(t.organisationId),
+  ],
+)
+
+/** Einladungslink in eine Organisation: einmalig nutzbar, zeitlich begrenzt, nur der Hash wird gespeichert. */
+export const organisationInvites = pgTable(
+  'organisation_invites',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organisationId: uuid('organisation_id')
+      .notNull()
+      .references(() => organisations.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    createdById: uuid('created_by_id').references(() => users.id, { onDelete: 'set null' }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    usedById: uuid('used_by_id').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('organisation_invites_token_unique').on(t.tokenHash),
+    index('organisation_invites_organisation_idx').on(t.organisationId),
   ],
 )
 

@@ -15,6 +15,11 @@ import { getDashboardFn } from '~/server/requests/dashboard.functions'
 import { pendingLexwareCountFn } from '~/server/invoices/lexware.functions'
 import { listAuditLogFn } from '~/server/audit/audit.functions'
 import { getAppInfoFn } from '~/server/app-info.functions'
+import {
+  describeInviteFn,
+  getManagedOrganisationFn,
+  listManagedOrganisationsFn,
+} from '~/server/organisations/org-admin.functions'
 import { listMailTemplatesFn } from '~/server/mail/mail-templates.functions'
 import type { AuditFilter } from '~/server/audit/audit.server'
 import type { RequestStatus } from './status'
@@ -126,6 +131,25 @@ export const catalogChangesQuery = queryOptions({
   queryKey: ['catalog', 'changes'],
   queryFn: () => listCatalogChangesFn(),
 })
+
+/** Organisationen, die der Kunde verwaltet (Issue #12). */
+export const managedOrganisationsQuery = queryOptions({
+  queryKey: ['organisations', 'managed'],
+  queryFn: () => listManagedOrganisationsFn(),
+})
+
+export const managedOrganisationQuery = (organisationId: string) =>
+  queryOptions({
+    queryKey: ['organisations', 'managed', organisationId],
+    queryFn: () => getManagedOrganisationFn({ data: { organisationId } }),
+  })
+
+export const inviteQuery = (token: string) =>
+  queryOptions({
+    queryKey: ['organisations', 'invite', token],
+    queryFn: () => describeInviteFn({ data: { token } }),
+    staleTime: 0,
+  })
 
 export const accountQuery = queryOptions({ queryKey: ['account'], queryFn: () => getMyAccountFn() })
 

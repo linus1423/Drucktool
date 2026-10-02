@@ -32,7 +32,13 @@ bearbeiten sie über einen Status-Workflow bis zur Auslieferung.
   Bestellen eine davon (oder keine). Im Profil kann er eine Organisation anfragen; Mitarbeiter und Admins ordnen ihn
   unter „Organisationsanfragen“ einer bestehenden zu, legen eine neue an oder lehnen ab. Der Kunde bekommt jeweils eine
   E-Mail. Eine deaktivierte Organisation sperrt kein Konto, sie steht beim Bestellen nur nicht mehr zur Auswahl.
-- Kunden sehen nur die Aufträge, die sie selbst angelegt haben.
+- Kunden sehen die Aufträge, die sie selbst angelegt haben. Verwalter einer Organisation sehen zusätzlich alle
+  Aufträge, die für diese Organisation bestellt wurden; ändern, freigeben und kommentieren kann sie nur der Besteller.
+- **Verwalter einer Organisation** (z. B. die Lehrstuhlsekretärin) ernennt ein Admin unter „Organisationen“ per Haken
+  „Verwalter“. Verwalter öffnen ihre Organisation über „Verwalten“ im Profil und können dort Kollegen per
+  Einladungslink hinzufügen (14 Tage gültig, einmal nutzbar, gespeichert wird nur ein Hash), Mitglieder entfernen,
+  weitere Verwalter ernennen und Adresse, USt-IdNr. und Kostenstelle pflegen. Den Namen ändert nur die Druckerei. Eine
+  Organisation behält immer mindestens einen Verwalter; alles landet im Audit-Log.
 
 Im Profil sieht jeder seine angemeldeten Geräte und kann sie einzeln oder alle anderen abmelden.
 
