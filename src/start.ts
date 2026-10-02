@@ -1,6 +1,10 @@
 import { createCsrfMiddleware, createMiddleware, createStart } from '@tanstack/react-start'
+import { z } from 'zod'
 import { createNonce, isHttps, securityHeaders, withSecurityHeaders } from './server/security-headers'
 import { errorMiddleware, requestLogMiddleware } from './server/middleware'
+
+// Zod-Meldungen ohne eigenen Text auf Deutsch, auf Server und Client (Issue #117).
+z.config(z.locales.de())
 
 // Setzt CSP, HSTS und weitere Security-Header auf jede Antwort. Der Nonce wird über den
 // Kontext an den Router weitergegeben (siehe router.tsx), der ihn an seine Inline-Skripte hängt.
