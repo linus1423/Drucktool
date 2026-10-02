@@ -231,4 +231,11 @@ describe.skipIf(!url)('OpenID Connect: Benutzerzuordnung (Integration)', async (
     expect(safeRedirect('https://evil.example')).toBe('/uebersicht')
     expect(safeRedirect(null)).toBe('/uebersicht')
   })
+
+  it('behält beim ersten Login das Ziel hinter dem Profil (Issue #137)', async () => {
+    const { firstLoginProfileUrl } = await import('~/lib/redirect')
+    expect(firstLoginProfileUrl('/einladung/abc')).toBe('/profil?neu=1&weiter=%2Feinladung%2Fabc')
+    expect(firstLoginProfileUrl(null)).toBe('/profil?neu=1')
+    expect(firstLoginProfileUrl('//evil.example')).toBe('/profil?neu=1')
+  })
 })

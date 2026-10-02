@@ -102,7 +102,10 @@ describe.skipIf(!url)('Druckbogen (Integration)', async () => {
     const after = await getRequestDetail(staff, id)
     expect(after.order!.paper.id).toBe(thick.id)
     expect(after.printSheet).toBeNull()
-    expect(after.events.at(-1)).toMatchObject({ type: 'print_sheet_changed', data: { reason: 'paper_changed' } })
+    // Annahme und Zurücksetzen des Bogens haben denselben Zeitstempel (eine Transaktion), die Reihenfolge ist offen.
+    expect(after.events).toContainEqual(
+      expect.objectContaining({ type: 'print_sheet_changed', data: expect.objectContaining({ reason: 'paper_changed' }) }),
+    )
     expect((await getRequestDetail(customer, id)).events.some((e) => e.type === 'print_sheet_changed')).toBe(false)
   })
 

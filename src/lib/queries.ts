@@ -19,7 +19,7 @@ import { listScriptsFn } from '~/server/scripts/scripts.functions'
 import {
   describeInviteFn,
   getManagedOrganisationFn,
-  listManagedOrganisationsFn,
+  listReadableOrganisationsFn,
 } from '~/server/organisations/org-admin.functions'
 import { listMailTemplatesFn } from '~/server/mail/mail-templates.functions'
 import type { AuditFilter } from '~/server/audit/audit.server'
@@ -133,10 +133,10 @@ export const catalogChangesQuery = queryOptions({
   queryFn: () => listCatalogChangesFn(),
 })
 
-/** Organisationen, die der Kunde verwaltet (Issue #12). */
-export const managedOrganisationsQuery = queryOptions({
-  queryKey: ['organisations', 'managed'],
-  queryFn: () => listManagedOrganisationsFn(),
+/** Organisationen, deren Aufträge der Kunde mitliest: verwaltete und SVK (Issues #12, #59). */
+export const readableOrganisationsQuery = queryOptions({
+  queryKey: ['organisations', 'readable'],
+  queryFn: () => listReadableOrganisationsFn(),
 })
 
 export const managedOrganisationQuery = (organisationId: string) =>

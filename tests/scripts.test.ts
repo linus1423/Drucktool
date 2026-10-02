@@ -88,9 +88,16 @@ describe.skipIf(!url)('Skripte der SVK (Issue #59)', async () => {
     const forStaff = await scriptsModule.listScripts(staff, { semester: 'WS 2026/27' })
     expect(forStaff.rows.map((r) => r.id)).toContain(id)
     expect(forStaff.canManage).toBe(false)
-    await expect(scriptsModule.updateScript(fremd, { ...base, id, archived: false, stock: 999 })).rejects.toThrow(
-      'Keine Berechtigung',
-    )
+    await expect(
+      scriptsModule.updateScript(fremd, { ...base, id, archived: false, stock: 999, previousStock: 0 }),
+    ).rejects.toThrow('Keine Berechtigung')
+  })
+
+  it('zeigt SVK-Mitgliedern die SVK als mitlesbare Organisation in der Auftragsliste (Issue #138)', async () => {
+    const { listReadableOrganisations } = await import('~/server/organisations/org-admin.server')
+    expect(await listReadableOrganisations(ben)).toEqual([{ id: svk, name: `SVK ${stamp}` }])
+    expect(await listReadableOrganisations(fremd)).toEqual([{ id: andere, name: `Lehrstuhl ${stamp}` }])
+    expect(await listReadableOrganisations(staff)).toEqual([])
   })
 
   it('bestellt ein Skript, Kollegen bestellen nach und der Bestand wächst mit fertigen Aufträgen', async () => {
@@ -141,12 +148,23 @@ describe.skipIf(!url)('Skripte der SVK (Issue #59)', async () => {
     row = (await scriptsModule.listScripts(anna, {})).rows.find((r) => r.id === scriptId)!
     expect(row).toMatchObject({ stock: 25, openCopies: 10, printedCopies: 25 })
     expect(row.lastOrder?.id).toBe(second.id)
+
+    // Ein Formular, das noch den alten Bestand zeigt, überschreibt die gedruckten Exemplare nicht (Issue #136).
+    await scriptsModule.updateScript(ben, { ...base, id: scriptId, archived: false, notes: 'neu', previousStock: 0 })
+    row = (await scriptsModule.listScripts(anna, {})).rows.find((r) => r.id === scriptId)!
+    expect(row).toMatchObject({ stock: 25, notes: 'neu' })
+    await expect(
+      scriptsModule.updateScript(ben, { ...base, id: scriptId, archived: false, stock: 5, previousStock: 0 }),
+    ).rejects.toThrow('inzwischen geändert')
+    await scriptsModule.updateScript(ben, { ...base, id: scriptId, archived: false, stock: 20, previousStock: 25 })
+    row = (await scriptsModule.listScripts(anna, {})).rows.find((r) => r.id === scriptId)!
+    expect(row.stock).toBe(20)
   })
 
   it('kopiert ein Skript für das nächste Semester und archiviert das alte', async () => {
     const { id } = await scriptsModule.createScript(anna, { ...base, title: `Physik ${stamp}`, organisationId: svk })
     const copy = await scriptsModule.copyScript(ben, { id, semester: 'SS 2027' })
-    await scriptsModule.updateScript(anna, { ...base, title: `Physik ${stamp}`, id, archived: true })
+    await scriptsModule.updateScript(anna, { ...base, title: `Physik ${stamp}`, id, archived: true, previousStock: 0 })
     const current = await scriptsModule.listScripts(anna, { semester: 'SS 2027' })
     expect(current.rows.map((r) => r.id)).toEqual([copy.id])
     expect(current.semesters).toEqual(expect.arrayContaining(['SS 2027', 'WS 2026/27']))

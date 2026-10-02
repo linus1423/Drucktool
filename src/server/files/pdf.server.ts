@@ -46,7 +46,9 @@ export async function analysePdf(file: string, sizeBytes: number): Promise<PdfIn
     const pages = doc.getPages()
     if (pages.length === 0) return empty('unreadable')
     const sizes = pages.map((page) => {
-      const { width, height } = page.getSize()
+      // Das Endformat steht in der TrimBox; die MediaBox enthält bei Druck-PDFs zusätzlich den Beschnitt (Issue #135).
+      // pdf-lib fällt ohne TrimBox auf CropBox und MediaBox zurück.
+      const { width, height } = page.getTrimBox()
       const rotated = page.getRotation().angle % 180 !== 0
       const w = Math.round((rotated ? height : width) * PT_TO_MM)
       const h = Math.round((rotated ? width : height) * PT_TO_MM)

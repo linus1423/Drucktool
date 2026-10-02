@@ -7,7 +7,7 @@ import {
   describeInvite,
   getManagedOrganisation,
   leaveOrganisation,
-  listManagedOrganisations,
+  listReadableOrganisations,
   memberActionSchema,
   organisationDetailsInputSchema,
   removeMember,
@@ -20,8 +20,8 @@ import {
 const organisationIdSchema = z.object({ organisationId: z.uuid() })
 const tokenSchema = z.object({ token: z.string().min(20).max(100) })
 
-export const listManagedOrganisationsFn = createServerFn({ method: 'GET' }).handler(async () =>
-  listManagedOrganisations(await requireUser()),
+export const listReadableOrganisationsFn = createServerFn({ method: 'GET' }).handler(async () =>
+  listReadableOrganisations(await requireUser()),
 )
 
 export const getManagedOrganisationFn = createServerFn({ method: 'GET' })

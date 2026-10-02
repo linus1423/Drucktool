@@ -152,17 +152,29 @@ export async function createScript(user: Principal, input: z.infer<typeof create
   return row!
 }
 
-export const updateScriptSchema = scriptInputSchema.extend({ id: z.uuid(), archived: z.boolean() })
+export const updateScriptSchema = scriptInputSchema.extend({
+  id: z.uuid(),
+  archived: z.boolean(),
+  /** Bestand, den das Formular beim Öffnen angezeigt hat. Fertige Aufträge erhöhen ihn inzwischen vielleicht (Issue #136). */
+  previousStock: z.number().int().min(0),
+})
 
 export async function updateScript(user: Principal, input: z.infer<typeof updateScriptSchema>) {
   return getDb().transaction(async (tx) => {
     const [script] = await tx.select().from(scripts).where(eq(scripts.id, input.id)).for('update')
     if (!script) throw new Error('Skript nicht gefunden')
     await assertSvkMember(tx, user, script.organisationId)
-    const { id, ...values } = input
+    const { id, previousStock, stock, ...values } = input
+    // Unveränderter Bestand im Formular: den aktuellen behalten, statt ihn mit dem alten Stand zu überschreiben.
+    const stockChanged = stock !== previousStock
+    if (stockChanged && script.stock !== previousStock) {
+      throw new Error(
+        `Der Bestand hat sich inzwischen geändert (jetzt ${script.stock} Exemplare). Bitte die Seite neu laden und erneut eintragen.`,
+      )
+    }
     await tx
       .update(scripts)
-      .set({ ...values, updatedAt: new Date() })
+      .set({ ...values, ...(stockChanged ? { stock } : {}), updatedAt: new Date() })
       .where(eq(scripts.id, id))
   })
 }

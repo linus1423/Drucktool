@@ -6,7 +6,7 @@ import { getDb, schema } from '../db/client.server'
 import { authenticateWithPassword } from './login.server'
 import { LinkLoginError, issueLoginLink, redeemLoginLink } from './magic-link.server'
 import { auditLogin } from '../audit/audit.server'
-import { safeRedirect } from '~/lib/redirect'
+import { firstLoginProfileUrl, safeRedirect } from '~/lib/redirect'
 import { getOidcSettings } from './oidc.server'
 import { assertRateLimit } from './rate-limit.server'
 import { createSession, destroyCurrentSession, getSessionUser } from './session.server'
@@ -73,5 +73,5 @@ export const redeemLoginLinkFn = createServerFn({ method: 'POST' })
       .where(eq(schema.users.id, result.userId))
     // Kunden ohne Rechnungsadresse landen zuerst im Profil.
     const needsProfile = user?.role === 'customer' && !user.billingAddress
-    return { redirect: needsProfile ? '/profil?neu=1' : safeRedirect(result.redirect) }
+    return { redirect: needsProfile ? firstLoginProfileUrl(result.redirect) : safeRedirect(result.redirect) }
   })

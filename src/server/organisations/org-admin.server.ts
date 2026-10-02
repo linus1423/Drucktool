@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { organisationDetailsSchema } from '~/lib/validation'
 import { writeAudit } from '../audit/audit.server'
 import { getDb, schema, type Tx } from '../db/client.server'
+import { svkOrganisations } from '../scripts/scripts.server'
 import type { Principal } from '../requests/requests.server'
 
 const { users, organisations, organisationMembers, organisationInvites } = schema
@@ -46,6 +47,18 @@ export async function listManagedOrganisations(user: Principal) {
       and(eq(organisationMembers.userId, user.id), eq(organisationMembers.isAdmin, true), eq(organisations.status, 'active')),
     )
     .orderBy(asc(organisations.name))
+}
+
+/**
+ * Organisationen, deren Aufträge der Kunde mitlesen darf: verwaltete (Issue #12) und SVK-Organisationen (Issue #59).
+ * Entspricht readVisibilityFilter und steuert Spalte „Angelegt von“ und Organisationsfilter der Auftragsliste.
+ */
+export async function listReadableOrganisations(user: Principal) {
+  if (user.role !== 'customer') return []
+  const db = getDb()
+  const [managed, svk] = await Promise.all([listManagedOrganisations(user), svkOrganisations(db, user.id)])
+  const byId = new Map([...managed, ...svk].map((o) => [o.id, o]))
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, 'de'))
 }
 
 async function assertOrgAdmin(db: Db, user: Principal, organisationId: string) {
