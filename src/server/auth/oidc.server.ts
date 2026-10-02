@@ -1,14 +1,20 @@
 import * as client from 'openid-client'
 
 /**
- * OpenID-Connect-Einstellungen aus der Umgebung. Ohne OIDC_ISSUER ist die
- * Anmeldung per OIDC abgeschaltet.
+ * OpenID-Connect-Einstellungen aus der Umgebung. Es gibt zwei unabhängige Anbieter:
+ * - staff (OIDC_*): Anmeldung für Mitarbeiter, z. B. Microsoft Entra ID. Ohne OIDC_ISSUER abgeschaltet.
+ * - customer (CUSTOMER_OIDC_*): Anmeldung für Kunden, z. B. der Federated TUM Keycloak (Issue #60).
+ *   Ohne CUSTOMER_OIDC_ISSUER abgeschaltet.
  */
-export type NewUserPolicy = 'reject' | 'pending' | 'staff'
+export type OidcProvider = 'staff' | 'customer'
+
+/** customer: unbekannte Benutzer werden direkt als aktive Kunden angelegt (wie beim Anmeldelink). */
+export type NewUserPolicy = 'reject' | 'pending' | 'staff' | 'customer'
 
 export type RoleMapping = { claim: string; adminValues: string[]; staffValues: string[] }
 
 export type OidcSettings = {
+  provider: OidcProvider
   issuer: string
   clientId: string
   clientSecret: string | undefined
@@ -21,10 +27,20 @@ export type OidcSettings = {
   roles: RoleMapping | null
   /** Mitarbeiter und Admins dürfen sich nicht mit Passwort anmelden (Superadmin schon, als Notfallzugang). */
   enforceForStaff: boolean
+  /** Nur Kundenkonten dürfen sich über diesen Anbieter anmelden. */
+  customersOnly: boolean
+  /** Pfad der Login- und Callback-Routen, z. B. /api/auth/oidc */
+  basePath: string
   redirectUri: string
 }
 
-export function getOidcSettings(): OidcSettings | null {
+export function getOidcSettings(provider: OidcProvider = 'staff'): OidcSettings | null {
+  return provider === 'customer' ? customerSettings() : staffSettings()
+}
+
+const appUrl = () => (process.env.APP_URL ?? 'http://localhost:3000').replace(/\/+$/, '')
+
+function staffSettings(): OidcSettings | null {
   const issuer = process.env.OIDC_ISSUER?.trim()
   const clientId = process.env.OIDC_CLIENT_ID?.trim()
   if (!issuer || !clientId) return null
@@ -32,8 +48,8 @@ export function getOidcSettings(): OidcSettings | null {
   if (policy !== 'reject' && policy !== 'pending' && policy !== 'staff') {
     throw new Error('OIDC_NEW_USERS muss "reject", "pending" oder "staff" sein')
   }
-  const appUrl = (process.env.APP_URL ?? 'http://localhost:3000').replace(/\/+$/, '')
   return {
+    provider: 'staff',
     issuer,
     clientId,
     clientSecret: process.env.OIDC_CLIENT_SECRET || undefined,
@@ -43,7 +59,31 @@ export function getOidcSettings(): OidcSettings | null {
     trustEmail: process.env.OIDC_TRUST_EMAIL === 'true',
     roles: roleMappingFromEnv(),
     enforceForStaff: process.env.OIDC_ENFORCE_FOR_STAFF === 'true',
-    redirectUri: `${appUrl}/api/auth/oidc/callback`,
+    customersOnly: false,
+    basePath: '/api/auth/oidc',
+    redirectUri: `${appUrl()}/api/auth/oidc/callback`,
+  }
+}
+
+function customerSettings(): OidcSettings | null {
+  const issuer = process.env.CUSTOMER_OIDC_ISSUER?.trim()
+  const clientId = process.env.CUSTOMER_OIDC_CLIENT_ID?.trim()
+  if (!issuer || !clientId) return null
+  return {
+    provider: 'customer',
+    issuer,
+    clientId,
+    clientSecret: process.env.CUSTOMER_OIDC_CLIENT_SECRET || undefined,
+    displayName: process.env.CUSTOMER_OIDC_DISPLAY_NAME || 'TUM-Kennung',
+    scope: process.env.CUSTOMER_OIDC_SCOPE || 'openid email profile',
+    newUsers: 'customer',
+    trustEmail: process.env.CUSTOMER_OIDC_TRUST_EMAIL === 'true',
+    // Rollen kommen nie vom Kunden-Anbieter, Mitarbeiter melden sich über ihren eigenen Anbieter oder mit Passwort an.
+    roles: null,
+    enforceForStaff: false,
+    customersOnly: true,
+    basePath: '/api/auth/kunden-sso',
+    redirectUri: `${appUrl()}/api/auth/kunden-sso/callback`,
   }
 }
 
@@ -61,13 +101,14 @@ function roleMappingFromEnv(): RoleMapping | null {
   return { claim: process.env.OIDC_ROLE_CLAIM || 'roles', adminValues, staffValues }
 }
 
-let cached: { key: string; config: Promise<client.Configuration> } | undefined
+const cache = new Map<string, Promise<client.Configuration>>()
 
 /** Lädt die Konfiguration des Anbieters (Discovery) einmal und hält sie im Speicher. */
 export function getOidcClient(settings: OidcSettings): Promise<client.Configuration> {
   const key = `${settings.issuer}|${settings.clientId}`
-  if (cached?.key !== key) {
-    const config = client
+  let config = cache.get(key)
+  if (!config) {
+    config = client
       .discovery(
         new URL(settings.issuer),
         settings.clientId,
@@ -77,10 +118,10 @@ export function getOidcClient(settings: OidcSettings): Promise<client.Configurat
         settings.issuer.startsWith('http://') ? { execute: [client.allowInsecureRequests] } : undefined,
       )
       .catch((error: unknown) => {
-        cached = undefined
+        cache.delete(key)
         throw error
       })
-    cached = { key, config }
+    cache.set(key, config)
   }
-  return cached.config
+  return config
 }

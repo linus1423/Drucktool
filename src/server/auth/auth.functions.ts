@@ -15,8 +15,12 @@ export const getCurrentUser = createServerFn({ method: 'GET' }).handler(() => ge
 
 /** Welche Anmeldewege die Login-Seite anbieten soll. */
 export const getAuthOptions = createServerFn({ method: 'GET' }).handler(() => {
-  const oidc = getOidcSettings()
-  return { oidc: oidc ? { displayName: oidc.displayName } : null }
+  const oidc = getOidcSettings('staff')
+  const customer = getOidcSettings('customer')
+  return {
+    oidc: oidc ? { displayName: oidc.displayName } : null,
+    customerOidc: customer ? { displayName: customer.displayName } : null,
+  }
 })
 
 /** Links auf Datenschutzerklärung und Impressum (PRIVACY_URL, IMPRINT_URL), für die Fußzeile. */

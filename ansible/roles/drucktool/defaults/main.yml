@@ -49,6 +49,11 @@ drucktool_oidc_role_claim: roles
 drucktool_oidc_admin_roles: []
 drucktool_oidc_staff_roles: []
 drucktool_oidc_enforce_for_staff: false
+drucktool_customer_oidc_issuer: ''
+drucktool_customer_oidc_client_id: ''
+drucktool_customer_oidc_client_secret: ''
+drucktool_customer_oidc_display_name: 'TUM-Kennung'
+drucktool_customer_oidc_trust_email: false
 
 # production oder staging (zeigt das Banner „Testsystem“). Wird in group_vars/production.yml bzw. staging.yml gesetzt.
 drucktool_environment: production

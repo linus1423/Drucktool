@@ -58,6 +58,14 @@ drucktool_oidc_staff_roles: []
 # true: Mitarbeiter und Admins melden sich nur noch über den Anbieter an
 drucktool_oidc_enforce_for_staff: false
 
+# Kunden-Anmeldung über den Federated TUM Keycloak (oder einen anderen OIDC-Anbieter). Leer = abgeschaltet.
+# Beim Anbieter als Redirect-URI eintragen: https://<drucktool_domain>/api/auth/kunden-sso/callback
+# Secret im Vault: drucktool_customer_oidc_client_secret
+drucktool_customer_oidc_issuer: ''
+drucktool_customer_oidc_client_id: ''
+drucktool_customer_oidc_display_name: 'TUM-Kennung'
+drucktool_customer_oidc_trust_email: false
+
 # Backups: täglich um 2:15 Uhr nach /var/backups/drucktool (Datenbank 14 Tage, Druckdateien als Spiegel), dazu vor
 # jedem Update. Optional: Ping an einen Überwachungsdienst wie https://healthchecks.io, der Alarm schlägt, wenn das
 # Backup ausbleibt oder fehlschlägt. Dasselbe für den monatlichen Restore-Test.

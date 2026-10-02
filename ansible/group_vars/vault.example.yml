@@ -13,6 +13,7 @@ drucktool_registry_password: ''
 drucktool_smtp_url: ''
 # Client-Secret für OpenID Connect (nur nötig, wenn drucktool_oidc_issuer gesetzt ist).
 drucktool_oidc_client_secret: ''
+drucktool_customer_oidc_client_secret: ''
 # Offsite-Backup mit restic (nur nötig, wenn drucktool_offsite_backup_enabled: true; mind. 16 Zeichen). Das Passwort
 # verschlüsselt die Backups; ohne es sind sie wertlos. Deshalb zusätzlich außerhalb des Servers aufbewahren.
 drucktool_restic_password: ''
