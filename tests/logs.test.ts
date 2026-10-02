@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { isUnexpectedError, logger, requestContext, serializeError } from '~/server/log.server'
 import { buildEnvelope, parseDsn, parseStack } from '~/server/error-reporting.server'
-import { isClientAbort } from '~/server/middleware'
+import { isClientAbort, loggedPath } from '~/server/middleware'
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -67,6 +67,13 @@ describe('isUnexpectedError', () => {
   it('lässt fachliche Meldungen durch', () => {
     expect(isUnexpectedError(new Error('E-Mail-Adresse oder Passwort ist falsch'))).toBe(false)
     expect(isUnexpectedError({ isRedirect: true })).toBe(false)
+  })
+})
+
+describe('loggedPath', () => {
+  it('maskiert Einladungstokens (Issue #132)', () => {
+    expect(loggedPath('/einladung/abcDEF123_-')).toBe('/einladung/…')
+    expect(loggedPath('/auftraege/123')).toBe('/auftraege/123')
   })
 })
 

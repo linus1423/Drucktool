@@ -164,6 +164,7 @@ describe.skipIf(!url)('Verwalter von Organisationen (Issue #12)', async () => {
 
     const detail = await getRequestDetail(chef, forOrg.id)
     expect(detail.canAct).toBe(false)
+    expect(detail.readOnlyAs).toBe('organisation_admin')
     expect(detail.canEdit).toBe(false)
     expect(detail.transitions).toEqual([])
     expect((await getRequestDetail(kollege, forOrg.id)).canAct).toBe(true)

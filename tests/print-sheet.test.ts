@@ -8,7 +8,9 @@ process.env.DATABASE_URL = url
 
 describe.skipIf(!url)('Druckbogen (Integration)', async () => {
   const { getDb, schema } = await import('~/server/db/client.server')
-  const { setPrintSheet, getRequestDetail } = await import('~/server/requests/requests.server')
+  const { setPrintSheet, getRequestDetail, proposeChange, answerChange } = await import('~/server/requests/requests.server')
+  const { getCatalog } = await import('~/server/catalog/catalog.server')
+  const { calculatePrice } = await import('~/lib/pricing')
   type Principal = import('~/server/requests/requests.server').Principal
 
   let customer: Principal
@@ -77,6 +79,31 @@ describe.skipIf(!url)('Druckbogen (Integration)', async () => {
     await expect(setPrintSheet(customer, { id, version: await version(), sheet: 'A3', coverSheet: null })).rejects.toThrow(
       'Keine Berechtigung',
     )
+  })
+
+  it('setzt den Bogen zurück, wenn ein angenommener Vorschlag das Papier ändert (Issue #131)', async () => {
+    await setPrintSheet(staff, { id, version: await version(), sheet: 'SRA3', coverSheet: null })
+    const catalog = await getCatalog({ onlyAvailable: true })
+    const detail = await getRequestDetail(staff, id)
+    const thick = catalog.papers.find((p) => p.name === 'Dickes Papier')!
+    const spec = { ...detail.order!.spec, paperId: thick.id }
+    const priced = calculatePrice(catalog, spec)
+    if (!priced.ok) throw new Error(priced.errors.join(' '))
+    const { version: v } = await proposeChange(staff, {
+      id,
+      version: await version(),
+      spec,
+      deliveryAddress: null,
+      priceOverrideCents: null,
+      expectedTotalCents: priced.price.totalCents,
+      reason: 'Dickeres Papier',
+    })
+    await answerChange(customer, { id, version: v, accept: true })
+    const after = await getRequestDetail(staff, id)
+    expect(after.order!.paper.id).toBe(thick.id)
+    expect(after.printSheet).toBeNull()
+    expect(after.events.at(-1)).toMatchObject({ type: 'print_sheet_changed', data: { reason: 'paper_changed' } })
+    expect((await getRequestDetail(customer, id)).events.some((e) => e.type === 'print_sheet_changed')).toBe(false)
   })
 
   it('setzt auf „wie berechnet“ zurück', async () => {

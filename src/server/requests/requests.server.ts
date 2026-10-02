@@ -369,6 +369,12 @@ export async function getRequestDetail(user: Principal, id: string) {
   const internalDueDate = isStaff ? r.internalDueDate : null
   // Verwalter einer Organisation sehen die Aufträge der Kollegen nur (Issue #12).
   const canAct = isStaff || r.createdById === user.id
+  // Warum der Benutzer nur lesen darf: als Verwalter der Organisation oder als Mitglied der SVK (Issue #133).
+  const readOnlyAs: 'organisation_admin' | 'svk_member' | null = canAct
+    ? null
+    : r.organisationId && (await managedOrganisationIds(db, user.id, r.organisationId)).length
+      ? 'organisation_admin'
+      : 'svk_member'
   return {
     ...r,
     // Kunden sehen nur Druck- und Lieferkosten, nicht den internen Rechenweg (Lastenheft Schritt 7).
@@ -421,6 +427,7 @@ export async function getRequestDetail(user: Principal, id: string) {
     canRecordAnswer: !!r.proposal && isStaff && r.createdById !== user.id,
     canEdit: canAct && canEditRequest(user, r.status),
     canAct,
+    readOnlyAs,
   }
 }
 
@@ -765,6 +772,9 @@ export async function answerChange(user: Principal, input: z.infer<typeof answer
     const p = current.proposal
     if (!p) throw new Error('Es gibt keinen offenen Änderungsvorschlag')
 
+    // Der gewählte Druckbogen gilt nur für das Papier, für das er ausgesucht wurde (Issue #131).
+    const resetSheet = input.accept && !!current.printSheet && current.order?.paper.id !== p.order.paper.id
+    const resetCoverSheet = input.accept && !!current.coverPrintSheet && current.order?.coverPaper?.id !== p.order.coverPaper?.id
     const values: Partial<typeof requests.$inferInsert> = input.accept
       ? {
           proposal: null,
@@ -775,9 +785,25 @@ export async function answerChange(user: Principal, input: z.infer<typeof answer
           deliveryAddress: p.deliveryAddress,
           status: p.returnStatus,
           statusChangedAt: new Date(),
+          ...(resetSheet ? { printSheet: null } : {}),
+          ...(resetCoverSheet ? { coverPrintSheet: null } : {}),
         }
       : { proposal: null }
     const updated = await updateWithVersion(tx, input.id, input.version, values)
+    if (resetSheet || resetCoverSheet) {
+      await tx.insert(requestEvents).values({
+        requestId: input.id,
+        // Keine Entscheidung des Kunden, sondern eine Folge des neuen Papiers; erscheint als „System“.
+        actorId: null,
+        type: 'print_sheet_changed',
+        internal: true,
+        data: {
+          sheet: updated.printSheet?.label ?? null,
+          coverSheet: updated.coverPrintSheet?.label ?? null,
+          reason: 'paper_changed',
+        },
+      })
+    }
     await tx.insert(requestEvents).values({
       requestId: input.id,
       actorId: user.id,

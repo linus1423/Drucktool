@@ -17,6 +17,14 @@ export function isClientAbort(request: Request, error: unknown) {
   return false
 }
 
+/** Pfade mit geheimen Tokens, die nicht im Log landen dürfen (Einladungslinks, Issue #132). */
+const SECRET_PATHS = [/^(\/einladung\/)[^/]+/]
+
+/** Pfad fürs Log: geheime Teile werden durch „…“ ersetzt. */
+export function loggedPath(pathname: string) {
+  return SECRET_PATHS.reduce((path, pattern) => path.replace(pattern, '$1…'), pathname)
+}
+
 /** Vergibt jeder Anfrage eine Request-ID und protokolliert Methode, Pfad, Status und Dauer. */
 export const requestLogMiddleware = createMiddleware().server(async ({ request, pathname, next }) => {
   const incoming = request.headers.get('x-request-id')
@@ -26,7 +34,12 @@ export const requestLogMiddleware = createMiddleware().server(async ({ request, 
     try {
       const result = await next()
       const status = result.response.status
-      const fields = { method: request.method, path: pathname, status, durationMs: Math.round(performance.now() - start) }
+      const fields = {
+        method: request.method,
+        path: loggedPath(pathname),
+        status,
+        durationMs: Math.round(performance.now() - start),
+      }
       // Healthchecks kommen alle 30 Sekunden und interessieren nur im Fehlerfall.
       if (status >= 500) logger.error('Anfrage fehlgeschlagen', fields)
       else if (pathname === '/api/health') logger.debug('Anfrage', fields)
@@ -38,7 +51,7 @@ export const requestLogMiddleware = createMiddleware().server(async ({ request, 
       }
       return result
     } catch (error) {
-      const fields = { method: request.method, path: pathname, durationMs: Math.round(performance.now() - start) }
+      const fields = { method: request.method, path: loggedPath(pathname), durationMs: Math.round(performance.now() - start) }
       // Schließt der Browser die Verbindung vorzeitig (Seite verlassen, Neu laden), ist das kein Fehler der App.
       if (isClientAbort(request, error)) logger.info('Verbindung vom Browser abgebrochen', fields)
       else logger.error('Unbehandelter Fehler', { ...fields, err: error })

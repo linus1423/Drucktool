@@ -1,6 +1,7 @@
 // Download der Importdatei für Lexware (Issue #53). Der Export markiert Aufträge als übergeben, daher POST statt Link.
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { formatRequestNumber } from '~/lib/format'
 import { pendingLexwareQuery } from '~/lib/queries'
 import { Alert, Button } from './ui'
 
@@ -21,7 +22,8 @@ async function download(ids?: string[]) {
   a.download = name
   a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
-  return Number(res.headers.get('x-exported-count') ?? 0)
+  const skipped = (res.headers.get('x-skipped-numbers') ?? '').split(',').filter(Boolean).map(Number)
+  return { count: Number(res.headers.get('x-exported-count') ?? 0), skipped }
 }
 
 export function LexwareExportButton({
@@ -38,11 +40,11 @@ export function LexwareExportButton({
   onDone?: () => void
 }) {
   const queryClient = useQueryClient()
-  const [done, setDone] = useState<number | null>(null)
+  const [done, setDone] = useState<{ count: number; skipped: number[] } | null>(null)
   const mutation = useMutation({
     mutationFn: () => download(ids),
-    onSuccess: async (count) => {
-      setDone(count)
+    onSuccess: async (result) => {
+      setDone(result)
       onDone?.()
       await queryClient.invalidateQueries({ queryKey: ['requests'] })
     },
@@ -55,7 +57,14 @@ export function LexwareExportButton({
       {mutation.error ? <Alert>{mutation.error.message}</Alert> : null}
       {done != null && !mutation.error ? (
         <Alert tone="success">
-          {done === 1 ? '1 Auftrag' : `${done} Aufträge`} exportiert. Die Datei in Lexware über die Shopschnittstelle importieren.
+          {done.count === 1 ? '1 Auftrag' : `${done.count} Aufträge`} exportiert. Die Datei in Lexware über die Shopschnittstelle
+          importieren.
+        </Alert>
+      ) : null}
+      {done && done.skipped.length > 0 && !mutation.error ? (
+        <Alert>
+          Nicht übergeben, weil Rechnungsadresse oder Preis fehlen: {done.skipped.map(formatRequestNumber).join(', ')}. Bitte von
+          Hand in Lexware erfassen.
         </Alert>
       ) : null}
     </div>
