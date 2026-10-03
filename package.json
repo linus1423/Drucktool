@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build && pnpm build:scripts",
-    "start": "node .output/server/index.mjs",
+    "start": "node --env-file-if-exists=.env .output/server/index.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint --type-aware",
     "format": "prettier --write .",
@@ -14,10 +14,10 @@
     "test:e2e": "playwright test",
     "test:coverage": "vitest run --coverage",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx scripts/migrate.ts",
-    "db:seed": "tsx scripts/seed.ts",
+    "db:migrate": "tsx --env-file-if-exists=.env scripts/migrate.ts",
+    "db:seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
     "build:scripts": "esbuild scripts/migrate.ts scripts/seed.ts scripts/mail-worker.ts --bundle --platform=node --format=esm --target=node22 --outdir=.output/scripts --out-extension:.js=.mjs --log-level=warning",
-    "mail:worker": "tsx scripts/mail-worker.ts"
+    "mail:worker": "tsx --env-file-if-exists=.env scripts/mail-worker.ts"
   },
   "dependencies": {
     "@tanstack/react-form": "^1.33.5",
@@ -62,7 +62,7 @@
     "vitest": "^5.0.3"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.9"
   },
   "packageManager": "pnpm@10.33.0"
 }

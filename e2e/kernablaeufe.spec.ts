@@ -101,9 +101,37 @@ test('Kunde nimmt die Änderung an', async ({ page }) => {
 })
 
 test('Verwaltungsseiten sind barrierefrei', async ({ page }) => {
+  // Zehn Seiten mit axe-Prüfung brauchen länger als die üblichen 30 Sekunden.
+  test.slow()
   await loginAsAdmin(page)
-  for (const path of ['/profil', '/admin/benutzer', '/admin/organisationen', '/admin/katalog']) {
+  for (const path of [
+    '/profil',
+    '/konto',
+    '/auftraege/board',
+    '/organisationsanfragen',
+    '/admin/freigaben',
+    '/admin/benutzer',
+    '/admin/organisationen',
+    '/admin/katalog',
+    '/admin/emails',
+    '/admin/protokoll',
+  ]) {
     await page.goto(path)
     await check(page, path)
   }
+})
+
+test('Navigation passt für den Superadmin auf Tablet und Desktop in eine Zeile', async ({ page }) => {
+  await loginAsAdmin(page)
+  for (const width of [1024, 1280]) {
+    await page.setViewportSize({ width, height: 800 })
+    const nav = page.getByRole('navigation', { name: 'Hauptnavigation' })
+    const height = await nav.evaluate((el) => el.getBoundingClientRect().height)
+    expect(height, `Höhe der Navigation bei ${width} px`).toBeLessThan(50)
+  }
+  await page.getByRole('button', { name: 'Verwaltung' }).click()
+  await check(page, 'Verwaltungsmenü')
+  await page.locator('#verwaltungsmenue').getByRole('link', { name: 'Benutzer' }).click()
+  await page.waitForURL('**/admin/benutzer')
+  await expect(page.locator('#verwaltungsmenue')).toHaveCount(0)
 })

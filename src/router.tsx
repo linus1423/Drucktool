@@ -3,6 +3,7 @@ import { createIsomorphicFn, getGlobalStartContext } from '@tanstack/react-start
 import { QueryClient } from '@tanstack/react-query'
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query'
 import { routeTree } from './routeTree.gen'
+import { ErrorPage } from './components/ErrorPage'
 
 // Nonce für die Content-Security-Policy, gesetzt von der Middleware in start.ts. Im Browser
 // liest der Router ihn selbst aus dem Meta-Tag "csp-nonce".
@@ -26,6 +27,7 @@ export function getRouter() {
     context: { queryClient },
     scrollRestoration: true,
     defaultPreload: 'intent',
+    defaultErrorComponent: ErrorPage,
     ...(nonce ? { ssr: { nonce } } : {}),
   })
   setupRouterSsrQueryIntegration({ router, queryClient })

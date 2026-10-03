@@ -164,9 +164,9 @@ function BoardPage() {
             >
               <h2 className="flex items-baseline justify-between px-1 pb-2 text-sm font-semibold text-slate-700">
                 <span>
-                  {col.title} {col.hint ? <span className="font-normal text-slate-500">({col.hint})</span> : null}
+                  {col.title} {col.hint ? <span className="font-normal text-slate-600">({col.hint})</span> : null}
                 </span>
-                <span className="text-slate-500">{isPending ? '…' : cards.length}</span>
+                <span className="text-slate-600">{isPending ? '…' : cards.length}</span>
               </h2>
               <ul className="space-y-2">
                 {cards.map((card) => (
@@ -221,7 +221,7 @@ function BoardCard({
     >
       <div className="flex items-start justify-between gap-2">
         <Link to="/auftraege/$requestId" params={{ requestId: card.id }} className="font-medium hover:underline">
-          <span className="mr-1 font-mono text-slate-400">{formatRequestNumber(card.number)}</span>
+          <span className="mr-1 font-mono text-slate-500">{formatRequestNumber(card.number)}</span>
           {card.title}
         </Link>
       </div>
