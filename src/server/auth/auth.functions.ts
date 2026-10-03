@@ -56,7 +56,8 @@ export const requestLoginLinkFn = createServerFn({ method: 'POST' })
   })
 
 export const redeemLoginLinkFn = createServerFn({ method: 'POST' })
-  .validator(z.object({ token: z.string().min(20).max(200) }))
+  // Keine Mindestlänge: ein gekürzter Link bekommt dieselbe Meldung wie ein unbekannter (Issue #151).
+  .validator(z.object({ token: z.string().max(500) }))
   .handler(async ({ data }) => {
     await assertRateLimit('login-link-redeem', 20, 10 * 60_000)
     const result = await redeemLoginLink(data.token).catch(async (error: unknown) => {

@@ -20,7 +20,8 @@ import {
 } from './org-admin.server'
 
 const organisationIdSchema = z.object({ organisationId: z.uuid() })
-const tokenSchema = z.object({ token: z.string().min(20).max(100) })
+// Keine Mindestlänge: gekürzte Links sollen die normale Meldung „ungültig“ bekommen, nicht den Validierungstext (Issue #151).
+const tokenSchema = z.object({ token: z.string().max(500) })
 
 export const listReadableOrganisationsFn = createServerFn({ method: 'GET' }).handler(async () =>
   listReadableOrganisations(await requireUser()),
