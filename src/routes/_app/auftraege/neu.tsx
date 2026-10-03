@@ -124,7 +124,10 @@ function normalize(catalog: OrderCatalog, d: Draft): Draft {
   const size = format
     ? formatSize(format, { customWidthMm: int(next.customWidth), customHeightMm: int(next.customHeight) })
     : null
-  if (!bindingChoices(catalog, format).some((c) => c.item.id === next.bindingId && c.allowed)) next.bindingId = ''
+  const bindings = bindingChoices(catalog, format).filter((c) => c.allowed && c.item.available)
+  if (!bindings.some((c) => c.item.id === next.bindingId)) next.bindingId = ''
+  // Gibt es zum Format nur eine Bindung (Plots, A6, A7, Visitenkarten: nur lose), ist sie gleich gewählt (Issue #146).
+  if (!next.bindingId && bindings.length === 1) next.bindingId = bindings[0]!.item.id
   const binding = catalog.bindings.find((b) => b.id === next.bindingId)
   if (next.duplex && !duplexChoice(format, binding).allowed) next.duplex = false
   if (!paperChoices(catalog, format, size, 'inner').some((c) => c.item.id === next.paperId && c.allowed)) next.paperId = ''
