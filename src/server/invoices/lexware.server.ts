@@ -207,14 +207,19 @@ export async function pendingLexwareCount() {
   return row?.count ?? 0
 }
 
-export const invoiceRecordSchema = z.object({
-  id: z.uuid(),
-  created: z.boolean(),
-  invoiceNumber: z.string().trim().max(50, 'Die Rechnungsnummer ist zu lang').default(''),
-})
+export const invoiceRecordSchema = z
+  .object({
+    id: z.uuid(),
+    created: z.boolean(),
+    invoiceNumber: z.string().trim().max(50, 'Die Rechnungsnummer ist zu lang').default(''),
+  })
+  .refine((v) => !v.created || v.invoiceNumber.length > 0, {
+    message: 'Bitte die Rechnungsnummer aus Lexware angeben',
+    path: ['invoiceNumber'],
+  })
 
 /**
- * Trägt ein, dass die Rechnung in Lexware angelegt ist (Issue #157), oder nimmt das zurück. Geht auch ohne Export,
+ * Trägt ein, dass die Rechnung in Lexware angelegt ist, mit deren Rechnungsnummer (Issue #157), oder nimmt das zurück. Geht auch ohne Export,
  * z. B. wenn der Auftrag von Hand erfasst wurde; danach zählt er nicht mehr als offen.
  */
 export async function recordInvoice(actorId: string, input: z.infer<typeof invoiceRecordSchema>) {
@@ -222,7 +227,8 @@ export async function recordInvoice(actorId: string, input: z.infer<typeof invoi
     const [current] = await tx.select({ status: requests.status }).from(requests).where(eq(requests.id, input.id)).for('update')
     if (!current) throw new Error('Auftrag nicht gefunden')
     if (current.status !== 'completed') throw new Error('Rechnungen gibt es nur für fertige Aufträge.')
-    const invoiceNumber = input.created ? input.invoiceNumber || null : null
+    if (input.created && !input.invoiceNumber) throw new Error('Bitte die Rechnungsnummer aus Lexware angeben')
+    const invoiceNumber = input.created ? input.invoiceNumber : null
     await tx
       .update(requests)
       .set(

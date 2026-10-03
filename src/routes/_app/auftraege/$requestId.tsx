@@ -1035,9 +1035,10 @@ function InvoiceCard({ request }: { request: Detail }) {
                 record.mutate(true)
               }}
             >
-              <Field label="Rechnungsnummer (optional)" htmlFor="invoice-number">
+              <Field label="Rechnungsnummer aus Lexware" htmlFor="invoice-number">
                 <Input
                   id="invoice-number"
+                  required
                   maxLength={50}
                   value={invoiceNumber}
                   onChange={(e) => setInvoiceNumber(e.target.value)}

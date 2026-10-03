@@ -277,7 +277,7 @@ export const requests = pgTable(
     // Übergabe an Lexware zur Rechnungsstellung (Issue #53); null heißt noch nicht übergeben.
     invoiceExportedAt: timestamp('invoice_exported_at', { withTimezone: true }),
     invoiceExportedById: uuid('invoice_exported_by_id').references(() => users.id, { onDelete: 'set null' }),
-    // Rechnung in Lexware angelegt (Issue #157), von Mitarbeitern eingetragen; die Nummer ist optional.
+    // Rechnung in Lexware angelegt (Issue #157), von Mitarbeitern mit der Rechnungsnummer aus Lexware eingetragen.
     invoiceCreatedAt: timestamp('invoice_created_at', { withTimezone: true }),
     invoiceCreatedById: uuid('invoice_created_by_id').references(() => users.id, { onDelete: 'set null' }),
     invoiceNumber: text('invoice_number'),

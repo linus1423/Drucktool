@@ -165,14 +165,16 @@ describe.skipIf(!url)('Übergabe an Lexware', async () => {
 
     await recordInvoice(staff.id, { id: ids[0]!, created: false, invoiceNumber: '' })
     expect(await getRequestDetail(staff, ids[0]!)).toMatchObject({ invoiceCreatedAt: null, invoiceNumber: null })
-    await expect(recordInvoice(staff.id, { id: ids[2]!, created: true, invoiceNumber: '' })).rejects.toThrow('fertige')
+    await expect(recordInvoice(staff.id, { id: ids[2]!, created: true, invoiceNumber: 'RE-1' })).rejects.toThrow('fertige')
+    // Die Rechnungsnummer aus Lexware ist Pflicht.
+    await expect(recordInvoice(staff.id, { id: ids[0]!, created: true, invoiceNumber: '' })).rejects.toThrow('Rechnungsnummer')
   })
 
   it('zählt von Hand angelegte Rechnungen nicht mehr als offen und exportiert sie nicht (Issue #157)', async () => {
     const manual = await placeOrder(customer, { title: 'Von Hand' })
     await getDb().update(schema.requests).set({ status: 'completed' }).where(eq(schema.requests.id, manual.id))
     const before = await pendingLexwareCount()
-    await recordInvoice(staff.id, { id: manual.id, created: true, invoiceNumber: '' })
+    await recordInvoice(staff.id, { id: manual.id, created: true, invoiceNumber: 'RE-2026-0043' })
     expect(await pendingLexwareCount()).toBe(before - 1)
     expect((await exportForLexware(staff.id)).numbers).not.toContain(manual.number)
   })
