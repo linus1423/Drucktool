@@ -156,7 +156,7 @@ async function customerDashboard(user: Principal) {
         hasProposal: sql<boolean>`${requests.proposal} is not null`,
       })
       .from(requests)
-      .where(and(mine, or(eq(requests.status, 'on_hold'), isNotNull(requests.proposal))))
+      .where(and(mine, or(inArray(requests.status, ['on_hold', 'offered']), isNotNull(requests.proposal))))
       .orderBy(asc(requests.statusChangedAt))
       .limit(50),
   ])

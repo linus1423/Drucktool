@@ -35,6 +35,7 @@ export const Route = createFileRoute('/_app/auftraege/board')({
 })
 
 const COLUMNS: { status: RequestStatus; title: string; hint?: string }[] = [
+  { status: 'offered', title: STATUS_LABELS.offered, hint: 'wartet auf den Kunden' },
   { status: 'submitted', title: STATUS_LABELS.submitted },
   { status: 'on_hold', title: STATUS_LABELS.on_hold },
   { status: 'confirmed', title: STATUS_LABELS.confirmed },
@@ -139,7 +140,7 @@ function BoardPage() {
           onSubmit={(note) => move.mutate({ ...pending, note })}
         />
       ) : null}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {COLUMNS.map((col) => {
           const cards = rows.filter((r) => r.status === col.status)
           const canDrop = !!dragging && dragging.status !== col.status && boardTargets(dragging).includes(col.status)

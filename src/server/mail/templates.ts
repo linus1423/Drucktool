@@ -53,6 +53,7 @@ export function requestCreatedMail(
 
 /** Was der Kunde beim jeweiligen Status erfährt (Lastenheft Abschnitt 7). */
 const STATUS_TEXT: Partial<Record<RequestStatus, string>> = {
+  offered: 'Die Druckerei hat Ihnen ein Angebot gemacht. Bitte nehmen Sie es im Drucktool an oder lehnen Sie es ab.',
   confirmed:
     'Die Druckerei hat Ihren Auftrag angenommen. Damit ist der Auftrag verbindlich; wir melden uns, sobald er fertig ist.',
   on_hold: 'Wir haben eine Rückfrage zu Ihrem Auftrag. Bitte antworten Sie im Drucktool.',
@@ -85,6 +86,10 @@ export function statusChangedMail(
 
 export function requestReceivedMail(r: RequestRef & OrderRef): MailContent {
   return compose('request_received', { ...requestVars(r), zusammenfassung: orderSummary(r) })
+}
+
+export function offerCreatedMail(r: RequestRef & OrderRef & { actorName: string; email: string }): MailContent {
+  return compose('offer_created', { ...requestVars(r), zusammenfassung: orderSummary(r), email: r.email })
 }
 
 export function changeProposedMail(

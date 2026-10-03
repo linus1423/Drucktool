@@ -100,6 +100,28 @@ export const MAIL_TEMPLATES = {
     ],
     sample: { ...REQUEST_SAMPLE, kunde: 'Erika Muster (Lehrstuhl für Drucktechnik)', zusammenfassung: SUMMARY_SAMPLE },
   },
+  offer_created: {
+    label: 'Angebot der Druckerei (an Kunden)',
+    description:
+      'Ein Mitarbeiter hat einen Auftrag für den Kunden angelegt, z. B. nach einem Besuch oder einer Mail (Issue #165).',
+    audience: 'Kunden',
+    variables: {
+      ...REQUEST_VARS,
+      zusammenfassung: 'Angebotene Optionen und Preis',
+      email: 'E-Mail-Adresse des Kunden, mit der er sich anmeldet',
+    },
+    subject: 'Ihr Angebot: {{auftrag}}',
+    blocks: [
+      { kind: 'p', text: '{{akteur}} hat für Sie das Angebot {{auftrag}} erstellt:' },
+      { kind: 'quote', text: '{{zusammenfassung}}' },
+      {
+        kind: 'p',
+        text: 'Bitte melden Sie sich mit {{email}} im Drucktool an, hinterlegen Sie Ihre Rechnungsadresse und nehmen Sie das Angebot an. Erst dann drucken wir. Sie können das Angebot dort auch ablehnen.',
+      },
+      { kind: 'button', label: 'Angebot ansehen', href: '{{link}}' },
+    ],
+    sample: { ...REQUEST_SAMPLE, akteur: 'Max Druck', zusammenfassung: SUMMARY_SAMPLE, email: 'erika@example.com' },
+  },
   status_changed: {
     label: 'Status geändert',
     description:

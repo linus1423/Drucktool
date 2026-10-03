@@ -3,6 +3,10 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { requireStaff, requireUser } from '../auth/guards.server'
 import {
+  acceptOffer,
+  acceptOfferSchema,
+  createOffer,
+  createOfferSchema,
   answerChange,
   answerChangeSchema,
   setDates,
@@ -59,6 +63,14 @@ export const getRequestFn = createServerFn({ method: 'GET' })
 export const createRequestFn = createServerFn({ method: 'POST' })
   .validator(createRequestSchema)
   .handler(async ({ data }) => createRequest(await requireUser(), data))
+
+export const createOfferFn = createServerFn({ method: 'POST' })
+  .validator(createOfferSchema)
+  .handler(async ({ data }) => createOffer(await requireStaff(), data))
+
+export const acceptOfferFn = createServerFn({ method: 'POST' })
+  .validator(acceptOfferSchema)
+  .handler(async ({ data }) => acceptOffer(await requireUser(), data))
 
 export const updateRequestFn = createServerFn({ method: 'POST' })
   .validator(updateRequestSchema)

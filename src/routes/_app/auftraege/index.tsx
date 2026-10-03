@@ -213,6 +213,15 @@ function RequestListPage() {
                 Als Board
               </Link>
             ) : null}
+            {staff ? (
+              <Link
+                to="/auftraege/neu"
+                search={{ angebot: true }}
+                className="inline-flex items-center rounded-md px-3 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100"
+              >
+                Angebot für Kunden
+              </Link>
+            ) : null}
             <Link
               to="/auftraege/neu"
               className="inline-flex items-center rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"

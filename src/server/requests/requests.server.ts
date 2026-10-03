@@ -20,7 +20,7 @@ import { calculatePrice } from '~/lib/pricing'
 import { buildSnapshot, type OrderSnapshot } from '~/lib/snapshot'
 import type { SheetSize } from '~/lib/catalog'
 import { applyPriceOverride, type ChangeProposal } from '~/lib/proposal'
-import { getCatalog, getDeadlineSettings } from '../catalog/catalog.server'
+import { getCatalog, getDeadlineSettings, getTexts } from '../catalog/catalog.server'
 import { attentionFor, berlinToday } from '~/lib/deadlines'
 import {
   MAX_ATTACHMENTS,
@@ -46,6 +46,7 @@ import {
   notifyAssigned,
   notifyChangeAnswered,
   notifyChangeProposed,
+  notifyOfferCreated,
   notifyComment,
   notifyPromisedDate,
   notifyRequestCreated,
@@ -294,6 +295,7 @@ export async function getRequestDetail(user: Principal, id: string) {
   const assignee = alias(users, 'assignee')
   const confirmer = alias(users, 'confirmer')
   const invoicer = alias(users, 'invoicer')
+  const offerer = alias(users, 'offerer')
 
   const [found] = await db
     .select({
@@ -304,6 +306,7 @@ export async function getRequestDetail(user: Principal, id: string) {
       assigneeName: assignee.name,
       confirmedByName: confirmer.name,
       invoiceCreatedByName: invoicer.name,
+      offeredByName: offerer.name,
     })
     .from(requests)
     .leftJoin(organisations, eq(organisations.id, requests.organisationId))
@@ -311,6 +314,7 @@ export async function getRequestDetail(user: Principal, id: string) {
     .leftJoin(assignee, eq(assignee.id, requests.assigneeId))
     .leftJoin(confirmer, eq(confirmer.id, requests.confirmedById))
     .leftJoin(invoicer, eq(invoicer.id, requests.invoiceCreatedById))
+    .leftJoin(offerer, eq(offerer.id, requests.offeredById))
     .where(and(eq(requests.id, id), readVisibilityFilter(user)))
     .limit(1)
   if (!found) notFound()
@@ -413,6 +417,7 @@ export async function getRequestDetail(user: Principal, id: string) {
     reorderOf: reorderOf ?? null,
     attention: attentionFor({ ...r, internalDueDate }, deadlines),
     confirmedByName: found.confirmedByName,
+    offeredByName: found.offeredByName,
     comments: comments.map(({ mentionedIds, ...c }) => ({
       ...c,
       attachments: attachments.get(c.id) ?? [],
@@ -430,6 +435,8 @@ export async function getRequestDetail(user: Principal, id: string) {
       ? allowedTransitions(r.status, actorOf(user)).filter((t) => !r.proposal || t === 'cancelled' || t === 'rejected')
       : [],
     canAnswerProposal: !!r.proposal && r.createdById === user.id,
+    // Ein Angebot der Druckerei nimmt nur der Kunde selbst an (Issue #165).
+    canAcceptOffer: r.status === 'offered' && r.createdById === user.id,
     // Antwortet der Kunde außerhalb des Tools, tragen Mitarbeiter sie ein (Issue #113).
     canRecordAnswer: !!r.proposal && isStaff && r.createdById !== user.id,
     canEdit: canAct && canEditRequest(user, r.status),
@@ -467,6 +474,38 @@ export function termsVersion(terms: string) {
   return createHash('sha256').update(terms).digest('hex').slice(0, 12)
 }
 
+type NewOrderInput = Pick<z.infer<typeof createRequestSchema>, 'spec' | 'mainFileId' | 'coverFileId' | 'deliveryAddress'>
+
+/** Prüfungen, die für neue Aufträge und Angebote gleich sind. */
+function checkNewOrder(input: NewOrderInput) {
+  const { spec } = input
+  if (spec.delivery === 'house_post' && !input.deliveryAddress) {
+    throw new Error('Bitte die Lieferadresse für die Hauspost angeben.')
+  }
+  // Die Deckblatt-Datei ist freiwillig (Issue #85): ohne sie kommt das Deckblatt aus der Druckdatei.
+  if (input.coverFileId && !spec.coverPaperId) throw new Error('Ein Deckblatt ist nicht ausgewählt.')
+  if (spec.coverPaperId && !!spec.coverFromMainFile === !!input.coverFileId) {
+    throw new Error(
+      input.coverFileId
+        ? 'Mit eigener Deckblatt-Datei wird das Deckblatt nicht aus der Druckdatei gedruckt.'
+        : 'Bitte die Datei für das Deckblatt hochladen oder das Deckblatt aus der Druckdatei wählen.',
+    )
+  }
+}
+
+/** Ordnet die hochgeladenen Dateien dem Auftrag zu und gleicht die Seitenzahl ab. */
+async function claimOrderFiles(tx: Tx, user: Principal, requestId: string, input: NewOrderInput) {
+  const { spec } = input
+  const files = await claimFiles(tx, user, requestId, { main: input.mainFileId, cover: input.coverFileId })
+  // Lesbare PDFs geben die Seitenzahl vor; nur bei unlesbaren Dateien zählt die Angabe des Kunden.
+  if (files.main.pageCount != null && files.main.pageCount !== spec.pages) {
+    throw new Error(`Die Seitenzahl passt nicht zur Datei (${files.main.pageCount} Seiten).`)
+  }
+  if (files.cover?.pageCount != null && files.cover.pageCount !== spec.coverPages) {
+    throw new Error(`Die Seitenzahl passt nicht zur Deckblatt-Datei (${files.cover.pageCount} Seiten).`)
+  }
+}
+
 /** Verbindliches Absenden aus dem Wizard (Lastenheft Schritt 8). */
 export async function createRequest(user: Principal, input: z.infer<typeof createRequestSchema>) {
   return getDb().transaction(async (tx) => {
@@ -491,18 +530,7 @@ export async function createRequest(user: Principal, input: z.infer<typeof creat
     }
 
     const { spec } = input
-    if (spec.delivery === 'house_post' && !input.deliveryAddress) {
-      throw new Error('Bitte die Lieferadresse für die Hauspost angeben.')
-    }
-    // Die Deckblatt-Datei ist freiwillig (Issue #85): ohne sie kommt das Deckblatt aus der Druckdatei.
-    if (input.coverFileId && !spec.coverPaperId) throw new Error('Ein Deckblatt ist nicht ausgewählt.')
-    if (spec.coverPaperId && !!spec.coverFromMainFile === !!input.coverFileId) {
-      throw new Error(
-        input.coverFileId
-          ? 'Mit eigener Deckblatt-Datei wird das Deckblatt nicht aus der Druckdatei gedruckt.'
-          : 'Bitte die Datei für das Deckblatt hochladen oder das Deckblatt aus der Druckdatei wählen.',
-      )
-    }
+    checkNewOrder(input)
 
     let reorderOf: { id: string; number: number } | null = null
     if (input.reorderOfId) {
@@ -546,14 +574,7 @@ export async function createRequest(user: Principal, input: z.infer<typeof creat
       .returning({ id: requests.id, number: requests.number })
     if (script) await linkOrderToScript(tx, script.id, created!.id)
 
-    const files = await claimFiles(tx, user, created!.id, { main: input.mainFileId, cover: input.coverFileId })
-    // Lesbare PDFs geben die Seitenzahl vor; nur bei unlesbaren Dateien zählt die Angabe des Kunden.
-    if (files.main.pageCount != null && files.main.pageCount !== spec.pages) {
-      throw new Error(`Die Seitenzahl passt nicht zur Datei (${files.main.pageCount} Seiten).`)
-    }
-    if (files.cover?.pageCount != null && files.cover.pageCount !== spec.coverPages) {
-      throw new Error(`Die Seitenzahl passt nicht zur Deckblatt-Datei (${files.cover.pageCount} Seiten).`)
-    }
+    await claimOrderFiles(tx, user, created!.id, input)
 
     await tx.insert(requestEvents).values({
       requestId: created!.id,
@@ -564,6 +585,151 @@ export async function createRequest(user: Principal, input: z.infer<typeof creat
     })
     await notifyRequestCreated(tx, user, created!.id)
     return created!
+  })
+}
+
+export const createOfferSchema = z
+  .object({
+    customer: z.object({
+      email: z.email('Bitte eine gültige E-Mail-Adresse angeben').trim().toLowerCase().max(320),
+      firstName: z.string().trim().max(200, 'Der Vorname ist zu lang'),
+      lastName: z.string().trim().min(1, 'Bitte den Nachnamen des Kunden angeben').max(200, 'Der Nachname ist zu lang'),
+    }),
+    title: createRequestSchema.shape.title,
+    notes: createRequestSchema.shape.notes,
+    spec: orderSpecSchema,
+    mainFileId: createRequestSchema.shape.mainFileId,
+    coverFileId: z.uuid().nullable(),
+    deliveryAddress: deliveryAddressSchema.nullable(),
+    /** Der berechnete Preis, den der Mitarbeiter gesehen hat. */
+    expectedTotalCents: z.number().int().min(0),
+    /** Manuell gesetzter Gesamtpreis; null übernimmt den berechneten Preis. */
+    priceOverrideCents: z.number().int().min(0).max(100_000_000).nullable(),
+    priceReason: z.string().trim().max(5000),
+  })
+  .refine((o) => o.priceOverrideCents == null || o.priceReason.length > 0, {
+    message: 'Bitte den abweichenden Preis für den Kunden begründen',
+    path: ['priceReason'],
+  })
+
+/**
+ * Ein Mitarbeiter legt den Auftrag für einen Kunden an, etwa nach einem Besuch in der Druckerei oder einer Mail
+ * (Issue #165). Gibt es zur E-Mail-Adresse noch kein Konto, entsteht ein Kundenkonto mit dem angegebenen Namen;
+ * angemeldet wird sich wie sonst per Link. Der Auftrag steht auf „Angebot“, bis der Kunde Rechnungsadresse und
+ * Auftragsbedingungen bestätigt (acceptOffer). Der Preis ist ab hier eingefroren wie beim Absenden.
+ */
+export async function createOffer(user: Principal, input: z.infer<typeof createOfferSchema>) {
+  if (!isStaffRole(user.role)) throw new Error('Keine Berechtigung')
+  return getDb().transaction(async (tx) => {
+    const { customer: c } = input
+    // Wie bei der Anmeldung per Link immer klein geschrieben, damit der Kunde sein Konto wiederfindet.
+    const email = c.email.trim().toLowerCase()
+    const [existing] = await tx
+      .select({ id: users.id, role: users.role, status: users.status, firstName: users.firstName, lastName: users.lastName })
+      .from(users)
+      .where(sql`lower(${users.email}) = ${email}`)
+      .for('update')
+    let customerId: string
+    if (existing) {
+      if (existing.role !== 'customer') {
+        throw new Error('Diese Adresse gehört einem Mitarbeiter. Angebote gehen nur an Kunden.')
+      }
+      if (existing.status === 'disabled' || existing.status === 'rejected') {
+        throw new Error('Das Konto zu dieser Adresse ist gesperrt.')
+      }
+      // Einen schon gepflegten Namen überschreibt die Druckerei nicht; leere Namen füllt sie aus.
+      if (!existing.firstName && !existing.lastName) {
+        await tx
+          .update(users)
+          .set({ firstName: c.firstName, lastName: c.lastName, updatedAt: new Date() })
+          .where(eq(users.id, existing.id))
+      }
+      customerId = existing.id
+    } else {
+      const [created] = await tx
+        .insert(users)
+        .values({ email, firstName: c.firstName, lastName: c.lastName, role: 'customer', status: 'active' })
+        .returning({ id: users.id })
+      customerId = created!.id
+    }
+
+    checkNewOrder(input)
+    const { spec } = input
+    const catalog = await getCatalog({ onlyAvailable: true }, tx)
+    const priced = calculatePrice(catalog, spec)
+    if (!priced.ok) throw new Error(priced.errors.join(' '))
+    if (priced.price.totalCents !== input.expectedTotalCents) throw new Error(PRICE_CHANGED_MESSAGE)
+    const price = applyPriceOverride(priced.price, input.priceOverrideCents, input.priceReason)
+
+    const [created] = await tx
+      .insert(requests)
+      .values({
+        createdById: customerId,
+        offeredById: user.id,
+        // Bis zur Annahme ist niemand sonst zuständig als der Mitarbeiter, der das Angebot gemacht hat.
+        assigneeId: user.id,
+        title: input.title,
+        description: input.notes,
+        quantity: spec.copies,
+        order: buildSnapshot(spec, price, priced.order, catalog.pricing),
+        totalCents: price.totalCents,
+        deliveryMethod: spec.delivery,
+        deliveryAddress: spec.delivery === 'house_post' ? input.deliveryAddress : null,
+        status: 'offered',
+      })
+      .returning({ id: requests.id, number: requests.number })
+    await claimOrderFiles(tx, user, created!.id, input)
+    await tx.insert(requestEvents).values({
+      requestId: created!.id,
+      actorId: user.id,
+      type: 'offer_created',
+      toStatus: 'offered',
+      data: { totalCents: price.totalCents, newCustomer: !existing },
+    })
+    await notifyOfferCreated(tx, user, created!.id)
+    return { ...created!, newCustomer: !existing }
+  })
+}
+
+export const acceptOfferSchema = z.object({
+  id: z.uuid(),
+  version: z.number().int().positive(),
+  acceptTerms: z.literal(true, 'Bitte stimmen Sie den Auftragsbedingungen zu.'),
+})
+
+/**
+ * Der Kunde nimmt das Angebot der Druckerei an (Issue #165). Wie beim Absenden aus dem Wizard braucht es die
+ * Rechnungsadresse aus dem Profil und die Zustimmung zu den Auftragsbedingungen. Weil die Druckerei das Angebot
+ * selbst gemacht hat, ist der Auftrag damit gleich bestätigt.
+ */
+export async function acceptOffer(user: Principal, input: z.infer<typeof acceptOfferSchema>) {
+  return getDb().transaction(async (tx) => {
+    const current = await loadForUpdate(tx, user, input.id)
+    if (current.createdById !== user.id) throw new Error('Nur der Kunde kann das Angebot annehmen')
+    if (current.version !== input.version) throw new Error(CONFLICT_MESSAGE)
+    if (current.status !== 'offered') throw new Error('Dieser Auftrag ist kein offenes Angebot mehr')
+    const [me] = await tx.select({ billingAddress: users.billingAddress }).from(users).where(eq(users.id, user.id))
+    if (!me?.billingAddress) throw new Error('Bitte hinterlegen Sie zuerst eine Rechnungsadresse in Ihrem Profil.')
+    const terms = (await getTexts(tx)).terms
+    const now = new Date()
+    const updated = await updateWithVersion(tx, input.id, input.version, {
+      status: 'confirmed',
+      statusChangedAt: now,
+      billingAddress: me.billingAddress,
+      termsAcceptedAt: now,
+      termsVersion: termsVersion(terms),
+      confirmedById: current.offeredById,
+      confirmedAt: now,
+    })
+    await tx.insert(requestEvents).values({
+      requestId: input.id,
+      actorId: user.id,
+      type: 'offer_accepted',
+      fromStatus: 'offered',
+      toStatus: 'confirmed',
+    })
+    await notifyStatusChanged(tx, user, { requestId: input.id, from: 'offered', to: 'confirmed' })
+    return { version: updated.version, status: updated.status }
   })
 }
 
@@ -707,6 +873,8 @@ export async function proposeChange(user: Principal, input: z.infer<typeof propo
     if (TERMINAL_STATUSES.has(current.status))
       throw new Error('Der Auftrag ist abgeschlossen und kann nicht mehr geändert werden')
     if (!current.order) throw new Error('Aufträge aus der Zeit vor dem Bestell-Wizard können nicht so geändert werden')
+    // Ein Angebot ist noch nicht angenommen; statt es zu ändern, zieht die Druckerei es zurück und macht ein neues.
+    if (current.status === 'offered') throw new Error('Ein offenes Angebot kann nicht geändert werden')
 
     const { spec } = input
     if (spec.delivery === 'house_post' && !input.deliveryAddress)
