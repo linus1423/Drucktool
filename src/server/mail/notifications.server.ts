@@ -307,12 +307,44 @@ export async function notifyRegistrationDecision(tx: Tx, user: { name: string; e
 }
 
 /** Neue Organisationsanfrage eines Kunden: an alle Mitarbeiter, die Benachrichtigungen wollen. */
-export async function notifyOrganisationRequested(tx: Tx, actor: Actor, input: { name: string; details: string }) {
+export async function notifyOrganisationRequested(
+  tx: Tx,
+  actor: Actor,
+  input: {
+    name: string
+    email: string | null
+    phone: string | null
+    street: string | null
+    zip: string | null
+    city: string | null
+    country: string
+    vatId: string | null
+    costCenter: string | null
+    details: string
+  },
+) {
   const [customer] = await tx.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, actor.id))
+  // Die Stammdaten stehen zusammen mit dem Freitext im Platzhalter {{angaben}}, damit angepasste Vorlagen weiter passen.
+  const place = [input.zip, input.city].filter(Boolean).join(' ')
+  const details = [
+    ['Adresse', [input.street, place, input.country !== 'DE' ? input.country : null].filter(Boolean).join(', ')],
+    ['E-Mail', input.email],
+    ['Telefon', input.phone],
+    ['USt-IdNr.', input.vatId],
+    ['Kostenstelle', input.costCenter],
+  ]
+    .filter(([, value]) => value)
+    .map(([label, value]) => `${label}: ${value}`)
+  if (input.details) details.push(input.details)
   await enqueueMail(
     tx,
     await staffRecipients(tx, null, actor.id),
-    organisationRequestedMail({ ...input, customerName: customer?.name ?? 'Ein Kunde', customerEmail: customer?.email ?? '' }),
+    organisationRequestedMail({
+      name: input.name,
+      details: details.join('\n'),
+      customerName: customer?.name ?? 'Ein Kunde',
+      customerEmail: customer?.email ?? '',
+    }),
   )
 }
 

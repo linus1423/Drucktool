@@ -125,6 +125,57 @@ describe.skipIf(!url)('Organisationen und Organisationsanfragen (Issue #68)', ()
     expect(await orgs.isActiveMember(getDb(), customer.id, organisationId!)).toBe(true)
   })
 
+  it('fragt alle Stammdaten ab und schlägt die naheliegendste Organisation vor (Issue #176)', async () => {
+    const [existing] = await getDb()
+      .insert(schema.organisations)
+      .values({ name: `Lehrstuhl für Drucktechnik ${stamp}`, costCenter: `KS-${stamp}`, status: 'active' })
+      .returning()
+    const { id } = await orgs.requestOrganisation(customer, {
+      name: `Lehrstuhl fuer Drucktechnik ${stamp}`,
+      email: 'sekretariat@druck.test',
+      phone: '089 123',
+      street: 'Boltzmannstraße 15',
+      zip: '85748',
+      city: 'Garching',
+      country: 'de',
+      vatId: '',
+      costCenter: `KS-${stamp}`,
+      details: 'Ansprechpartnerin Frau Muster',
+    })
+    const [stored] = await getDb().select().from(schema.organisationRequests).where(eq(schema.organisationRequests.id, id))
+    expect(stored).toMatchObject({ street: 'Boltzmannstraße 15', zip: '85748', country: 'DE', vatId: null })
+    const mail = (await mailsTo(email('staff'))).find((m) => m.subject.includes('Lehrstuhl fuer Drucktechnik'))
+    expect(mail?.text).toContain('Boltzmannstraße 15, 85748 Garching')
+    expect(mail?.text).toContain(`Kostenstelle: KS-${stamp}`)
+
+    const open = (await orgs.listOpenOrganisationRequests()).find((r) => r.id === id)
+    expect(open).toMatchObject({ city: 'Garching', costCenter: `KS-${stamp}` })
+    expect(open?.suggestions[0]).toMatchObject({ id: existing!.id, score: 1 })
+
+    // Beim Anlegen werden die korrigierten Stammdaten übernommen.
+    const { organisationId } = await orgs.resolveOrganisationRequest(staff, {
+      id,
+      action: 'create',
+      name: `Lehrstuhl für Drucktechnik Garching ${stamp}`,
+      email: 'sekretariat@druck.test',
+      phone: '089 123',
+      street: 'Boltzmannstraße 15',
+      zip: '85748',
+      city: 'Garching',
+      country: 'DE',
+      vatId: '',
+      costCenter: `KS-${stamp}`,
+    })
+    const [created] = await getDb().select().from(schema.organisations).where(eq(schema.organisations.id, organisationId!))
+    expect(created).toMatchObject({
+      city: 'Garching',
+      zip: '85748',
+      email: 'sekretariat@druck.test',
+      vatId: null,
+      status: 'active',
+    })
+  })
+
   it('lehnt Anfragen mit Begründung ab', async () => {
     const before = await membershipsOf(customer.id)
     const { id } = await orgs.requestOrganisation(customer, { name: 'Unbekannt', details: '' })

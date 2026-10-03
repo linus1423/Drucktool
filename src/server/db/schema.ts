@@ -142,6 +142,16 @@ export const organisationRequests = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
+    // Stammdaten wie bei organisations, damit aus der Anfrage direkt eine Organisation entstehen kann (Issue #176).
+    email: text('email'),
+    phone: text('phone'),
+    street: text('street'),
+    zip: text('zip'),
+    city: text('city'),
+    country: text('country').notNull().default('DE'),
+    vatId: text('vat_id'),
+    costCenter: text('cost_center'),
+    // Freitext für alles, was in kein Feld passt.
     details: text('details').notNull().default(''),
     status: organisationRequestStatus('status').notNull().default('open'),
     // Die Organisation, der der Kunde am Ende zugeordnet wurde.
