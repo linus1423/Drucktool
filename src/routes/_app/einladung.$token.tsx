@@ -34,11 +34,6 @@ function InvitePage() {
             <Alert>{invite.message}</Alert>
           ) : invite.alreadyMember ? (
             <Alert tone="info">Sie gehören „{invite.organisationName}“ bereits an.</Alert>
-          ) : !invite.canJoin ? (
-            <Alert tone="info">
-              Mitarbeiter der Druckerei können keiner Kunden-Organisation beitreten. Bitte öffnen Sie den Link mit dem Konto der
-              eingeladenen Person.
-            </Alert>
           ) : (
             <>
               <p>

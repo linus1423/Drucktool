@@ -115,11 +115,11 @@ describe.skipIf(!url)('Skripte der SVK (Issue #59)', async () => {
     await expect(scriptsModule.copyScript(staff, { id, semester: 'SS 2027' })).rejects.toThrow('Keine Berechtigung')
 
     const forHelfer = await scriptsModule.listScripts(helfer, {})
-    expect(forHelfer).toMatchObject({ canManage: true, canOrder: false, showOrganisation: true })
+    expect(forHelfer).toMatchObject({ canManage: true, showOrganisation: true })
     expect(forHelfer.organisations.map((o) => o.id)).toContain(svk)
     expect(forHelfer.organisations.map((o) => o.id)).not.toContain(andere)
-    expect(forHelfer.rows.find((r) => r.id === id)).toMatchObject({ title: `Helfer ${stamp}`, stock: 5 })
-    expect(await scriptsModule.listScripts(admin, {})).toMatchObject({ canManage: true, canOrder: false })
+    expect(forHelfer.rows.find((r) => r.id === id)).toMatchObject({ title: `Helfer ${stamp}`, stock: 5, canOrder: false })
+    expect(await scriptsModule.listScripts(admin, {})).toMatchObject({ canManage: true })
     expect(await scriptsModule.listScripts(staff, {})).toMatchObject({ canManage: false, organisations: [] })
     await expect(scriptsModule.scriptForOrder(getDb(), helfer, id)).rejects.toThrow('Keine Berechtigung')
 
@@ -127,6 +127,19 @@ describe.skipIf(!url)('Skripte der SVK (Issue #59)', async () => {
       .update(schema.scripts)
       .set({ archived: true })
       .where(inArray(schema.scripts.id, [id, copy.id]))
+  })
+
+  it('behandelt Mitarbeiter, die Mitglied der SVK sind, wie Mitglieder (Issue #164)', async () => {
+    const mitglied = await user('mitglied', 'staff')
+    await getDb().insert(schema.organisationMembers).values({ organisationId: svk, userId: mitglied.id })
+    const { id } = await scriptsModule.createScript(mitglied, { ...base, title: `Mitglied ${stamp}`, organisationId: svk })
+    await expect(scriptsModule.createScript(mitglied, { ...base, organisationId: andere })).rejects.toThrow('Keine Berechtigung')
+    const list = await scriptsModule.listScripts(mitglied, {})
+    expect(list).toMatchObject({ canManage: true, showOrganisation: true })
+    expect(list.organisations.map((o) => o.id)).toEqual([svk])
+    expect(list.rows.find((r) => r.id === id)).toMatchObject({ canManage: true, canOrder: true })
+    expect((await scriptsModule.scriptForOrder(getDb(), mitglied, id)).id).toBe(id)
+    await getDb().update(schema.scripts).set({ archived: true }).where(eq(schema.scripts.id, id))
   })
 
   it('zeigt SVK-Mitgliedern die SVK als mitlesbare Organisation in der Auftragsliste (Issue #138)', async () => {

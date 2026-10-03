@@ -363,7 +363,7 @@ const userFields = {
   ...personNameFields,
   email: emailSchema,
   role: z.enum(USER_ROLES),
-  // Nur für Kunden; keine, eine oder mehrere Organisationen.
+  // Keine, eine oder mehrere Organisationen, für jede Rolle (Issue #164).
   organisationIds: z.array(z.uuid()).max(50),
   // Nur für Mitarbeiter; Admins verwalten Skripte immer (Issue #158).
   canManageScripts: z.boolean().optional(),
@@ -374,7 +374,7 @@ export const createUserSchema = z.object({ ...userFields, password: z.union([z.l
 
 export async function createUser(actor: Principal, input: z.infer<typeof createUserSchema>) {
   assertMayManageRole(actor, input.role)
-  const organisationIds = input.role === 'customer' ? [...new Set(input.organisationIds)].sort() : []
+  const organisationIds = [...new Set(input.organisationIds)].sort()
   const passwordHash = input.password ? await hashPassword(input.password) : null
   return getDb().transaction(async (tx) => {
     const [taken] = await tx
@@ -438,7 +438,7 @@ export async function updateUser(actor: Principal, input: z.infer<typeof updateU
         .where(and(eq(users.role, 'superadmin'), eq(users.status, 'active'), ne(users.id, current.id)))
       if ((others?.n ?? 0) === 0) throw new Error('Der letzte aktive Superadmin kann nicht entfernt werden')
     }
-    const organisationIds = input.role === 'customer' ? [...new Set(input.organisationIds)].sort() : []
+    const organisationIds = [...new Set(input.organisationIds)].sort()
     const previousOrganisationIds = await memberOrganisationIds(tx, current.id)
 
     if (input.email !== current.email.toLowerCase()) {

@@ -16,7 +16,7 @@ export type SessionUser = {
   name: string
   role: UserRole
   status: UserStatus
-  /** Aktive Organisationen des Kunden, für die er bestellen kann; leer, wenn er keiner angehört. isAdmin: er verwaltet sie. */
+  /** Aktive Organisationen des Benutzers, für die er bestellen kann; leer, wenn er keiner angehört. isAdmin: er verwaltet sie. */
   organisations: { id: string; name: string; isSvk: boolean; isAdmin: boolean }[]
 }
 
@@ -101,15 +101,13 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   }
 
   const { sessionExpiresAt: _, ...user } = row
-  const organisations =
-    user.role === 'customer'
-      ? (await listMemberships(db, user.id, { onlyActive: true })).map(({ id, name, isSvk, isAdmin }) => ({
-          id,
-          name,
-          isSvk,
-          isAdmin,
-        }))
-      : []
+  // Auch Mitarbeiter können Mitglied oder Verwalter einer Organisation sein (Issue #164).
+  const organisations = (await listMemberships(db, user.id, { onlyActive: true })).map(({ id, name, isSvk, isAdmin }) => ({
+    id,
+    name,
+    isSvk,
+    isAdmin,
+  }))
   return { ...user, organisations }
 }
 

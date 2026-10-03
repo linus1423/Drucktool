@@ -79,7 +79,7 @@ describe.skipIf(!url)('Verwalter von Organisationen (Issue #12)', async () => {
     await expect(orgAdmin.getManagedOrganisation(kollege, lehrstuhl)).rejects.toThrow('Keine Berechtigung')
     await expect(orgAdmin.getManagedOrganisation(fremd, lehrstuhl)).rejects.toThrow('Keine Berechtigung')
     await expect(orgAdmin.getManagedOrganisation(chef, anderer)).rejects.toThrow('Keine Berechtigung')
-    // Mitarbeiter verwalten über die Admin-Seiten, nicht hier.
+    // Mitarbeiter ohne Mitgliedschaft verwalten über die Admin-Seiten, nicht hier.
     await expect(orgAdmin.getManagedOrganisation(staff, lehrstuhl)).rejects.toThrow('Keine Berechtigung')
     await expect(orgAdmin.createInvite(fremd, lehrstuhl)).rejects.toThrow('Keine Berechtigung')
     await expect(orgAdmin.removeMember(fremd, { organisationId: lehrstuhl, userId: kollege.id })).rejects.toThrow(
@@ -116,7 +116,6 @@ describe.skipIf(!url)('Verwalter von Organisationen (Issue #12)', async () => {
     expect(stored.some((i) => i.tokenHash === createHash('sha256').update(token).digest('hex'))).toBe(true)
 
     expect(await orgAdmin.describeInvite(neu, token)).toMatchObject({ valid: true, organisationId: lehrstuhl })
-    await expect(orgAdmin.acceptInvite(staff, token)).rejects.toThrow('Mitarbeiter')
     await orgAdmin.acceptInvite(neu, token)
     expect(await isMember(lehrstuhl, neu.id)).toMatchObject({ isAdmin: false })
     // Ein zweites Mal geht nicht.
@@ -258,5 +257,21 @@ describe.skipIf(!url)('Verwalter von Organisationen (Issue #12)', async () => {
     await member(extra[0]!.id, kollege.id)
     await setOrganisationAdmin(admin, { organisationId: extra[0]!.id, userId: kollege.id, isAdmin: true })
     expect(await isMember(extra[0]!.id, kollege.id)).toMatchObject({ isAdmin: true })
+  })
+
+  it('lässt Mitarbeiter Mitglied und Verwalter einer Organisation sein (Issue #164)', async () => {
+    const [eigene] = await getDb()
+      .insert(schema.organisations)
+      .values({ name: `Doppelrolle ${stamp}`, status: 'active' })
+      .returning()
+    await member(eigene!.id, chef.id, true)
+    const { token } = await orgAdmin.createInvite(chef, eigene!.id)
+    await orgAdmin.acceptInvite(staff, token)
+    expect(await isMember(eigene!.id, staff.id)).toMatchObject({ isAdmin: false })
+
+    await orgAdmin.setMemberAdmin(chef, { organisationId: eigene!.id, userId: staff.id, isAdmin: true })
+    const view = await orgAdmin.getManagedOrganisation(staff, eigene!.id)
+    expect(view.members.map((m) => m.id)).toContain(staff.id)
+    expect(await orgAdmin.listManagedOrganisations(staff)).toEqual([{ id: eigene!.id, name: `Doppelrolle ${stamp}` }])
   })
 })

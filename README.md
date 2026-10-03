@@ -380,6 +380,9 @@ pnpm build && pnpm start
 SUPERADMIN_EMAIL=admin@example.com SUPERADMIN_PASSWORD='mindestens-12-zeichen' docker compose up --build
 ```
 
+Das baut das Image aus dem Quellcode, zum Ausprobieren. Für den Betrieb auf einem Server siehe
+[Betrieb mit Docker Compose oder Podman](#betrieb-mit-docker-compose-oder-podman).
+
 Der Container spielt beim Start die Migrationen ein und legt den Superadmin an, falls noch keiner existiert
 (`RUN_MIGRATIONS=false` schaltet das ab). Healthcheck: `GET /api/health`. Der Dienst `worker` nutzt dasselbe Image
 und verschickt die E-Mails. Druckdateien liegen im Volume `uploads`. Der Dienst `clamav` prüft die Uploads auf
@@ -388,6 +391,131 @@ Schadsoftware und startet automatisch mit (siehe Virenprüfung unter Sicherheit)
 App und Worker übernehmen alle Einstellungen aus der `.env` (z. B. `OIDC_*` und `CUSTOMER_OIDC_*` für die Anmeldung,
 siehe `.env.example`). Datenbank-URL und Upload-Verzeichnis setzt die Compose-Datei selbst, die für `pnpm dev`
 gedachten Werte aus der `.env` gelten im Container also nicht.
+
+## Betrieb mit Docker Compose oder Podman
+
+Ohne Ansible lässt sich das Drucktool auf jedem Linux-Server mit der `docker-compose.yml` aus diesem Repository
+betreiben. Die CI veröffentlicht das fertige Image unter `ghcr.io/linus1423/drucktool` (siehe [CI](#ci)), gebaut wird
+auf dem Server nichts. Backups, Monitoring und automatische Updates des Testsystems bringt nur das
+[Ansible-Playbook](#ausrollen-mit-ansible) mit; hier geht das von Hand.
+
+**Voraussetzungen:** Docker Engine mit Compose-Plugin ab 2.24 oder Podman ab 4.4 mit `podman compose` (nutzt
+`docker-compose` oder `podman-compose` ab 1.1). Etwa 2,5 GB RAM, davon 1,5 GB für den Virenscanner.
+
+### Einrichten
+
+```sh
+git clone https://github.com/linus1423/Drucktool.git /opt/drucktool
+cd /opt/drucktool
+git checkout v1.2.0              # Compose-Datei passend zur Version, die laufen soll
+cp .env.example .env
+chmod 600 .env
+```
+
+In der `.env` mindestens diese Werte setzen (die übrigen sind in `.env.example` erklärt, `DATABASE_URL` und
+`UPLOAD_DIR` dort gelten nur für `pnpm dev` und werden im Container ignoriert):
+
+```sh
+APP_IMAGE=ghcr.io/linus1423/drucktool:v1.2.0
+APP_URL=https://druck.example.org
+APP_ENVIRONMENT=production
+POSTGRES_PASSWORD=<langes zufälliges Passwort>
+SUPERADMIN_EMAIL=admin@example.org
+SUPERADMIN_PASSWORD=<mindestens 12 Zeichen>
+SMTP_URL=smtps://benutzer:passwort@mail.example.org:465
+MAIL_FROM="Druckerei Muster <auftraege@example.org>"
+COOKIE_SECURE=true
+TRUST_PROXY=true
+APP_PORT=127.0.0.1:3000
+COMPOSE_PROFILES=https
+DOMAIN=druck.example.org
+```
+
+- `APP_IMAGE`: eine feste Version, `latest` folgt dem Stand von `main`.
+- `POSTGRES_PASSWORD`: z. B. `openssl rand -hex 24`. Es gilt ab dem ersten Start; später ändern geht nur zusätzlich in
+  der Datenbank (`ALTER USER drucktool PASSWORD '…'`).
+- `APP_PORT=127.0.0.1:3000`: Die App ist nur auf dem Server erreichbar, HTTPS übernimmt der Proxy. Docker umgeht die
+  Firewall, deshalb den Port nie ohne `127.0.0.1` veröffentlichen, außer zum Ausprobieren.
+- `COMPOSE_PROFILES=https` und `DOMAIN` starten den mitgelieferten Caddy, der automatisch ein Let's-Encrypt-Zertifikat
+  holt. Die Ports 80 und 443 müssen frei und aus dem Internet erreichbar sein, die Domain muss auf den Server zeigen.
+
+Läuft schon ein Reverse Proxy (nginx, Traefik …), `COMPOSE_PROFILES` und `DOMAIN` weglassen und den Proxy auf
+`127.0.0.1:3000` zeigen lassen. Ist das Paket in der Registry privat, vorher mit einem Token mit `read:packages`
+anmelden: `docker login ghcr.io` bzw. `podman login ghcr.io`.
+
+Starten:
+
+```sh
+docker compose pull
+docker compose up -d --no-build
+docker compose ps                       # app wird nach etwa 20 Sekunden "healthy"
+curl -s http://127.0.0.1:3000/api/health
+```
+
+Mit Podman lauten die Befehle gleich, nur `podman compose` statt `docker compose`. Beim ersten Start spielt die App
+die Migrationen ein und legt den Superadmin an; danach kann `SUPERADMIN_PASSWORD` aus der `.env` entfernt werden. Der
+Virenscanner lädt beim ersten Start einige Minuten lang seine Signaturen, so lange lehnt die App Uploads mit einem
+Hinweis ab.
+
+Hinweise für Podman:
+
+- **Rootless und Ports 80/443:** Ohne root darf Podman keine Ports unter 1024 öffnen. Entweder
+  `sysctl net.ipv4.ip_unprivileged_port_start=80` (dauerhaft in `/etc/sysctl.d/`) oder Podman als root betreiben.
+- **Neustart des Servers:** `restart: unless-stopped` greift bei Podman erst mit
+  `systemctl --user enable --now podman-restart.service` und `loginctl enable-linger <benutzer>` (als root:
+  `systemctl enable --now podman-restart.service`).
+- **Kurze Image-Namen:** Fragt Podman, aus welcher Registry `postgres` oder `caddy` kommen soll, in
+  `/etc/containers/registries.conf` `unqualified-search-registries = ["docker.io"]` eintragen.
+- **`podman-compose`** wertet `COMPOSE_PROFILES` je nach Version nicht aus, dann `--profile https` bei jedem Befehl
+  mitgeben.
+
+### Backup
+
+Die Datenbank und die Druckdateien (Volume `uploads`) gehören gesichert, z. B. nachts per Cron:
+
+```sh
+cd /opt/drucktool && mkdir -p backup
+docker compose exec -T db pg_dump -U drucktool drucktool | gzip > backup/drucktool-$(date +%F-%H%M).sql.gz
+docker compose exec -T app tar -C /app -czf - uploads > backup/uploads-$(date +%F-%H%M).tar.gz
+```
+
+Die Dateien zusätzlich außerhalb des Servers ablegen.
+
+### Updates
+
+Releases stehen unter [Releases](https://github.com/linus1423/Drucktool/releases) mit Changelog. Die App spielt beim
+Start neue Migrationen ein, die sich nicht zurückdrehen lassen, deshalb vor jedem Update sichern:
+
+```sh
+cd /opt/drucktool
+docker compose exec -T db pg_dump -U drucktool drucktool | gzip > backup/drucktool-$(date +%F-%H%M)-vor-update.sql.gz
+
+git fetch --tags && git checkout v1.3.0                                    # Compose-Datei der neuen Version
+sed -i 's|^APP_IMAGE=.*|APP_IMAGE=ghcr.io/linus1423/drucktool:v1.3.0|' .env   # neue Version eintragen
+comm -23 <(grep -o '^[A-Z_]*=' .env.example | sort) <(grep -o '^[A-Z_]*=' .env | sort)  # neu in .env.example?
+
+docker compose pull
+docker compose up -d --no-build --remove-orphans
+docker compose ps
+curl -s http://127.0.0.1:3000/api/health          # zeigt "version": "v1.3.0"
+docker image prune -f                             # alte Images löschen
+```
+
+`docker compose pull` holt dabei auch neue Patch-Versionen von Postgres 16, ClamAV und Caddy. Der Worker startet
+erst, wenn die App nach den Migrationen wieder "healthy" ist. Wer mit `APP_IMAGE=…:latest` immer dem Stand von `main`
+folgt (nur fürs Testsystem sinnvoll), überspringt das Umstellen der Version und braucht nur Backup, `pull` und `up`.
+
+**Rollback:** Die alte Version in `APP_IMAGE` eintragen, `git checkout` auf den alten Tag und
+`docker compose up -d --no-build`. Enthielt das neue Release Migrationen, zusätzlich die Datenbank aus dem Backup vor
+dem Update zurückholen (alles seit dem Update Eingegebene geht dabei verloren):
+
+```sh
+docker compose stop app worker
+docker compose exec -T db psql -U drucktool -d postgres \
+  -c 'DROP DATABASE drucktool WITH (FORCE)' -c 'CREATE DATABASE drucktool OWNER drucktool'
+gunzip -c backup/drucktool-<zeitpunkt>-vor-update.sql.gz | docker compose exec -T db psql -U drucktool -d drucktool -q
+docker compose up -d --no-build
+```
 
 ## Logs und Überwachung
 

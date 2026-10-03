@@ -84,7 +84,6 @@ export const organisationRequestSchema = z.object({
 })
 
 export async function requestOrganisation(user: Principal, input: z.infer<typeof organisationRequestSchema>) {
-  if (user.role !== 'customer') throw new Error('Nur Kunden können eine Organisation anfragen')
   return getDb().transaction(async (tx) => {
     // Sperre auf den Benutzer, damit parallele Anfragen das Limit nicht umgehen.
     await tx.select({ id: users.id }).from(users).where(eq(users.id, user.id)).for('update')

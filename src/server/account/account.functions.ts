@@ -35,10 +35,10 @@ export const getMyAccountFn = createServerFn({ method: 'GET' }).handler(async ()
     .from(sessions)
     .where(and(eq(sessions.userId, user.id), gt(sessions.expiresAt, new Date())))
     .orderBy(desc(sessions.createdAt))
-  const customer = user.role === 'customer'
-  const [memberships, organisationRequests] = customer
-    ? await Promise.all([listMemberships(db, user.id), listMyOrganisationRequests(user.id)])
-    : [[], []]
+  const [memberships, organisationRequests] = await Promise.all([
+    listMemberships(db, user.id),
+    listMyOrganisationRequests(user.id),
+  ])
   return {
     ...user,
     firstName: row?.firstName ?? '',

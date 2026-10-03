@@ -33,8 +33,8 @@ export function svkOrganisationIds(db: Db, userId: string) {
     .where(and(eq(organisationMembers.userId, userId), eq(organisations.isSvk, true), eq(organisations.status, 'active')))
 }
 
+// Auch Mitarbeiter können Mitglied einer SVK sein (Issue #164).
 async function assertSvkMember(db: Db, user: Principal, organisationId: string) {
-  if (user.role !== 'customer') throw new Error(NO_PERMISSION)
   const orgs = await svkOrganisations(db, user.id)
   if (!orgs.some((o) => o.id === organisationId)) throw new Error(NO_PERMISSION)
 }
@@ -58,8 +58,7 @@ function allSvkOrganisations(db: Db) {
 
 /** Skripte verwalten (anlegen, bearbeiten, kopieren): SVK-Mitglieder ihre, freigegebene Mitarbeiter alle. */
 async function assertMayManage(db: Db, user: Principal, organisationId: string) {
-  if (user.role === 'customer') return assertSvkMember(db, user, organisationId)
-  if (!(await staffMayManageScripts(db, user))) throw new Error(NO_PERMISSION)
+  if (!isStaffRole(user.role) || !(await staffMayManageScripts(db, user))) return assertSvkMember(db, user, organisationId)
   const orgs = await allSvkOrganisations(db)
   if (!orgs.some((o) => o.id === organisationId)) throw new Error(NO_PERMISSION)
 }
@@ -100,7 +99,10 @@ export const scriptListSchema = z.object({
 export async function listScripts(user: Principal, filter: z.infer<typeof scriptListSchema>) {
   const db = getDb()
   const staff = isStaffRole(user.role)
-  const orgIds = staff ? null : (await svkOrganisations(db, user.id)).map((o) => o.id)
+  // Auch Mitarbeiter können Mitglied einer SVK sein (Issue #164) und bestellen dann wie Kunden für sie nach.
+  const memberOf = await svkOrganisations(db, user.id)
+  const memberIds = new Set(memberOf.map((o) => o.id))
+  const orgIds = staff ? null : [...memberIds]
   if (orgIds && orgIds.length === 0) throw new Error(NO_PERMISSION)
   const open = sql.join(
     OPEN_STATUSES.map((s) => sql`${s}`),
@@ -143,19 +145,20 @@ export async function listScripts(user: Principal, filter: z.infer<typeof script
     .from(scripts)
     .where(orgIds ? inArray(scripts.organisationId, orgIds) : undefined)
     .orderBy(desc(scripts.semester))
-  const canManage = staff ? await staffMayManageScripts(db, user) : true
+  const manageAll = staff && (await staffMayManageScripts(db, user))
   return {
     rows: rows.map((r) => ({
       ...r,
       lastOrder: r.lastOrder ? { ...r.lastOrder, createdAt: new Date(r.lastOrder.createdAt) } : null,
+      canManage: manageAll || memberIds.has(r.organisationId),
+      /** Nachbestellt wird über den Wizard als Auftrag der SVK, das können nur ihre Mitglieder. */
+      canOrder: memberIds.has(r.organisationId),
     })),
     semesters: semesters.map((s) => s.semester),
-    canManage,
-    /** Nachbestellt wird über den Wizard als Auftrag der SVK, das können nur ihre Mitglieder. */
-    canOrder: !staff,
+    canManage: manageAll || memberOf.length > 0,
     /** Mitarbeiter sehen Skripte aller SVKs und brauchen deren Namen. */
     showOrganisation: staff,
-    organisations: staff ? (canManage ? await allSvkOrganisations(db) : []) : await svkOrganisations(db, user.id),
+    organisations: manageAll ? await allSvkOrganisations(db) : memberOf,
   }
 }
 

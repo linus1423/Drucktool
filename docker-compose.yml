@@ -1,4 +1,5 @@
-# Lokaler Betrieb und Vorlage für den Server. Produktiv wird über Ansible ausgerollt.
+# Lokaler Betrieb und Betrieb auf einem Server mit Docker Compose oder Podman Compose (siehe README, "Betrieb mit
+# Docker Compose oder Podman"). Mit Ansible ausgerollte Server nutzen ansible/roles/drucktool/templates/docker-compose.yml.j2.
 services:
   db:
     image: postgres:16-alpine
@@ -22,7 +23,8 @@ services:
 
   app:
     build: .
-    image: drucktool:local
+    # Auf dem Server das veröffentlichte Image, z. B. APP_IMAGE=ghcr.io/linus1423/drucktool:v1.2.0 in der .env.
+    image: ${APP_IMAGE:-drucktool:local}
     logging: *logging
     restart: unless-stopped
     depends_on:
@@ -63,11 +65,13 @@ services:
     volumes:
       - uploads:/app/uploads
     ports:
+      # Hinter Caddy oder einem anderen Reverse Proxy APP_PORT=127.0.0.1:3000 setzen, sonst ist die App ohne HTTPS
+      # von außen erreichbar (Docker umgeht die Firewall).
       - '${APP_PORT:-3000}:3000'
 
   # Verschickt E-Mails aus der Outbox. Startet nach der App, damit die Migrationen gelaufen sind.
   worker:
-    image: drucktool:local
+    image: ${APP_IMAGE:-drucktool:local}
     command: worker
     logging: *logging
     restart: unless-stopped
@@ -114,7 +118,27 @@ services:
       retries: 3
       start_period: 10m
 
+  # HTTPS mit automatischem Let's-Encrypt-Zertifikat, nur mit Profil "https" (COMPOSE_PROFILES=https in der .env).
+  # Braucht DOMAIN in der .env und die Ports 80 und 443.
+  caddy:
+    image: caddy:2-alpine
+    profiles: [https]
+    logging: *logging
+    restart: unless-stopped
+    depends_on: [app]
+    environment:
+      DOMAIN: ${DOMAIN:-}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
 volumes:
   db-data:
   uploads:
   clamav-db:
+  caddy-data:
+  caddy-config:

@@ -92,8 +92,8 @@ function ScriptsPage() {
             <ScriptRow
               key={s.id}
               script={s}
-              canManage={data.canManage}
-              canOrder={data.canOrder}
+              canManage={s.canManage}
+              canOrder={s.canOrder}
               showOrganisation={data.showOrganisation}
             />
           ))}

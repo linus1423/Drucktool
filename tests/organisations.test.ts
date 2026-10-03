@@ -79,9 +79,9 @@ describe.skipIf(!url)('Organisationen und Organisationsanfragen (Issue #68)', ()
     expect(await membershipsOf(created.id)).toEqual([b!.name])
     await updateUser(admin, { ...base, role: 'customer', organisationIds: [] })
     expect(await membershipsOf(created.id)).toEqual([])
-    // Mitarbeiter gehören keiner Kunden-Organisation an.
+    // Auch Mitarbeiter können einer Organisation angehören (Issue #164).
     await updateUser(admin, { ...base, role: 'staff', organisationIds: [a!.id] })
-    expect(await membershipsOf(created.id)).toEqual([])
+    expect(await membershipsOf(created.id)).toEqual([a!.name])
   })
 
   it('ordnet einen Kunden nach seiner Anfrage einer bestehenden Organisation zu', async () => {
@@ -147,8 +147,7 @@ describe.skipIf(!url)('Organisationen und Organisationsanfragen (Issue #68)', ()
     await expect(orgs.requestOrganisation(other, { name: 'Jetzt geht es', details: '' })).resolves.toHaveProperty('id')
   })
 
-  it('lässt nur Kunden anfragen und nur Mitarbeiter entscheiden', async () => {
-    await expect(orgs.requestOrganisation(staff, { name: 'X', details: '' })).rejects.toThrow('Nur Kunden')
+  it('lässt nur Mitarbeiter über Anfragen entscheiden', async () => {
     const { id } = await orgs.requestOrganisation(customer, { name: 'Y', details: '' })
     await expect(orgs.resolveOrganisationRequest(customer, { id, action: 'reject', note: '' })).rejects.toThrow(
       'Keine Berechtigung',
