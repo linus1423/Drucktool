@@ -169,7 +169,8 @@ function label(key: string, value: unknown, orgName: OrgName) {
   if (key === 'organisationId' && typeof value === 'string') return orgName(value)
   if (key === 'organisationIds' && Array.isArray(value))
     return value.length ? value.map((v) => orgName(String(v))).join(', ') : 'keine'
-  return typeof value === 'object' ? JSON.stringify(value) : String(value as string | number | boolean)
+  if (typeof value === 'boolean') return value ? 'ja' : 'nein'
+  return typeof value === 'object' ? JSON.stringify(value) : String(value as string | number)
 }
 
 function describeChanges(before: Record<string, unknown> | null, after: Record<string, unknown> | null, orgName: OrgName) {

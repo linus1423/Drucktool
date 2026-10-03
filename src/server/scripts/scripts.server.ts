@@ -3,12 +3,12 @@
 // gewöhnlicher Auftrag der SVK-Organisation; fertige Aufträge erhöhen den Bestand des Skripts.
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { isStaffRole } from '~/lib/roles'
+import { isAdminRole, isStaffRole } from '~/lib/roles'
 import { OPEN_STATUSES } from '~/lib/status'
 import { getDb, schema, type Tx } from '../db/client.server'
 import type { Principal } from '../requests/requests.server'
 
-const { scripts, requests, organisations, organisationMembers } = schema
+const { scripts, requests, organisations, organisationMembers, users } = schema
 
 type Db = ReturnType<typeof getDb> | Tx
 
@@ -36,6 +36,31 @@ export function svkOrganisationIds(db: Db, userId: string) {
 async function assertSvkMember(db: Db, user: Principal, organisationId: string) {
   if (user.role !== 'customer') throw new Error(NO_PERMISSION)
   const orgs = await svkOrganisations(db, user.id)
+  if (!orgs.some((o) => o.id === organisationId)) throw new Error(NO_PERMISSION)
+}
+
+/** Admins immer, Mitarbeiter mit Freigabe in der Benutzerverwaltung (Issue #158). */
+export async function staffMayManageScripts(db: Db, user: Principal) {
+  if (isAdminRole(user.role)) return true
+  if (user.role !== 'staff') return false
+  const [row] = await db.select({ allowed: users.canManageScripts }).from(users).where(eq(users.id, user.id))
+  return row?.allowed ?? false
+}
+
+/** Alle aktiven SVKs, für Mitarbeiter, die Skripte verwalten. */
+function allSvkOrganisations(db: Db) {
+  return db
+    .select({ id: organisations.id, name: organisations.name })
+    .from(organisations)
+    .where(and(eq(organisations.isSvk, true), eq(organisations.status, 'active')))
+    .orderBy(asc(organisations.name))
+}
+
+/** Skripte verwalten (anlegen, bearbeiten, kopieren): SVK-Mitglieder ihre, freigegebene Mitarbeiter alle. */
+async function assertMayManage(db: Db, user: Principal, organisationId: string) {
+  if (user.role === 'customer') return assertSvkMember(db, user, organisationId)
+  if (!(await staffMayManageScripts(db, user))) throw new Error(NO_PERMISSION)
+  const orgs = await allSvkOrganisations(db)
   if (!orgs.some((o) => o.id === organisationId)) throw new Error(NO_PERMISSION)
 }
 
@@ -71,7 +96,7 @@ export const scriptListSchema = z.object({
   archived: z.boolean().optional(),
 })
 
-/** Skripte samt Kennzahlen. Mitarbeiter sehen alle, SVK-Mitglieder die ihrer SVK. */
+/** Skripte samt Kennzahlen. Mitarbeiter sehen alle, SVK-Mitglieder die ihrer SVK. Verwalten: siehe assertMayManage. */
 export async function listScripts(user: Principal, filter: z.infer<typeof scriptListSchema>) {
   const db = getDb()
   const staff = isStaffRole(user.role)
@@ -118,14 +143,19 @@ export async function listScripts(user: Principal, filter: z.infer<typeof script
     .from(scripts)
     .where(orgIds ? inArray(scripts.organisationId, orgIds) : undefined)
     .orderBy(desc(scripts.semester))
+  const canManage = staff ? await staffMayManageScripts(db, user) : true
   return {
     rows: rows.map((r) => ({
       ...r,
       lastOrder: r.lastOrder ? { ...r.lastOrder, createdAt: new Date(r.lastOrder.createdAt) } : null,
     })),
     semesters: semesters.map((s) => s.semester),
-    canManage: !staff,
-    organisations: staff ? [] : await svkOrganisations(db, user.id),
+    canManage,
+    /** Nachbestellt wird über den Wizard als Auftrag der SVK, das können nur ihre Mitglieder. */
+    canOrder: !staff,
+    /** Mitarbeiter sehen Skripte aller SVKs und brauchen deren Namen. */
+    showOrganisation: staff,
+    organisations: staff ? (canManage ? await allSvkOrganisations(db) : []) : await svkOrganisations(db, user.id),
   }
 }
 
@@ -144,7 +174,7 @@ export const createScriptSchema = scriptInputSchema.extend({ organisationId: z.u
 /** Skriptenannahme: neues Skript ohne Vorlage. Die erste Bestellung über den Wizard wird zur Vorlage. */
 export async function createScript(user: Principal, input: z.infer<typeof createScriptSchema>) {
   const db = getDb()
-  await assertSvkMember(db, user, input.organisationId)
+  await assertMayManage(db, user, input.organisationId)
   const [row] = await db
     .insert(scripts)
     .values({ ...input, createdById: user.id })
@@ -163,7 +193,7 @@ export async function updateScript(user: Principal, input: z.infer<typeof update
   return getDb().transaction(async (tx) => {
     const [script] = await tx.select().from(scripts).where(eq(scripts.id, input.id)).for('update')
     if (!script) throw new Error('Skript nicht gefunden')
-    await assertSvkMember(tx, user, script.organisationId)
+    await assertMayManage(tx, user, script.organisationId)
     const { id, previousStock, stock, ...values } = input
     // Unveränderter Bestand im Formular: den aktuellen behalten, statt ihn mit dem alten Stand zu überschreiben.
     const stockChanged = stock !== previousStock
@@ -184,7 +214,7 @@ export async function copyScript(user: Principal, input: { id: string; semester:
   return getDb().transaction(async (tx) => {
     const [script] = await tx.select().from(scripts).where(eq(scripts.id, input.id))
     if (!script) throw new Error('Skript nicht gefunden')
-    await assertSvkMember(tx, user, script.organisationId)
+    await assertMayManage(tx, user, script.organisationId)
     const [row] = await tx
       .insert(scripts)
       .values({

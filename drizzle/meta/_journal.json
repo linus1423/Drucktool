@@ -169,6 +169,20 @@
       "when": 1791052253395,
       "tag": "0023_user_name_fallback",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791052475172,
+      "tag": "0024_staff_manage_scripts",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791052638643,
+      "tag": "0025_invoice_recorded",
+      "breakpoints": true
     }
   ]
 }

@@ -76,6 +76,8 @@ export const users = pgTable(
     reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
     emailNotifications: boolean('email_notifications').notNull().default(true),
+    /** Mitarbeiter mit Freigabe verwalten die Skripte aller SVKs; Admins dürfen das immer (Issue #158). */
+    canManageScripts: boolean('can_manage_scripts').notNull().default(false),
     billingAddress: jsonb('billing_address').$type<BillingAddress>(),
     deliveryAddress: jsonb('delivery_address').$type<DeliveryAddress>(),
     // Gesetzt, wenn das Konto anonymisiert wurde (DSGVO, Issue #26). Aufträge bleiben erhalten.
@@ -275,6 +277,10 @@ export const requests = pgTable(
     // Übergabe an Lexware zur Rechnungsstellung (Issue #53); null heißt noch nicht übergeben.
     invoiceExportedAt: timestamp('invoice_exported_at', { withTimezone: true }),
     invoiceExportedById: uuid('invoice_exported_by_id').references(() => users.id, { onDelete: 'set null' }),
+    // Rechnung in Lexware angelegt (Issue #157), von Mitarbeitern mit der Rechnungsnummer aus Lexware eingetragen.
+    invoiceCreatedAt: timestamp('invoice_created_at', { withTimezone: true }),
+    invoiceCreatedById: uuid('invoice_created_by_id').references(() => users.id, { onDelete: 'set null' }),
+    invoiceNumber: text('invoice_number'),
     // Optimistic Locking: jede Änderung erhöht die Version, Updates prüfen die erwartete Version.
     version: integer('version').notNull().default(1),
     ...timestamps,
@@ -361,6 +367,7 @@ export const requestEventType = pgEnum('request_event_type', [
   'change_withdrawn',
   'dates_changed',
   'print_sheet_changed',
+  'invoice_recorded',
 ])
 
 export const requestEvents = pgTable(

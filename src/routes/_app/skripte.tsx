@@ -10,7 +10,8 @@ import { isStaffRole } from '~/lib/roles'
 import type { RequestStatus } from '~/lib/status'
 import { copyScriptFn, createScriptFn, updateScriptFn } from '~/server/scripts/scripts.functions'
 
-// Skriptenverwaltung der SVK (Issue #59). Mitarbeiter sehen alle Skripte, die SVK nur ihre.
+// Skriptenverwaltung der SVK (Issue #59). Mitarbeiter sehen alle Skripte, die SVK nur ihre. Verwalten dürfen
+// SVK-Mitglieder, Admins und dafür freigegebene Mitarbeiter (Issue #158); nachbestellen nur SVK-Mitglieder.
 export const Route = createFileRoute('/_app/skripte')({
   validateSearch: z.object({
     semester: z.string().max(50).optional().catch(undefined),
@@ -48,7 +49,11 @@ function ScriptsPage() {
             ? 'Skripte als Vorlagen: Nachbestellen übernimmt Dateien und Optionen des letzten Auftrags. Fertige Aufträge erhöhen den Bestand.'
             : 'Skripte der SVK mit Bestand und Nachbestellungen.'
         }
-        actions={data.canManage && !creating ? <Button onClick={() => setCreating(true)}>Neues Skript</Button> : null}
+        actions={
+          data.canManage && data.organisations.length > 0 && !creating ? (
+            <Button onClick={() => setCreating(true)}>Neues Skript</Button>
+          ) : null
+        }
       />
       {creating ? <ScriptForm organisations={data.organisations} onDone={() => setCreating(false)} /> : null}
       <div className="flex flex-wrap gap-2">
@@ -84,7 +89,13 @@ function ScriptsPage() {
       ) : (
         <ul className="space-y-3">
           {data.rows.map((s) => (
-            <ScriptRow key={s.id} script={s} canManage={data.canManage} />
+            <ScriptRow
+              key={s.id}
+              script={s}
+              canManage={data.canManage}
+              canOrder={data.canOrder}
+              showOrganisation={data.showOrganisation}
+            />
           ))}
         </ul>
       )}
@@ -92,7 +103,17 @@ function ScriptsPage() {
   )
 }
 
-function ScriptRow({ script: s, canManage }: { script: Script; canManage: boolean }) {
+function ScriptRow({
+  script: s,
+  canManage,
+  canOrder,
+  showOrganisation,
+}: {
+  script: Script
+  canManage: boolean
+  canOrder: boolean
+  showOrganisation: boolean
+}) {
   const [editing, setEditing] = useState(false)
   const queryClient = useQueryClient()
   const copy = useMutation({
@@ -109,7 +130,7 @@ function ScriptRow({ script: s, canManage }: { script: Script; canManage: boolea
               {s.title} {s.archived ? <Badge>Archiviert</Badge> : null}
             </h2>
             <p className="text-slate-600">
-              {[s.lecturer, s.semester, canManage ? null : s.organisationName].filter(Boolean).join(' · ')}
+              {[s.lecturer, s.semester, showOrganisation ? s.organisationName : null].filter(Boolean).join(' · ')}
             </p>
             <p>
               <strong>Bestand: {s.stock.toLocaleString('de-DE')}</strong>
@@ -131,17 +152,19 @@ function ScriptRow({ script: s, canManage }: { script: Script; canManage: boolea
           </div>
           {canManage && !s.archived ? (
             <div className="flex flex-wrap gap-2">
-              <Link
-                to="/auftraege/neu"
-                search={{ vorlage: s.templateRequestId ?? undefined, skript: s.id }}
-                className={
-                  s.templateRequestId
-                    ? 'inline-flex items-center rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700'
-                    : linkButton
-                }
-              >
-                {s.templateRequestId ? 'Nachbestellen' : 'Erste Bestellung'}
-              </Link>
+              {canOrder ? (
+                <Link
+                  to="/auftraege/neu"
+                  search={{ vorlage: s.templateRequestId ?? undefined, skript: s.id }}
+                  className={
+                    s.templateRequestId
+                      ? 'inline-flex items-center rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700'
+                      : linkButton
+                  }
+                >
+                  {s.templateRequestId ? 'Nachbestellen' : 'Erste Bestellung'}
+                </Link>
+              ) : null}
               <Button variant="secondary" onClick={() => setEditing(true)}>
                 Bearbeiten
               </Button>

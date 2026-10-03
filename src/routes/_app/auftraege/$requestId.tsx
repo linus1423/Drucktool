@@ -5,6 +5,7 @@ import { formatBillingAddress, formatDeliveryAddress } from '~/lib/address'
 import { formatBytes, uploadFile, type UploadedFile } from '~/components/FileUpload'
 import { AttentionBadge } from '~/components/AttentionBadge'
 import { LexwareExportButton } from '~/components/LexwareExport'
+import { recordInvoiceFn } from '~/server/invoices/lexware.functions'
 import { ProposalCard, ProposeChangeForm } from '~/components/ChangeProposal'
 import { RequestFields, useRequestForm } from '~/components/RequestFields'
 import { Alert, Badge, Button, Card, Field, Input, Select, StatusBadge, Textarea, cx } from '~/components/ui'
@@ -911,6 +912,11 @@ function describeEvent(e: Detail['events'][number]) {
         ? `hat den Druckbogen auf ${name(e.data.sheet)}, Deckblatt ${name(e.data.coverSheet)} gesetzt`
         : `hat den Druckbogen auf ${name(e.data.sheet)} gesetzt`
     }
+    case 'invoice_recorded': {
+      if (e.data.created !== true) return 'hat die Rechnung wieder als nicht angelegt markiert'
+      const nr = typeof e.data.invoiceNumber === 'string' ? e.data.invoiceNumber : null
+      return nr ? `hat die Rechnung ${nr} in Lexware angelegt` : 'hat die Rechnung in Lexware angelegt'
+    }
     case 'dates_changed': {
       const what = e.data.field === 'internalDueDate' ? 'die interne Frist' : 'den zugesagten Termin'
       const to = typeof e.data.to === 'string' ? e.data.to : null
@@ -983,6 +989,15 @@ function Files({ request, staff }: { request: Detail; staff: boolean }) {
 }
 
 function InvoiceCard({ request }: { request: Detail }) {
+  const queryClient = useQueryClient()
+  const [invoiceNumber, setInvoiceNumber] = useState('')
+  const record = useMutation({
+    mutationFn: (created: boolean) => recordInvoiceFn({ data: { id: request.id, created, invoiceNumber } }),
+    onSuccess: async () => {
+      setInvoiceNumber('')
+      await queryClient.invalidateQueries({ queryKey: ['requests'] })
+    },
+  })
   return (
     <Card title="Rechnung">
       <div className="space-y-3 text-sm">
@@ -995,6 +1010,46 @@ function InvoiceCard({ request }: { request: Detail }) {
           ids={[request.id]}
           label={request.invoiceExportedAt ? 'Erneut für Lexware exportieren' : 'Für Lexware exportieren'}
         />
+        {/* Zweiter Schritt (Issue #157): die Rechnung ist in Lexware tatsächlich angelegt. */}
+        <div className="space-y-2 border-t border-slate-200 pt-3">
+          {record.error ? <Alert>{errorMessage(record.error)}</Alert> : null}
+          {request.invoiceCreatedAt ? (
+            <>
+              <p className="flex flex-wrap items-center gap-2">
+                <Badge className="bg-emerald-100 text-emerald-800">Rechnung angelegt</Badge>
+                <span>
+                  {request.invoiceNumber ? `Nr. ${request.invoiceNumber}, ` : ''}
+                  am {formatDateTime(request.invoiceCreatedAt)}
+                  {request.invoiceCreatedByName ? ` von ${request.invoiceCreatedByName}` : ''}
+                </span>
+              </p>
+              <Button variant="ghost" disabled={record.isPending} onClick={() => record.mutate(false)}>
+                Zurücknehmen
+              </Button>
+            </>
+          ) : (
+            <form
+              className="flex flex-wrap items-end gap-2"
+              onSubmit={(e) => {
+                e.preventDefault()
+                record.mutate(true)
+              }}
+            >
+              <Field label="Rechnungsnummer aus Lexware" htmlFor="invoice-number">
+                <Input
+                  id="invoice-number"
+                  required
+                  maxLength={50}
+                  value={invoiceNumber}
+                  onChange={(e) => setInvoiceNumber(e.target.value)}
+                />
+              </Field>
+              <Button type="submit" variant="secondary" disabled={record.isPending}>
+                In Lexware angelegt
+              </Button>
+            </form>
+          )}
+        </div>
       </div>
     </Card>
   )

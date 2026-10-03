@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -91,6 +91,42 @@ describe.skipIf(!url)('Skripte der SVK (Issue #59)', async () => {
     await expect(
       scriptsModule.updateScript(fremd, { ...base, id, archived: false, stock: 999, previousStock: 0 }),
     ).rejects.toThrow('Keine Berechtigung')
+  })
+
+  it('lässt Admins und freigegebene Mitarbeiter Skripte verwalten, aber nicht nachbestellen (Issue #158)', async () => {
+    const admin = await user('admin', 'admin')
+    const helfer = await user('helfer', 'staff')
+    await getDb().update(schema.users).set({ canManageScripts: true }).where(eq(schema.users.id, helfer.id))
+
+    const { id } = await scriptsModule.createScript(admin, { ...base, title: `Admin ${stamp}`, organisationId: svk })
+    await scriptsModule.updateScript(helfer, {
+      ...base,
+      title: `Helfer ${stamp}`,
+      id,
+      archived: false,
+      stock: 5,
+      previousStock: 0,
+    })
+    const copy = await scriptsModule.copyScript(helfer, { id, semester: 'SS 2027' })
+    expect(copy.id).toBeTruthy()
+    // Nur SVKs, keine anderen Organisationen.
+    await expect(scriptsModule.createScript(helfer, { ...base, organisationId: andere })).rejects.toThrow('Keine Berechtigung')
+    // Ohne Freigabe weiterhin nur lesen.
+    await expect(scriptsModule.copyScript(staff, { id, semester: 'SS 2027' })).rejects.toThrow('Keine Berechtigung')
+
+    const forHelfer = await scriptsModule.listScripts(helfer, {})
+    expect(forHelfer).toMatchObject({ canManage: true, canOrder: false, showOrganisation: true })
+    expect(forHelfer.organisations.map((o) => o.id)).toContain(svk)
+    expect(forHelfer.organisations.map((o) => o.id)).not.toContain(andere)
+    expect(forHelfer.rows.find((r) => r.id === id)).toMatchObject({ title: `Helfer ${stamp}`, stock: 5 })
+    expect(await scriptsModule.listScripts(admin, {})).toMatchObject({ canManage: true, canOrder: false })
+    expect(await scriptsModule.listScripts(staff, {})).toMatchObject({ canManage: false, organisations: [] })
+    await expect(scriptsModule.scriptForOrder(getDb(), helfer, id)).rejects.toThrow('Keine Berechtigung')
+
+    await getDb()
+      .update(schema.scripts)
+      .set({ archived: true })
+      .where(inArray(schema.scripts.id, [id, copy.id]))
   })
 
   it('zeigt SVK-Mitgliedern die SVK als mitlesbare Organisation in der Auftragsliste (Issue #138)', async () => {
