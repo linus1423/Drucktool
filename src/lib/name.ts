@@ -3,6 +3,7 @@ export type PersonName = { firstName: string; lastName: string }
 /**
  * Anzeigename „Vorname Nachname“. Entspricht der generierten Spalte users.name
  * (btrim(first_name || ' ' || last_name)), damit Listen, Mails und Suche einheitlich bleiben.
+ * Sind beide leer, nimmt die Spalte die E-Mail-Adresse; hier kommt dann ein leerer Text zurück.
  */
 export function displayName(n: PersonName): string {
   return `${n.firstName.trim()} ${n.lastName.trim()}`.trim()

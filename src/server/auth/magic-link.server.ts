@@ -103,12 +103,12 @@ export async function redeemLoginLink(token: string): Promise<LinkLogin> {
       .limit(1)
 
     if (!existing) {
-      // Vor- und Nachnamen tragen Kunden vor dem ersten Auftrag im Profil nach.
+      // Vor- und Nachnamen tragen Kunden vor dem ersten Auftrag im Profil nach (Issue #159);
+      // bis dahin zeigt users.name die E-Mail-Adresse.
       const [created] = await tx
         .insert(users)
         .values({
           email: link.email,
-          lastName: link.email.split('@')[0]!,
           role: 'customer',
           status: 'active',
           lastLoginAt: new Date(),

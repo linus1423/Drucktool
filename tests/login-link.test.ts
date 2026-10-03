@@ -40,6 +40,8 @@ describe.skipIf(!url)('Anmeldung per E-Mail-Link (Integration)', async () => {
       status: 'active',
       passwordHash: null,
     })
+    // Namen trägt der Kunde im Profil ein; bis dahin zeigt users.name die Adresse (Issue #159).
+    expect(await userByEmail(email('neu'))).toMatchObject({ firstName: '', lastName: '', name: email('neu') })
     // Auch die erste Anmeldung zählt als letzte Anmeldung (Issue #147).
     expect((await userByEmail(email('neu')))?.lastLoginAt).toBeInstanceOf(Date)
   })
