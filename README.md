@@ -141,7 +141,7 @@ zurücknehmen. Die Ansicht „Liegt zur Abholung bereit“ in der Liste und der 
 fertigen Aufträge, die noch in der Druckerei liegen. Liegt ein Abholauftrag länger als die unter „Katalog und Preise“
 → „Preise und Texte“ eingestellten Tage (Standard 7), ist er intern als „Nicht abgeholt“ markiert, und der Kunde
 bekommt einmal eine Erinnerung (Vorlage „Erinnerung an die Abholung“). Die Erinnerungen verschickt der Mail-Worker mit
-dem stündlichen Aufräumen. Bei der Einführung (Migration `0027_pickup_handover.sql`) gelten Aufträge, die seit mehr als 14 Tagen fertig
+dem stündlichen Aufräumen. Bei der Einführung (Migration `0031_pickup_handover.sql`) gelten Aufträge, die seit mehr als 14 Tagen fertig
 sind, als übergeben; jüngere bleiben offen, bekommen aber keine Erinnerung.
 
 ## Übersicht
