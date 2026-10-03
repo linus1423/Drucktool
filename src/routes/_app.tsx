@@ -133,8 +133,10 @@ function AppLayout() {
       <main id="inhalt" tabIndex={-1} className="mx-auto max-w-7xl px-4 py-8 focus:outline-none">
         <Outlet />
       </main>
-      <LegalLinks className="pb-8" />
-      {isAdminRole(user.role) ? <VersionInfo /> : null}
+      <footer>
+        <LegalLinks className="pb-8" />
+        {isAdminRole(user.role) ? <VersionInfo /> : null}
+      </footer>
     </div>
   )
 }

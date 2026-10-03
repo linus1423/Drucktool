@@ -101,8 +101,21 @@ test('Kunde nimmt die Änderung an', async ({ page }) => {
 })
 
 test('Verwaltungsseiten sind barrierefrei', async ({ page }) => {
+  // Zehn Seiten mit axe-Prüfung brauchen länger als die üblichen 30 Sekunden.
+  test.slow()
   await loginAsAdmin(page)
-  for (const path of ['/profil', '/admin/benutzer', '/admin/organisationen', '/admin/katalog']) {
+  for (const path of [
+    '/profil',
+    '/konto',
+    '/auftraege/board',
+    '/organisationsanfragen',
+    '/admin/freigaben',
+    '/admin/benutzer',
+    '/admin/organisationen',
+    '/admin/katalog',
+    '/admin/emails',
+    '/admin/protokoll',
+  ]) {
     await page.goto(path)
     await check(page, path)
   }
