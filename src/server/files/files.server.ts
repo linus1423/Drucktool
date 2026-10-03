@@ -293,7 +293,8 @@ export async function claimAttachments(tx: Tx, user: Principal, requestId: strin
     .for('update')
   if (rows.length !== new Set(ids).size) throw new Error('Ein Anhang wurde nicht gefunden. Bitte erneut hochladen.')
   await tx.update(requestFiles).set({ requestId, commentId }).where(inArray(requestFiles.id, ids))
-  return rows.map(publicFile)
+  // In der Reihenfolge, in der sie angehängt wurden; Postgres liefert ohne ORDER BY beliebig.
+  return rows.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id)).map(publicFile)
 }
 
 export async function listCommentAttachments(commentIds: string[]) {
