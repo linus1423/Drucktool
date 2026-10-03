@@ -7,6 +7,7 @@ process.env.DATABASE_URL = url
 describe.skipIf(!url)('Anmeldung per E-Mail-Link (Integration)', async () => {
   const { getDb, schema } = await import('~/server/db/client.server')
   const { issueLoginLink, redeemLoginLink, isDomainAllowed } = await import('~/server/auth/magic-link.server')
+  const { recordLoginFailure, clearLoginFailures, ACCOUNT_MAX_FAILURES } = await import('~/server/auth/rate-limit.server')
   const stamp = Date.now()
   const email = (name: string) => `${name}-${stamp}@link.test`
 
@@ -93,5 +94,39 @@ describe.skipIf(!url)('Anmeldung per E-Mail-Link (Integration)', async () => {
     // Bestehende Konten dürfen sich weiter anmelden.
     expect(await issueLoginLink(email('neu'), null)).toBeTruthy()
     delete process.env.CUSTOMER_EMAIL_DOMAINS
+  })
+
+  it('schickt Mitarbeitern und Admins mit Passwort keinen Link', async () => {
+    await getDb()
+      .insert(schema.users)
+      .values([
+        { email: email('admin-pw'), lastName: 'Admin', role: 'superadmin', status: 'active', passwordHash: 'scrypt$x' },
+        { email: email('staff-pw'), lastName: 'Staff', role: 'staff', status: 'active', passwordHash: 'scrypt$x' },
+        { email: email('staff-ohne'), lastName: 'Ohne', role: 'staff', status: 'active' },
+      ])
+    expect(await issueLoginLink(email('admin-pw'), null)).toBeNull()
+    expect(await issueLoginLink(email('staff-pw'), null)).toBeNull()
+    // Ohne Passwort bleibt der Link der Weg herein.
+    const token = await issueLoginLink(email('staff-ohne'), null)
+    expect(token).toBeTruthy()
+
+    // Ein Link von vor dem Setzen des Passworts gilt danach nicht mehr.
+    await getDb()
+      .update(schema.users)
+      .set({ passwordHash: 'scrypt$x' })
+      .where(eq(schema.users.email, email('staff-ohne')))
+    await expect(redeemLoginLink(token!)).rejects.toThrow('Passwort')
+  })
+
+  it('schickt während einer Sperre nach Fehlversuchen keinen Link', async () => {
+    const address = email('gesperrt-fehlversuche')
+    const token = await issueLoginLink(address, null)
+    await redeemLoginLink(token!)
+    const later = await issueLoginLink(address, null)
+    for (let i = 0; i < ACCOUNT_MAX_FAILURES; i++) await recordLoginFailure(address)
+    expect(await issueLoginLink(address, null)).toBeNull()
+    await expect(redeemLoginLink(later!)).rejects.toThrow('Fehlversuche')
+    await clearLoginFailures(address)
+    expect(await issueLoginLink(address, null)).toBeTruthy()
   })
 })

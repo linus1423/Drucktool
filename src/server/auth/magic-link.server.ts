@@ -7,6 +7,7 @@ import { enqueueMail } from '../mail/outbox.server'
 import { appUrl, loginLinkMail } from '../mail/templates'
 import { getOidcSettings } from './oidc.server'
 import { auditLogin } from '../audit/audit.server'
+import { accountBlockedMs } from './rate-limit.server'
 
 export const LINK_MINUTES = 15
 const { users, loginTokens } = schema
@@ -14,6 +15,8 @@ const { users, loginTokens } = schema
 const INVALID = 'Der Anmeldelink ist ungültig, abgelaufen oder wurde schon benutzt. Bitte fordern Sie einen neuen an.'
 const INACTIVE = 'Ihr Konto ist nicht aktiv. Bitte wenden Sie sich an die Druckerei.'
 const STAFF_SSO = 'Mitarbeiter melden sich bitte über das Firmenkonto an.'
+const PASSWORD_REQUIRED = 'Mit diesem Konto melden Sie sich bitte mit Ihrem Passwort an.'
+const BLOCKED = 'Zu viele Fehlversuche für dieses Konto. Bitte versuchen Sie es später erneut.'
 
 function hashToken(token: string) {
   return createHash('sha256').update(token).digest('hex')
@@ -38,6 +41,15 @@ function staffMustUseSso(role: string) {
 }
 
 /**
+ * Mitarbeiter, Admins und Superadmins mit Passwort melden sich nur mit dem Passwort an. Sonst würde
+ * der Link die Sperre nach Fehlversuchen umgehen, und wer das Postfach übernimmt, hätte ihre Rechte.
+ * Ohne Passwort bleibt der Link ihr Weg herein.
+ */
+function mustUsePassword(user: { role: string; passwordHash: string | null }) {
+  return user.role !== 'customer' && !!user.passwordHash
+}
+
+/**
  * Legt einen Link an und stellt die Mail in die Outbox. Gibt nach außen immer dasselbe
  * zurück, damit sich nicht ermitteln lässt, welche Adressen ein Konto haben.
  * Liefert den Token nur für Tests zurück.
@@ -45,14 +57,16 @@ function staffMustUseSso(role: string) {
 export async function issueLoginLink(email: string, redirect: string | null): Promise<string | null> {
   const db = getDb()
   const [user] = await db
-    .select({ role: users.role, status: users.status })
+    .select({ role: users.role, status: users.status, passwordHash: users.passwordHash })
     .from(users)
     .where(sql`lower(${users.email}) = ${email}`)
     .limit(1)
 
   if (user) {
     if (user.status === 'disabled' || user.status === 'rejected') return null
-    if (staffMustUseSso(user.role)) return null
+    if (staffMustUseSso(user.role) || mustUsePassword(user)) return null
+    // Ist das Konto nach Fehlversuchen gesperrt, gibt es bis zum Ende der Sperre auch keinen Link.
+    if ((await accountBlockedMs(email)) > 0) return null
   } else if (!isDomainAllowed(email)) {
     const domains = allowedDomains()
     throw new Error(`Bitte verwenden Sie eine Adresse mit ${domains.map((d) => `@${d}`).join(' oder ')}.`)
@@ -96,7 +110,7 @@ export async function redeemLoginLink(token: string): Promise<LinkLogin> {
     if (!link) throw new LinkLoginError(INVALID, null, 'invalid_link')
 
     const [existing] = await tx
-      .select({ id: users.id, role: users.role, status: users.status })
+      .select({ id: users.id, role: users.role, status: users.status, passwordHash: users.passwordHash })
       .from(users)
       .where(sql`lower(${users.email}) = ${link.email}`)
       .for('update')
@@ -122,6 +136,9 @@ export async function redeemLoginLink(token: string): Promise<LinkLogin> {
       throw new LinkLoginError(INACTIVE, existing.id, 'inactive')
     }
     if (staffMustUseSso(existing.role)) throw new LinkLoginError(STAFF_SSO, existing.id, 'sso_required')
+    // Der Link kann vor dem Setzen des Passworts oder vor der Sperre verschickt worden sein.
+    if (mustUsePassword(existing)) throw new LinkLoginError(PASSWORD_REQUIRED, existing.id, 'password_required')
+    if ((await accountBlockedMs(link.email, tx)) > 0) throw new LinkLoginError(BLOCKED, existing.id, 'blocked')
     // Die Adresse ist durch den Link bestätigt; eine Freigabe ist nicht mehr nötig.
     await tx
       .update(users)
