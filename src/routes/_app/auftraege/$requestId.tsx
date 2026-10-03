@@ -421,7 +421,13 @@ function StatusActions({ request, staff }: { request: Detail; staff: boolean }) 
               </p>
             ) : null}
             <Field
-              label={target === 'on_hold' ? 'Rückfrage an den Kunden' : 'Nachricht (optional)'}
+              label={
+                target === 'on_hold'
+                  ? 'Rückfrage an den Kunden'
+                  : target === 'rejected' && actor === 'staff'
+                    ? 'Begründung für den Kunden'
+                    : 'Nachricht (optional)'
+              }
               htmlFor="note"
               hint="Wird als Kommentar für alle Beteiligten gespeichert und in der E-Mail mitgeschickt."
             >
@@ -430,7 +436,7 @@ function StatusActions({ request, staff }: { request: Detail; staff: boolean }) 
                 rows={3}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                required={target === 'on_hold'}
+                required={target === 'on_hold' || (target === 'rejected' && actor === 'staff')}
               />
             </Field>
             <div className="flex justify-end gap-2">

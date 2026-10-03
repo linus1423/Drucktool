@@ -30,7 +30,8 @@ export function OrganisationsCard({ account }: { account: Pick<Account, 'members
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: accountQuery.queryKey })
-    await queryClient.invalidateQueries({ queryKey: currentUserQuery.queryKey })
+    // Ohne Beobachter würde invalidateQueries die Kopfzeile nicht neu laden (Issue #147).
+    await queryClient.fetchQuery({ ...currentUserQuery, staleTime: 0 })
     await router.invalidate()
   }
   const request = useMutation({

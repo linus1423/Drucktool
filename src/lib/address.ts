@@ -28,14 +28,21 @@ export function billingName(a: StoredBillingAddress): string {
   return 'name' in a ? a.name : displayName(a)
 }
 
-/** Adresse für die Hauspost, z. B. Lehrstuhl, Gebäude und Raum. */
-export const deliveryAddressSchema = z.object({
-  recipient: required('Empfänger'),
-  department: optional(),
-  building: optional(100),
-  room: optional(100),
-  note: optional(500),
-})
+export const DELIVERY_PLACE_MISSING = 'Bitte Lehrstuhl/Einrichtung oder Gebäude angeben, damit die Hauspost Sie findet'
+
+/**
+ * Adresse für die Hauspost, z. B. Lehrstuhl, Gebäude und Raum. Nur mit dem Empfänger weiß die Hauspost nicht,
+ * wohin (Issue #143), deshalb braucht es zusätzlich den Lehrstuhl oder das Gebäude.
+ */
+export const deliveryAddressSchema = z
+  .object({
+    recipient: required('Empfänger'),
+    department: optional(),
+    building: optional(100),
+    room: optional(100),
+    note: optional(500),
+  })
+  .refine((a) => !!a.department || !!a.building, { message: DELIVERY_PLACE_MISSING, path: ['department'] })
 export type DeliveryAddress = z.infer<typeof deliveryAddressSchema>
 
 export const EMPTY_BILLING: BillingAddress = {

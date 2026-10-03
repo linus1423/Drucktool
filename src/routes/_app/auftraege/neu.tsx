@@ -5,7 +5,7 @@ import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-quer
 import { FileUpload, type UploadedFile } from '~/components/FileUpload'
 import { HelpTip } from '~/components/HelpTip'
 import { Alert, Button, Card, Field, Input, PageHeader, Select, Textarea, cx } from '~/components/ui'
-import { EMPTY_DELIVERY, deliveryAddressSchema, type DeliveryAddress } from '~/lib/address'
+import { EMPTY_DELIVERY, deliveryAddressSchema, formatDeliveryAddress, type DeliveryAddress } from '~/lib/address'
 import { errorMessage } from '~/lib/errors'
 import { formatMoney, formatRequestNumber } from '~/lib/format'
 import {
@@ -124,7 +124,10 @@ function normalize(catalog: OrderCatalog, d: Draft): Draft {
   const size = format
     ? formatSize(format, { customWidthMm: int(next.customWidth), customHeightMm: int(next.customHeight) })
     : null
-  if (!bindingChoices(catalog, format).some((c) => c.item.id === next.bindingId && c.allowed)) next.bindingId = ''
+  const bindings = bindingChoices(catalog, format).filter((c) => c.allowed && c.item.available)
+  if (!bindings.some((c) => c.item.id === next.bindingId)) next.bindingId = ''
+  // Gibt es zum Format nur eine Bindung (Plots, A6, A7, Visitenkarten: nur lose), ist sie gleich gewählt (Issue #146).
+  if (!next.bindingId && bindings.length === 1) next.bindingId = bindings[0]!.item.id
   const binding = catalog.bindings.find((b) => b.id === next.bindingId)
   if (next.duplex && !duplexChoice(format, binding).allowed) next.duplex = false
   if (!paperChoices(catalog, format, size, 'inner').some((c) => c.item.id === next.paperId && c.allowed)) next.paperId = ''
@@ -488,10 +491,8 @@ function stepBlockers(catalog: OrderCatalog, d: Draft): (string | null)[] {
     : !copies || copies < 1
       ? 'Bitte die Anzahl der Exemplare angeben.'
       : null
-  const delivery =
-    d.delivery === 'house_post' && !deliveryAddressSchema.safeParse(d.deliveryAddress).success
-      ? 'Bitte mindestens den Empfänger für die Hauspost angeben.'
-      : null
+  const address = d.delivery === 'house_post' ? deliveryAddressSchema.safeParse(d.deliveryAddress) : null
+  const delivery = address && !address.success ? `${address.error.issues[0]!.message}.` : null
   const terms = !d.acceptTerms ? 'Bitte den Auftragsbedingungen zustimmen.' : null
   return [file, fmt, bind, paper, options, delivery, terms]
 }
@@ -948,6 +949,26 @@ function SubmitStep({ draft, update, catalog, organisationField }: StepProps & {
           <p className="mt-2 whitespace-pre-line">{catalog.texts.terms}</p>
         </details>
       ) : null}
+      <dl className="space-y-2 rounded-md border border-slate-200 p-3 text-sm">
+        <div>
+          <dt className="text-slate-500">Titel</dt>
+          <dd>{draft.title.trim() || '–'}</dd>
+        </div>
+        {draft.notes.trim() ? (
+          <div>
+            <dt className="text-slate-500">Bemerkungen</dt>
+            <dd className="whitespace-pre-line">{draft.notes.trim()}</dd>
+          </div>
+        ) : null}
+        <div>
+          <dt className="text-slate-500">{DELIVERY_LABELS[draft.delivery]}</dt>
+          <dd>
+            {draft.delivery === 'house_post'
+              ? formatDeliveryAddress(draft.deliveryAddress).map((line) => <div key={line}>{line}</div>)
+              : 'Sie holen den Auftrag im Regal der Druckerei ab.'}
+          </dd>
+        </div>
+      </dl>
       <label className="flex items-start gap-2 text-sm">
         <input
           type="checkbox"
@@ -960,6 +981,22 @@ function SubmitStep({ draft, update, catalog, organisationField }: StepProps & {
       {catalog.texts.turnaround ? <p className="text-sm text-slate-500">{catalog.texts.turnaround}</p> : null}
     </>
   )
+}
+
+/** Zeilen der Preisvorschau, die nur erscheinen, wenn der Kunde die Option gewählt hat. */
+function optionalRows(catalog: OrderCatalog, draft: Draft): [string, string][] {
+  const rows: [string, string][] = []
+  const coverPaper = selectedCoverPaper(catalog, draft)
+  if (coverPaper) {
+    const source = draft.coverFile ? 'eigene Datei' : COVER_FROM_MAIN_FILE_LABELS[draft.coverFromMain]
+    rows.push(['Deckblatt', `${coverPaper.name}, ${source}`])
+  }
+  const color = (id: string) => catalog.coverColors.find((c) => c.id === id)?.name
+  const front = color(draft.coverColorId)
+  const back = color(draft.coverBackColorId)
+  if (front || back) rows.push(['Coverfarbe', back && back !== front ? `vorne ${front ?? 'Standard'}, hinten ${back}` : front!])
+  if (draft.borderless) rows.push(['Randlos', 'ja'])
+  return rows
 }
 
 function PricePreview({
@@ -992,6 +1029,8 @@ function PricePreview({
     ],
     ['Bindung', bindingLabel && `${bindingLabel}, ${draft.duplex ? 'doppelseitig' : 'einseitig'}`],
     ['Papier', paperLabel],
+    // Deckblatt, Coverfarbe und randlos ändern Ware und Preis, deshalb stehen sie mit in der Übersicht (Issue #145).
+    ...optionalRows(catalog, draft),
     ['Exemplare', draft.copies],
     ['Lieferung', DELIVERY_LABELS[draft.delivery]],
   ]

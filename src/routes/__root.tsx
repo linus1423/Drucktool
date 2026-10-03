@@ -15,7 +15,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   },
   head: () => ({
     meta: [{ charSet: 'utf-8' }, { name: 'viewport', content: 'width=device-width, initial-scale=1' }, { title: 'Drucktool' }],
-    links: [{ rel: 'stylesheet', href: appCss }],
+    links: [
+      { rel: 'stylesheet', href: appCss },
+      // Ohne Favicon fragt jeder Browser /favicon.ico ab und bekommt 404 (Issue #148).
+      { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+    ],
   }),
   shellComponent: RootDocument,
   component: RootComponent,

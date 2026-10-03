@@ -112,8 +112,9 @@ function ProfileForm({ account, next }: { account: Account; next: string | null 
       try {
         await updateMyProfileFn({ data: { ...value, deliveryAddress: withDelivery ? value.deliveryAddress : null } })
         await queryClient.invalidateQueries({ queryKey: accountQuery.queryKey })
-        // Der Name steht auch in der Kopfzeile.
-        await queryClient.invalidateQueries({ queryKey: currentUserQuery.queryKey })
+        // Der Name steht auch in der Kopfzeile. Die Abfrage hat keinen Beobachter: invalidateQueries würde sie nur als
+        // veraltet markieren und ensureQueryData im Root weiter den alten Namen liefern (Issue #147).
+        await queryClient.fetchQuery({ ...currentUserQuery, staleTime: 0 })
         await router.invalidate()
         if (next) {
           await router.navigate({ href: next })
