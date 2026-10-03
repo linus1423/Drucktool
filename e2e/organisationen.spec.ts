@@ -44,7 +44,8 @@ test('Verwalter erstellt einen Einladungslink', async ({ page }) => {
 test('Verwalter erreicht die Organisation über die Kopfzeile', async ({ page }) => {
   await loginAsCustomer(page, chef)
   await page.goto('/uebersicht')
-  await page.getByRole('navigation', { name: 'Hauptnavigation' }).getByRole('link', { name: 'Organisation' }).click()
+  await page.getByRole('button', { name: 'Menü' }).click()
+  await page.getByRole('navigation', { name: 'Hauptnavigation' }).getByRole('link', { name: 'Organisation', exact: true }).click()
   await page.waitForURL(`**/organisationen/${organisationId}`)
   await expect(page.getByRole('heading', { name: orgName })).toBeVisible()
 })
