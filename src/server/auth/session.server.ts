@@ -101,10 +101,12 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   }
 
   const { sessionExpiresAt: _, ...user } = row
-  const organisations =
-    user.role === 'customer'
-      ? (await listMemberships(db, user.id, { onlyActive: true })).map(({ id, name, isSvk }) => ({ id, name, isSvk }))
-      : []
+  // Auch Mitarbeiter können Mitglied oder Verwalter einer Organisation sein (Issue #164).
+  const organisations = (await listMemberships(db, user.id, { onlyActive: true })).map(({ id, name, isSvk }) => ({
+    id,
+    name,
+    isSvk,
+  }))
   return { ...user, organisations }
 }
 

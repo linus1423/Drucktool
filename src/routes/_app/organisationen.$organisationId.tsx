@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFileRoute, Link, notFound, redirect, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Link, notFound, useNavigate } from '@tanstack/react-router'
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { OrganisationForm } from '~/components/OrganisationForm'
 import { Alert, Badge, Button, Card, Input, PageHeader } from '~/components/ui'
@@ -16,9 +16,6 @@ import {
 
 // Verwalter einer Organisation pflegen Mitglieder und Stammdaten selbst (Issue #12).
 export const Route = createFileRoute('/_app/organisationen/$organisationId')({
-  beforeLoad: ({ context }) => {
-    if (context.user.role !== 'customer') throw redirect({ to: '/auftraege' })
-  },
   loader: ({ context, params }) => {
     if (!UUID.test(params.organisationId)) throw notFound()
     return context.queryClient.ensureQueryData(managedOrganisationQuery(params.organisationId))

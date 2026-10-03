@@ -26,7 +26,7 @@ export type ResolveOptions = {
   customersOnly?: boolean
 }
 
-const { users, organisationMembers, oidcAccounts, sessions } = schema
+const { users, oidcAccounts, sessions } = schema
 
 const INACTIVE = 'Ihr Konto ist nicht aktiv. Bitte wenden Sie sich an die Druckerei.'
 const STAFF_ELSEWHERE =
@@ -79,8 +79,6 @@ async function decide(userId: string, claims: OidcClaims, options: ResolveOption
           updatedAt: new Date(),
         })
         .where(eq(users.id, userId))
-      // Mitarbeiter gehören keiner Kunden-Organisation an.
-      await db.delete(organisationMembers).where(eq(organisationMembers.userId, userId))
       await db.delete(sessions).where(eq(sessions.userId, userId))
       row.role = mapped
       if (row.status === 'pending') row.status = 'active'
