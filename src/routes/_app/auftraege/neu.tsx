@@ -488,10 +488,8 @@ function stepBlockers(catalog: OrderCatalog, d: Draft): (string | null)[] {
     : !copies || copies < 1
       ? 'Bitte die Anzahl der Exemplare angeben.'
       : null
-  const delivery =
-    d.delivery === 'house_post' && !deliveryAddressSchema.safeParse(d.deliveryAddress).success
-      ? 'Bitte mindestens den Empfänger für die Hauspost angeben.'
-      : null
+  const address = d.delivery === 'house_post' ? deliveryAddressSchema.safeParse(d.deliveryAddress) : null
+  const delivery = address && !address.success ? `${address.error.issues[0]!.message}.` : null
   const terms = !d.acceptTerms ? 'Bitte den Auftragsbedingungen zustimmen.' : null
   return [file, fmt, bind, paper, options, delivery, terms]
 }

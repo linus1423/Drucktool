@@ -3,7 +3,7 @@
 // die Antwort ein.
 import { useState } from 'react'
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
-import { EMPTY_DELIVERY, deliveryAddressSchema, type DeliveryAddress } from '~/lib/address'
+import { DELIVERY_PLACE_MISSING, EMPTY_DELIVERY, deliveryAddressSchema, type DeliveryAddress } from '~/lib/address'
 import { errorMessage, isConflictError } from '~/lib/errors'
 import { formatDateTime, formatMoney } from '~/lib/format'
 import {
@@ -443,6 +443,7 @@ export function ProposeChangeForm({
             {addr('department', 'Lehrstuhl / Einrichtung')}
             {addr('building', 'Gebäude')}
             {addr('room', 'Raum')}
+            {!addressOk ? <p className="text-sm text-slate-600 sm:col-span-2">{DELIVERY_PLACE_MISSING}.</p> : null}
           </div>
         ) : null}
 
