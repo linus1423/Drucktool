@@ -254,6 +254,23 @@ export async function copyAsUpload(user: Principal, source: typeof requestFiles.
   }
 }
 
+/**
+ * Dateien eines im Browser gespeicherten Entwurfs (Issue #175): nur eigene, noch nicht abgeschickte Uploads mit
+ * passender Rolle. Sie werden frisch datiert, damit das Aufräumen sie nicht löscht, während der Assistent offen ist.
+ */
+export async function draftFiles(user: Principal, ids: { main: string | null; cover: string | null }) {
+  const wanted = [ids.main, ids.cover].filter((id): id is string => !!id)
+  if (wanted.length === 0) return { main: null, cover: null }
+  const rows = await getDb()
+    .update(requestFiles)
+    .set({ createdAt: new Date() })
+    .where(and(inArray(requestFiles.id, wanted), eq(requestFiles.ownerId, user.id), isNull(requestFiles.requestId)))
+    .returning()
+  const main = rows.find((r) => r.id === ids.main && r.role === 'main')
+  const cover = rows.find((r) => r.id === ids.cover && r.role === 'cover')
+  return { main: main ? publicFile(main) : null, cover: cover ? publicFile(cover) : null }
+}
+
 export async function claimFiles(tx: Tx, user: Principal, requestId: string, ids: { main: string; cover: string | null }) {
   const wanted = [ids.main, ...(ids.cover ? [ids.cover] : [])]
   const rows = await tx
