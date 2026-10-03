@@ -554,6 +554,8 @@ holt einen älteren Stand.
 | `UPLOAD_DIR`                                                                        | Ablage für Druckdateien, Standard `data/uploads` (im Image `/app/uploads`)           |
 | `UPLOAD_MAX_MB`                                                                     | Größte erlaubte Druckdatei in MB, Standard 500                                       |
 | `UPLOAD_PENDING_MAX_MB`                                                             | Offene Uploads pro Person zusammen in MB, Standard 3 × `UPLOAD_MAX_MB`               |
+| `PDF_ANALYSE_TIMEOUT_SECONDS`                                                       | Zeitlimit für das Auslesen einer PDF, Standard 60                                    |
+| `PDF_ANALYSE_MAX_MEMORY_MB`                                                         | Speicherlimit dafür (eigener Prozess), Standard 1024                                 |
 | `CLAMAV_HOST`, `CLAMAV_PORT`                                                        | Virenprüfung mit clamd; Compose/Ansible: `clamav`, leer = keine Prüfung              |
 | `LEXWARE_ARTICLE_NUMBER`, `LEXWARE_TAX_RATE`                                        | Lexware-Export: Stammartikel (Standard `DRUCK`) und Steuersatz in % (Standard 19)    |
 | `ATTACHMENT_MAX_MB`, `ATTACHMENT_TYPES`                                             | Anhänge an Nachrichten: Größe in MB (Standard 25), erlaubte Endungen (kommagetrennt) |

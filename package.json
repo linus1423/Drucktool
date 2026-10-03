@@ -16,7 +16,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env scripts/migrate.ts",
     "db:seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
-    "build:scripts": "esbuild scripts/migrate.ts scripts/seed.ts scripts/mail-worker.ts --bundle --platform=node --format=esm --target=node22 --outdir=.output/scripts --out-extension:.js=.mjs --log-level=warning",
+    "build:scripts": "esbuild scripts/migrate.ts scripts/seed.ts scripts/mail-worker.ts --bundle --platform=node --format=esm --target=node22 --outdir=.output/scripts --out-extension:.js=.mjs --log-level=warning && esbuild src/server/files/pdf-worker.ts --bundle --platform=node --format=esm --target=node22 --outfile=.output/scripts/pdf-worker.mjs --log-level=warning",
     "mail:worker": "tsx --env-file-if-exists=.env scripts/mail-worker.ts"
   },
   "dependencies": {
