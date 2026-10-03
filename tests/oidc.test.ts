@@ -185,7 +185,9 @@ describe.skipIf(!url)('OpenID Connect: Benutzerzuordnung (Integration)', async (
     expect(links).toHaveLength(0)
 
     // Auch eine ältere Verknüpfung hilft nicht mehr.
-    await getDb().insert(schema.oidcAccounts).values({ userId: su!.id, issuer: ISS, subject: `su-alt-${stamp}` })
+    await getDb()
+      .insert(schema.oidcAccounts)
+      .values({ userId: su!.id, issuer: ISS, subject: `su-alt-${stamp}` })
     const linked = await resolveOidcUser(ISS, { sub: `su-alt-${stamp}` }, { policy: 'reject', roles })
     expect(linked.kind).toBe('denied')
   })
