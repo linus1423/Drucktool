@@ -2,6 +2,8 @@
 // Organisationen sind optional; ein Kunde kann keiner, einer oder mehreren angehören.
 import { and, asc, count, desc, eq, inArray, notInArray } from 'drizzle-orm'
 import { z } from 'zod'
+import { suggestOrganisations } from '~/lib/organisation-match'
+import { organisationSchema } from '~/lib/validation'
 import { writeAudit } from '../audit/audit.server'
 import { getDb, schema, type Tx } from '../db/client.server'
 import { notifyOrganisationRequestDecision, notifyOrganisationRequested } from '../mail/notifications.server'
@@ -78,12 +80,31 @@ async function addMembership(tx: Tx, userId: string, organisationId: string) {
 // Anfragen durch Kunden
 // ---------------------------------------------------------------------------
 
-export const organisationRequestSchema = z.object({
-  name: z.string().trim().min(1, 'Name ist erforderlich').max(200, 'Der Name ist zu lang'),
+// Alle Stammdaten einer Organisation, damit die Druckerei sie ohne Rückfrage anlegen kann (Issue #176).
+const organisationFieldsSchema = organisationSchema.omit({ status: true, isSvk: true }).partial().required({ name: true })
+
+export const organisationRequestSchema = organisationFieldsSchema.extend({
   details: z.string().trim().max(2000, 'Die Angaben sind zu lang'),
 })
 
-export async function requestOrganisation(user: Principal, input: z.infer<typeof organisationRequestSchema>) {
+/** Leere Felder als null speichern, wie bei den Organisationen selbst. */
+function organisationFields(input: z.infer<typeof organisationFieldsSchema>) {
+  const blank = (v: string | undefined) => v || null
+  return {
+    name: input.name,
+    email: blank(input.email),
+    phone: blank(input.phone),
+    street: blank(input.street),
+    zip: blank(input.zip),
+    city: blank(input.city),
+    country: (input.country || 'DE').toUpperCase(),
+    vatId: blank(input.vatId),
+    costCenter: blank(input.costCenter),
+  }
+}
+
+export async function requestOrganisation(user: Principal, input: z.input<typeof organisationRequestSchema>) {
+  const data = organisationRequestSchema.parse(input)
   return getDb().transaction(async (tx) => {
     // Sperre auf den Benutzer, damit parallele Anfragen das Limit nicht umgehen.
     await tx.select({ id: users.id }).from(users).where(eq(users.id, user.id)).for('update')
@@ -96,9 +117,9 @@ export async function requestOrganisation(user: Principal, input: z.infer<typeof
     }
     const [row] = await tx
       .insert(organisationRequests)
-      .values({ userId: user.id, name: input.name, details: input.details })
+      .values({ userId: user.id, ...organisationFields(data), details: data.details })
       .returning({ id: organisationRequests.id })
-    await notifyOrganisationRequested(tx, user, { name: input.name, details: input.details })
+    await notifyOrganisationRequested(tx, user, { ...organisationFields(data), details: data.details })
     return row!
   })
 }
@@ -137,30 +158,55 @@ export async function withdrawOrganisationRequest(user: Principal, id: string) {
 // ---------------------------------------------------------------------------
 
 export async function listOpenOrganisationRequests() {
-  return getDb()
-    .select({
-      id: organisationRequests.id,
-      name: organisationRequests.name,
-      details: organisationRequests.details,
-      createdAt: organisationRequests.createdAt,
-      userId: users.id,
-      userName: users.name,
-      userEmail: users.email,
-    })
-    .from(organisationRequests)
-    .innerJoin(users, eq(users.id, organisationRequests.userId))
-    .where(eq(organisationRequests.status, 'open'))
-    .orderBy(asc(organisationRequests.createdAt))
+  const [rows, active] = await Promise.all([
+    getDb()
+      .select({
+        id: organisationRequests.id,
+        name: organisationRequests.name,
+        email: organisationRequests.email,
+        phone: organisationRequests.phone,
+        street: organisationRequests.street,
+        zip: organisationRequests.zip,
+        city: organisationRequests.city,
+        country: organisationRequests.country,
+        vatId: organisationRequests.vatId,
+        costCenter: organisationRequests.costCenter,
+        details: organisationRequests.details,
+        createdAt: organisationRequests.createdAt,
+        userId: users.id,
+        userName: users.name,
+        userEmail: users.email,
+      })
+      .from(organisationRequests)
+      .innerJoin(users, eq(users.id, organisationRequests.userId))
+      .where(eq(organisationRequests.status, 'open'))
+      .orderBy(asc(organisationRequests.createdAt)),
+    getDb()
+      .select({
+        id: organisations.id,
+        name: organisations.name,
+        email: organisations.email,
+        street: organisations.street,
+        zip: organisations.zip,
+        city: organisations.city,
+        vatId: organisations.vatId,
+        costCenter: organisations.costCenter,
+      })
+      .from(organisations)
+      .where(eq(organisations.status, 'active')),
+  ])
+  // Die naheliegendsten Organisationen für die Zuordnung (Issue #176).
+  return rows.map((r) => ({ ...r, suggestions: suggestOrganisations(r, active) }))
 }
 
 export const resolveOrganisationRequestSchema = z.discriminatedUnion('action', [
   // Kunden einer bestehenden Organisation zuordnen.
   z.object({ id: z.uuid(), action: z.literal('assign'), organisationId: z.uuid() }),
-  // Aus der Anfrage eine neue Organisation anlegen; der Name kann noch korrigiert werden.
-  z.object({
+  // Aus der Anfrage eine neue Organisation anlegen; die Angaben können noch korrigiert werden.
+  organisationFieldsSchema.extend({
     id: z.uuid(),
     action: z.literal('create'),
-    name: z.string().trim().min(1, 'Name ist erforderlich').max(200, 'Der Name ist zu lang'),
+    isSvk: z.boolean().optional(),
   }),
   z.object({ id: z.uuid(), action: z.literal('reject'), note: z.string().trim().max(2000) }),
 ])
@@ -205,7 +251,7 @@ export async function resolveOrganisationRequest(actor: Principal, input: z.infe
     } else {
       const [created] = await tx
         .insert(organisations)
-        .values({ name: input.name, status: 'active' })
+        .values({ ...organisationFields(input), isSvk: input.isSvk ?? false, status: 'active' })
         .returning({ id: organisations.id, name: organisations.name, status: organisations.status })
       organisation = created!
       await writeAudit(tx, {
