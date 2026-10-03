@@ -33,6 +33,7 @@ import { Route as AppAuftraegeRequestIdRouteImport } from './routes/_app/auftrae
 import { Route as AppAuftraegeBoardRouteImport } from './routes/_app/auftraege/board'
 import { Route as AppAuftraegeNeuRouteImport } from './routes/_app/auftraege/neu'
 import { Route as AppEinladungTokenRouteImport } from './routes/_app/einladung.$token'
+import { Route as AppOrganisationenIndexRouteImport } from './routes/_app/organisationen.index'
 import { Route as AppOrganisationenOrganisationIdRouteImport } from './routes/_app/organisationen.$organisationId'
 import { Route as ApiAuftraegeExportRouteImport } from './routes/api/auftraege/export'
 import { Route as ApiDateienIndexRouteImport } from './routes/api/dateien/index'
@@ -167,6 +168,11 @@ const AppEinladungTokenRoute = AppEinladungTokenRouteImport.update({
   path: '/einladung/$token',
   getParentRoute: () => AppRoute,
 } as any)
+const AppOrganisationenIndexRoute = AppOrganisationenIndexRouteImport.update({
+  id: '/organisationen/',
+  path: '/organisationen/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppOrganisationenOrganisationIdRoute =
   AppOrganisationenOrganisationIdRouteImport.update({
     id: '/organisationen/$organisationId',
@@ -267,6 +273,7 @@ export interface FileRoutesByFullPath {
   '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
   '/api/rechnungen/lexware': typeof ApiRechnungenLexwareRoute
   '/auftraege/': typeof AppAuftraegeIndexRoute
+  '/organisationen/': typeof AppOrganisationenIndexRoute
   '/api/dateien/': typeof ApiDateienIndexRoute
   '/admin/organisationen/$organisationId': typeof AppAdminOrganisationenOrganisationIdRoute
   '/admin/organisationen/neu': typeof AppAdminOrganisationenNeuRoute
@@ -305,6 +312,7 @@ export interface FileRoutesByTo {
   '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
   '/api/rechnungen/lexware': typeof ApiRechnungenLexwareRoute
   '/auftraege': typeof AppAuftraegeIndexRoute
+  '/organisationen': typeof AppOrganisationenIndexRoute
   '/api/dateien': typeof ApiDateienIndexRoute
   '/admin/organisationen/$organisationId': typeof AppAdminOrganisationenOrganisationIdRoute
   '/admin/organisationen/neu': typeof AppAdminOrganisationenNeuRoute
@@ -345,6 +353,7 @@ export interface FileRoutesById {
   '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
   '/api/rechnungen/lexware': typeof ApiRechnungenLexwareRoute
   '/_app/auftraege/': typeof AppAuftraegeIndexRoute
+  '/_app/organisationen/': typeof AppOrganisationenIndexRoute
   '/api/dateien/': typeof ApiDateienIndexRoute
   '/_app/admin/organisationen/$organisationId': typeof AppAdminOrganisationenOrganisationIdRoute
   '/_app/admin/organisationen/neu': typeof AppAdminOrganisationenNeuRoute
@@ -385,6 +394,7 @@ export interface FileRouteTypes {
     | '/api/dateien/$fileId'
     | '/api/rechnungen/lexware'
     | '/auftraege/'
+    | '/organisationen/'
     | '/api/dateien/'
     | '/admin/organisationen/$organisationId'
     | '/admin/organisationen/neu'
@@ -423,6 +433,7 @@ export interface FileRouteTypes {
     | '/api/dateien/$fileId'
     | '/api/rechnungen/lexware'
     | '/auftraege'
+    | '/organisationen'
     | '/api/dateien'
     | '/admin/organisationen/$organisationId'
     | '/admin/organisationen/neu'
@@ -462,6 +473,7 @@ export interface FileRouteTypes {
     | '/api/dateien/$fileId'
     | '/api/rechnungen/lexware'
     | '/_app/auftraege/'
+    | '/_app/organisationen/'
     | '/api/dateien/'
     | '/_app/admin/organisationen/$organisationId'
     | '/_app/admin/organisationen/neu'
@@ -663,6 +675,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppEinladungTokenRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/organisationen/': {
+      id: '/_app/organisationen/'
+      path: '/organisationen'
+      fullPath: '/organisationen/'
+      preLoaderRoute: typeof AppOrganisationenIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/organisationen/$organisationId': {
       id: '/_app/organisationen/$organisationId'
       path: '/organisationen/$organisationId'
@@ -797,6 +816,7 @@ interface AppRouteChildren {
   AppEinladungTokenRoute: typeof AppEinladungTokenRoute
   AppOrganisationenOrganisationIdRoute: typeof AppOrganisationenOrganisationIdRoute
   AppAuftraegeIndexRoute: typeof AppAuftraegeIndexRoute
+  AppOrganisationenIndexRoute: typeof AppOrganisationenIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -812,6 +832,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppEinladungTokenRoute: AppEinladungTokenRoute,
   AppOrganisationenOrganisationIdRoute: AppOrganisationenOrganisationIdRoute,
   AppAuftraegeIndexRoute: AppAuftraegeIndexRoute,
+  AppOrganisationenIndexRoute: AppOrganisationenIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

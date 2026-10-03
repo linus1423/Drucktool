@@ -60,6 +60,11 @@ function AppLayout() {
           Skripte
         </Link>
       ) : null}
+      {user.organisations.some((o) => o.isAdmin) ? (
+        <Link to="/organisationen" className={navLink} activeProps={navActive}>
+          Organisation
+        </Link>
+      ) : null}
       {isStaffRole(user.role) ? (
         <Link to="/organisationsanfragen" className={navLink} activeProps={navActive}>
           Organisationsanfragen
