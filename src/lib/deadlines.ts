@@ -4,16 +4,31 @@ import { z } from 'zod'
 import { TERMINAL_STATUSES, type RequestStatus } from './status'
 
 const days = z.number().int().min(1, 'Mindestens 1 Tag').max(365)
+// Erinnerungen (Issue #174): 0 schaltet ab. Fehlt der Wert in älteren Einstellungen, ist die Erinnerung aus.
+const reminderDays = z.number().int().min(0, 'Mindestens 0 Tage').max(365).default(0)
 
-/** Ab wie vielen Tagen im selben Status ein Auftrag hervorgehoben wird. */
+/**
+ * Ab wie vielen Tagen im selben Status ein Auftrag hervorgehoben wird, und nach wie vielen Tagen der Kunde
+ * an eine offene Rückfrage, ein Angebot oder einen Änderungsvorschlag erinnert wird.
+ */
 export const deadlineSettingsSchema = z.object({
   staleSubmittedDays: days,
   staleOnHoldDays: days,
   staleConfirmedDays: days,
+  remindOnHoldDays: reminderDays,
+  remindOfferedDays: reminderDays,
+  remindProposalDays: reminderDays,
 })
 export type DeadlineSettings = z.infer<typeof deadlineSettingsSchema>
 
-export const DEFAULT_DEADLINE_SETTINGS: DeadlineSettings = { staleSubmittedDays: 2, staleOnHoldDays: 5, staleConfirmedDays: 10 }
+export const DEFAULT_DEADLINE_SETTINGS: DeadlineSettings = {
+  staleSubmittedDays: 2,
+  staleOnHoldDays: 5,
+  staleConfirmedDays: 10,
+  remindOnHoldDays: 0,
+  remindOfferedDays: 0,
+  remindProposalDays: 0,
+}
 
 export type Attention = 'overdue' | 'due_today' | 'stale'
 
