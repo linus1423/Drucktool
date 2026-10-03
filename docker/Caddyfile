@@ -1,0 +1,5 @@
+# Für den Dienst caddy in docker-compose.yml (Profil "https"). DOMAIN kommt aus der .env.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:3000
+}
