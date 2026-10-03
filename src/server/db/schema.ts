@@ -76,6 +76,8 @@ export const users = pgTable(
     reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
     emailNotifications: boolean('email_notifications').notNull().default(true),
+    /** Mitarbeiter mit Freigabe verwalten die Skripte aller SVKs; Admins dürfen das immer (Issue #158). */
+    canManageScripts: boolean('can_manage_scripts').notNull().default(false),
     billingAddress: jsonb('billing_address').$type<BillingAddress>(),
     deliveryAddress: jsonb('delivery_address').$type<DeliveryAddress>(),
     // Gesetzt, wenn das Konto anonymisiert wurde (DSGVO, Issue #26). Aufträge bleiben erhalten.

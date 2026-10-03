@@ -73,6 +73,7 @@ export const AUDIT_FIELD_LABELS: Record<string, string> = {
   email: 'E-Mail',
   role: 'Rolle',
   status: 'Status',
+  canManageScripts: 'Skripte verwalten',
   organisationId: 'Organisation',
   organisationIds: 'Organisationen',
   phone: 'Telefon',

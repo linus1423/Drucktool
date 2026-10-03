@@ -103,6 +103,8 @@ Mitglieder sehen den Menüpunkt „Skripte“ und dort:
   Semester. „Für neues Semester kopieren“ übernimmt die Vorlage, alte Skripte lassen sich archivieren.
 
 Alle SVK-Mitglieder sehen die Aufträge der SVK (nur lesend, ändern kann der Besteller). Mitarbeiter sehen alle Skripte.
+Administratoren und Mitarbeiter mit dem Haken „Darf Skripte der SVK verwalten“ (Benutzerverwaltung) legen Skripte
+außerdem an, bearbeiten, kopieren und archivieren sie; bestellen können weiterhin nur SVK-Mitglieder.
 
 ## Status eines Auftrags
 

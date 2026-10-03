@@ -103,4 +103,25 @@ describe.skipIf(!url)('Freigabe von Registrierungen (Integration)', () => {
       }),
     ).rejects.toThrow('Nur ein Superadmin')
   })
+
+  it('speichert die Freigabe für Skripte nur bei Mitarbeitern (Issue #158)', async () => {
+    const admin = await principal('admin')
+    const staff = await principal('staff')
+    const input = {
+      id: staff.id,
+      firstName: '',
+      lastName: 'Helfer',
+      email: `helfer-${Date.now()}@test`,
+      role: 'staff' as const,
+      organisationIds: [],
+      status: 'active' as const,
+      password: '',
+      canManageScripts: true,
+    }
+    const flag = async () => (await getDb().select().from(schema.users).where(eq(schema.users.id, staff.id)))[0]!.canManageScripts
+    await updateUser(admin, input)
+    expect(await flag()).toBe(true)
+    await updateUser(admin, { ...input, role: 'customer' })
+    expect(await flag()).toBe(false)
+  })
 })

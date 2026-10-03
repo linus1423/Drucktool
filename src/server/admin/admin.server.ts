@@ -13,7 +13,7 @@ import type { Principal } from '../requests/requests.server'
 const { users, organisations, organisationMembers, requests, sessions } = schema
 
 // Felder, die im Audit-Log festgehalten werden (keine Passwörter oder Hashes).
-const USER_AUDIT_FIELDS = ['firstName', 'lastName', 'email', 'role', 'status', 'organisationIds'] as const
+const USER_AUDIT_FIELDS = ['firstName', 'lastName', 'email', 'role', 'status', 'canManageScripts', 'organisationIds'] as const
 const ORG_AUDIT_FIELDS = [
   'name',
   'email',
@@ -322,6 +322,7 @@ export async function listUsers() {
         email: users.email,
         role: users.role,
         status: users.status,
+        canManageScripts: users.canManageScripts,
         lastLoginAt: users.lastLoginAt,
         anonymizedAt: users.anonymizedAt,
         createdAt: users.createdAt,
@@ -364,6 +365,8 @@ const userFields = {
   role: z.enum(USER_ROLES),
   // Nur für Kunden; keine, eine oder mehrere Organisationen.
   organisationIds: z.array(z.uuid()).max(50),
+  // Nur für Mitarbeiter; Admins verwalten Skripte immer (Issue #158).
+  canManageScripts: z.boolean().optional(),
 }
 
 // Ohne Passwort meldet sich die Person per Anmeldelink oder Single Sign-on an.
@@ -386,6 +389,7 @@ export async function createUser(actor: Principal, input: z.infer<typeof createU
         lastName: input.lastName,
         email: input.email,
         role: input.role,
+        canManageScripts: input.role === 'staff' && !!input.canManageScripts,
         passwordHash,
         status: 'active',
         reviewedById: actor.id,
@@ -453,6 +457,7 @@ export async function updateUser(actor: Principal, input: z.infer<typeof updateU
         email: input.email,
         role: input.role,
         status: input.status,
+        canManageScripts: input.role === 'staff' && !!input.canManageScripts,
         ...(passwordHash ? { passwordHash } : {}),
         updatedAt: new Date(),
       })

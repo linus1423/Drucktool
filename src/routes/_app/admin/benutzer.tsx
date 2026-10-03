@@ -94,6 +94,7 @@ function UserForm({ editing, actorRole, onDone }: { editing: Editing; actorRole:
       role: (existing?.role ?? 'staff') as UserRole,
       status: (existing?.status ?? 'active') as UserStatus,
       organisationIds: existing?.organisations.map((o) => o.id) ?? [],
+      canManageScripts: existing?.canManageScripts ?? false,
       password: '',
     },
     onSubmit: async ({ value }) => {
@@ -105,6 +106,7 @@ function UserForm({ editing, actorRole, onDone }: { editing: Editing; actorRole:
           email: value.email,
           role: value.role,
           organisationIds: value.role === 'customer' ? value.organisationIds : [],
+          canManageScripts: value.role === 'staff' && value.canManageScripts,
         }
         if (existing) {
           await updateUserFn({ data: { ...base, id: existing.id, status: value.status, password: value.password } })
@@ -204,6 +206,23 @@ function UserForm({ editing, actorRole, onDone }: { editing: Editing; actorRole:
                       ))}
                     </div>
                   </fieldset>
+                )}
+              </form.Field>
+            ) : role === 'staff' ? (
+              <form.Field name="canManageScripts">
+                {(field) => (
+                  <label className="flex items-start gap-2 self-end text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.checked)}
+                    />
+                    <span>
+                      Darf Skripte der SVK verwalten
+                      <span className="block text-slate-500">Administratoren dürfen das immer.</span>
+                    </span>
+                  </label>
                 )}
               </form.Field>
             ) : (
