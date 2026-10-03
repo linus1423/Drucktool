@@ -62,10 +62,13 @@ export const users = pgTable(
     email: text('email').notNull(),
     firstName: text('first_name').notNull().default(''),
     lastName: text('last_name').notNull().default(''),
-    /** Anzeigename „Vorname Nachname“, von der Datenbank berechnet (siehe displayName in lib/name.ts). */
+    /**
+     * Anzeigename „Vorname Nachname“, von der Datenbank berechnet (siehe displayName in lib/name.ts).
+     * Solange beide leer sind (neue Kunden vor dem Ausfüllen des Profils), steht hier die E-Mail-Adresse.
+     */
     name: text('name')
       .notNull()
-      .generatedAlwaysAs(sql`btrim(first_name || ' ' || last_name)`),
+      .generatedAlwaysAs(sql`coalesce(nullif(btrim(first_name || ' ' || last_name), ''), email)`),
     passwordHash: text('password_hash'),
     role: userRole('role').notNull().default('customer'),
     status: userStatus('status').notNull().default('pending'),

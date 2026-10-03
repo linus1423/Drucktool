@@ -97,6 +97,14 @@ describe.skipIf(!url)('OpenID Connect: Benutzerzuordnung (Integration)', async (
     // Ohne given_name/family_name wird name am letzten Leerzeichen geteilt.
     expect(p).toMatchObject({ firstName: 'Neu', lastName: 'Zwei' })
 
+    // Ganz ohne Namens-Claims bleiben die Namen leer statt der Adresse im Nachnamen (Issue #159).
+    await resolveOidcUser(ISS, { sub: `o-${stamp}`, email: email('ohne'), email_verified: true }, { policy: 'pending' })
+    const [o] = await getDb()
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.email, email('ohne')))
+    expect(o).toMatchObject({ firstName: '', lastName: '', name: email('ohne') })
+
     const staff = await resolveOidcUser(
       ISS,
       { sub: `st-${stamp}`, email: email('neu3'), email_verified: true },

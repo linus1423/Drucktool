@@ -37,14 +37,14 @@ const claimText = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
 
 /**
  * Vor- und Nachname aus den Claims: bevorzugt given_name/family_name, sonst wird name am letzten
- * Leerzeichen geteilt, notfalls steht die E-Mail-Adresse im Nachnamen.
+ * Leerzeichen geteilt. Ohne Namen bleiben beide leer, die Person trägt sie im Profil nach (Issue #159).
  */
-export function nameFromClaims(claims: OidcClaims, email: string): PersonName {
+export function nameFromClaims(claims: OidcClaims): PersonName {
   const firstName = claimText(claims.given_name)
   const lastName = claimText(claims.family_name)
   if (firstName || lastName) return { firstName, lastName }
   const name = claimText(claims.name)
-  return name ? splitName(name) : { firstName: '', lastName: email }
+  return name ? splitName(name) : { firstName: '', lastName: '' }
 }
 
 /** Liefert "admin" oder "staff", wenn der Claim einen der konfigurierten Werte enthält. */
@@ -141,7 +141,7 @@ export async function resolveOidcUser(issuer: string, claims: OidcClaims, option
   const role = mapped ?? (options.policy === 'staff' ? 'staff' : 'customer')
   // Lastenheft V2: Kunden über den Kunden-Anbieter sind sofort aktiv, wie beim Anmeldelink.
   const status = role === 'customer' && options.policy !== 'customer' ? 'pending' : 'active'
-  const personName = nameFromClaims(claims, email)
+  const personName = nameFromClaims(claims)
   const created = await db.transaction(async (tx) => {
     const [user] = await tx
       .insert(users)
@@ -152,7 +152,7 @@ export async function resolveOidcUser(issuer: string, claims: OidcClaims, option
     await tx.insert(oidcAccounts).values({ userId: user.id, issuer, subject: claims.sub })
     if (status === 'pending') {
       await notifyRegistrationReceived(tx, {
-        name: displayName(personName),
+        name: displayName(personName) || email,
         email,
         organisationName: 'ohne Organisation (Anmeldung über OIDC)',
       })
