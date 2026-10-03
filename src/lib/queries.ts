@@ -56,7 +56,7 @@ export const requestListQuery = (filter: RequestListFilter) =>
     queryFn: () => listRequestsFn({ data: filter }),
   })
 
-export const requestBoardQuery = (filter: { mine?: boolean; search?: string }) =>
+export const requestBoardQuery = (filter: { mine?: boolean; search?: string; ready?: boolean }) =>
   queryOptions({
     queryKey: ['requests', 'list', 'board', filter],
     queryFn: () => listBoardFn({ data: filter }),

@@ -7,7 +7,7 @@ import { Badge, Button, Input, PageHeader, Select, StatusBadge, cx } from '~/com
 import { LexwarePending } from '~/components/LexwareExport'
 import { AttentionBadge } from '~/components/AttentionBadge'
 import { formatDate, formatDateTime, formatMoney, formatRequestNumber } from '~/lib/format'
-import { DELIVERY_LABELS } from '~/lib/order'
+import { DELIVERY_LABELS, HANDOVER_LABELS } from '~/lib/order'
 import { activeOrganisationsQuery, assignableStaffQuery, readableOrganisationsQuery, requestListQuery } from '~/lib/queries'
 import { isStaffRole } from '~/lib/roles'
 import { INTERNAL_STATUS_LABELS, INTERNAL_STATUS_TONES, REQUEST_STATUSES, STATUS_LABELS } from '~/lib/status'
@@ -19,7 +19,10 @@ const date = z.iso.date().optional().catch(undefined)
 // Filter, Sortierung und Seite stehen in der URL, damit Links und „Zurück“ funktionieren (Issue #15).
 const searchSchema = z.object({
   status: z.enum(REQUEST_STATUSES).optional().catch(undefined),
-  ansicht: z.enum(['offen', 'fertig', 'alle', 'meine', 'fuer_mich', 'ungelesen', 'ueberfaellig']).optional().catch(undefined),
+  ansicht: z
+    .enum(['offen', 'fertig', 'abholbereit', 'alle', 'meine', 'fuer_mich', 'ungelesen', 'ueberfaellig'])
+    .optional()
+    .catch(undefined),
   q: z.string().optional().catch(undefined),
   org: z.uuid().optional().catch(undefined),
   zustaendig: z
@@ -65,6 +68,7 @@ function toFilter(search: Search) {
     status: search.status,
     open: view === 'offen' && !search.status ? true : undefined,
     done: view === 'fertig' && !search.status ? true : undefined,
+    readyForPickup: view === 'abholbereit' ? true : undefined,
     assignedToMe: view === 'meine' ? true : undefined,
     overdue: view === 'ueberfaellig' ? true : undefined,
     watching: view === 'fuer_mich' ? true : undefined,
@@ -177,12 +181,24 @@ function RequestListPage() {
       col.accessor('deliveryMethod', {
         header: 'Lieferung',
         enableSorting: false,
-        cell: (info) =>
-          info.getValue() === 'house_post' ? (
-            <Badge className="bg-violet-100 text-violet-800">{DELIVERY_LABELS.house_post}</Badge>
-          ) : (
-            <span className="text-slate-500">{DELIVERY_LABELS.pickup}</span>
-          ),
+        cell: (info) => {
+          const { status, handedOverAt } = info.row.original
+          return (
+            <>
+              {info.getValue() === 'house_post' ? (
+                <Badge className="bg-violet-100 text-violet-800">{DELIVERY_LABELS.house_post}</Badge>
+              ) : (
+                <span className="text-slate-500">{DELIVERY_LABELS.pickup}</span>
+              )}
+              {/* Abholung bzw. Zustellung erfasst (Issue #173). */}
+              {status === 'completed' ? (
+                <span className="block text-xs text-slate-500">
+                  {handedOverAt ? `${HANDOVER_LABELS[info.getValue()]} ${formatDate(handedOverAt)}` : 'liegt bereit'}
+                </span>
+              ) : null}
+            </>
+          )
+        },
       }),
       ...(staff
         ? [col.accessor('assigneeName', { header: 'Zuständig', enableSorting: false, cell: (info) => info.getValue() ?? '–' })]
@@ -308,6 +324,7 @@ function RequestListPage() {
             >
               <option value="offen">{staff ? 'Warteschlange (offen)' : 'Offene Aufträge'}</option>
               <option value="fertig">Fertige Aufträge</option>
+              {staff ? <option value="abholbereit">Liegt zur Abholung bereit</option> : null}
               <option value="alle">Alle Aufträge</option>
               {staff ? <option value="meine">Mir zugewiesen</option> : null}
               {staff ? <option value="fuer_mich">Für mich (beobachtet)</option> : null}
