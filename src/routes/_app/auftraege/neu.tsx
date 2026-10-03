@@ -264,8 +264,9 @@ function NewOrderPage() {
         deliveryAddress: t.deliveryAddress ?? d.deliveryAddress,
       }),
     )
-    // Bei einer Nachbestellung ändert sich meist nur die Anzahl.
-    setStep(4)
+    // Bei einer Nachbestellung ändert sich meist nur die Anzahl. Ist die Druckdatei nach Ablauf der Löschfrist
+    // gelöscht (Issue #172), geht es mit dem Upload los.
+    setStep(t.mainFile ? 4 : 0)
   }, [template.data, catalog])
   // Erste Bestellung eines Skripts: Titel aus dem Skript übernehmen.
   const scriptTitle = script.data && !vorlage ? `${script.data.title} (${script.data.semester})` : null
@@ -387,7 +388,11 @@ function NewOrderPage() {
               <Link to="/auftraege/$requestId" params={{ requestId: template.data.source.id }} className="underline">
                 {formatRequestNumber(template.data.source.number)}
               </Link>
-              . Optionen und Dateien sind übernommen; der Preis wird mit den aktuellen Preisen neu berechnet. Bitte alles prüfen.
+              .{' '}
+              {template.data.filesPurged
+                ? 'Die Optionen sind übernommen. Die Dateien des alten Auftrags wurden nach Ablauf der Löschfrist gelöscht, bitte laden Sie die Druckdatei (und ggf. das Deckblatt) neu hoch.'
+                : 'Optionen und Dateien sind übernommen.'}{' '}
+              Der Preis wird mit den aktuellen Preisen neu berechnet. Bitte alles prüfen.
             </Alert>
           ) : null}
         </div>

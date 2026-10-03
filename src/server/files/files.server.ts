@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { isStaffRole } from '~/lib/roles'
 import { getDb, schema, type Tx } from '../db/client.server'
 import { managedOrganisationIds } from '../organisations/org-admin.server'
@@ -6,6 +6,7 @@ import { svkOrganisationIds } from '../scripts/scripts.server'
 import type { Principal } from '../requests/requests.server'
 import { writeAudit } from '../audit/audit.server'
 import { logger } from '../log.server'
+import { purgeUnsubmittedUploads } from '../maintenance/cleanup.server'
 import { analysePdf } from './pdf.server'
 import {
   maxAttachmentBytes,
@@ -80,9 +81,6 @@ async function storeWithinRoom(body: Parameters<typeof storeStream>[0], limit: n
   }
 }
 
-/** Nicht abgeschickte Uploads werden nach einem Tag gelöscht. */
-const ORPHAN_MAX_AGE_MS = 24 * 60 * 60 * 1000
-
 export function publicFile(row: typeof requestFiles.$inferSelect) {
   return {
     id: row.id,
@@ -94,6 +92,8 @@ export function publicFile(row: typeof requestFiles.$inferSelect) {
     pageWidthMm: row.pageWidthMm,
     pageHeightMm: row.pageHeightMm,
     mixedPageSizes: row.mixedPageSizes,
+    // Nach Ablauf der Löschfrist entfernt (Issue #172): dann gibt es nichts mehr herunterzuladen.
+    purgedAt: row.purgedAt,
     createdAt: row.createdAt,
   }
 }
@@ -169,13 +169,9 @@ async function assertNoVirus(user: Principal, key: string, filename: string) {
   throw new VirusFoundError(result.signature)
 }
 
-export async function cleanupOrphans(now = Date.now()) {
-  const rows = await getDb()
-    .delete(requestFiles)
-    .where(and(isNull(requestFiles.requestId), lt(requestFiles.createdAt, new Date(now - ORPHAN_MAX_AGE_MS))))
-    .returning({ key: requestFiles.storageKey })
-  await Promise.all(rows.map((r) => removeStored(r.key)))
-  return rows.length
+/** Räumt nie abgeschickte Uploads ab (UNSUBMITTED_UPLOAD_RETENTION_DAYS); läuft auch stündlich im Worker. */
+export async function cleanupOrphans() {
+  return purgeUnsubmittedUploads(getDb())
 }
 
 /**
@@ -217,6 +213,7 @@ export async function fileForDownload(user: Principal, id: string) {
  * Die Kopie liegt getrennt auf der Platte, damit das Löschen eines Auftrags die andere nicht berührt.
  */
 export async function copyAsUpload(user: Principal, source: typeof requestFiles.$inferSelect) {
+  if (source.purgedAt) throw new Error('Die Datei wurde nach Ablauf der Löschfrist gelöscht. Bitte neu hochladen.')
   // Der Wizard lädt die Vorlage bei jedem Öffnen neu: eine schon vorhandene, freie Kopie wiederverwenden (Issue #140).
   const [free] = await getDb()
     .select({ id: requestFiles.id })

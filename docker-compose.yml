@@ -91,8 +91,13 @@ services:
       AUDIT_LOG_RETENTION_DAYS: ${AUDIT_LOG_RETENTION_DAYS:-365}
       SESSION_IP_RETENTION_DAYS: ${SESSION_IP_RETENTION_DAYS:-30}
       REJECTED_REGISTRATION_RETENTION_DAYS: ${REJECTED_REGISTRATION_RETENTION_DAYS:-30}
+      REQUEST_FILE_RETENTION_DAYS: ${REQUEST_FILE_RETENTION_DAYS:-90}
+      UNSUBMITTED_UPLOAD_RETENTION_DAYS: ${UNSUBMITTED_UPLOAD_RETENTION_DAYS:-1}
       MAIL_REDIRECT_TO: ${MAIL_REDIRECT_TO:-}
       UPLOAD_DIR: /app/uploads
+    # Der Aufräumjob löscht Dateien nach Ablauf der Löschfristen (Issue #172) und braucht dafür die Ablage.
+    volumes:
+      - uploads:/app/uploads
     healthcheck:
       disable: true
 

@@ -880,12 +880,18 @@ function Comments({ request, staff, isNew }: { request: Detail; staff: boolean; 
                   <ul className="mt-2 flex flex-wrap gap-2">
                     {c.attachments.map((a) => (
                       <li key={a.id}>
-                        <a
-                          href={`/api/dateien/${a.id}`}
-                          className="inline-flex items-center gap-1 rounded bg-white px-2 py-1 text-xs ring-1 ring-slate-200 hover:bg-slate-100"
-                        >
-                          📎 {a.filename} <span className="text-slate-500">{formatBytes(a.sizeBytes)}</span>
-                        </a>
+                        {a.purgedAt ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-slate-50 px-2 py-1 text-xs text-slate-600 ring-1 ring-slate-200">
+                            📎 {a.filename} <span>(nach Ablauf der Löschfrist gelöscht)</span>
+                          </span>
+                        ) : (
+                          <a
+                            href={`/api/dateien/${a.id}`}
+                            className="inline-flex items-center gap-1 rounded bg-white px-2 py-1 text-xs ring-1 ring-slate-200 hover:bg-slate-100"
+                          >
+                            📎 {a.filename} <span className="text-slate-500">{formatBytes(a.sizeBytes)}</span>
+                          </a>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -972,6 +978,8 @@ function describeEvent(e: Detail['events'][number]) {
         : 'hat das Angebot erstellt'
     case 'offer_accepted':
       return 'hat das Angebot angenommen'
+    case 'files_purged':
+      return 'hat die Dateien nach Ablauf der Löschfrist gelöscht'
     case 'created':
       return typeof e.data.reorderOfNumber === 'number'
         ? `hat den Auftrag als Nachbestellung von ${formatRequestNumber(e.data.reorderOfNumber)} eingereicht`
@@ -1054,17 +1062,30 @@ function Files({ request, staff }: { request: Detail; staff: boolean }) {
   if (request.files.length === 0) return null
   // Ohne eigene Deckblatt-Datei kommt das Deckblatt aus der Druckdatei (Issue #85).
   const coverFromMain = request.order?.coverPaper ? coverPagesFromMainFile(request.order.spec) : null
+  const purgedAt = request.files.find((f) => f.purgedAt)?.purgedAt
   return (
     <Card title="Dateien">
+      {purgedAt ? (
+        <p className="mb-2 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          Die Dateien wurden am {formatDate(purgedAt)} nach Ablauf der Löschfrist gelöscht. Auftrag, Preis und Verlauf bleiben
+          erhalten. Für eine Nachbestellung bitte die Druckdatei neu hochladen.
+        </p>
+      ) : null}
       <ul className="divide-y divide-slate-100 text-sm">
         {request.files.map((f) => {
           const problem = PDF_STATUS_TEXT[f.pdfStatus]
           return (
             <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
               <div>
-                <a href={`/api/dateien/${f.id}`} className="font-medium text-slate-900 underline">
-                  {f.filename}
-                </a>
+                {f.purgedAt ? (
+                  <span className="font-medium text-slate-700">
+                    {f.filename} <span className="font-normal text-slate-600">(gelöscht)</span>
+                  </span>
+                ) : (
+                  <a href={`/api/dateien/${f.id}`} className="font-medium text-slate-900 underline">
+                    {f.filename}
+                  </a>
+                )}
                 <span className="ml-2 text-slate-500">
                   {f.role === 'cover' ? 'Deckblatt · ' : ''}
                   {formatBytes(f.sizeBytes)}

@@ -15,6 +15,13 @@ export const Route = createFileRoute('/api/dateien/$fileId')({
         if (!user) return new Response('Nicht angemeldet', { status: 401 })
         const file = UUID.test(params.fileId) ? await fileForDownload(user, params.fileId) : null
         if (!file) return new Response('Datei nicht gefunden', { status: 404 })
+        // Löschfrist abgelaufen (Issue #172): Der Auftrag bleibt, die Datei ist weg.
+        if (file.purgedAt) {
+          return new Response('Die Datei wurde nach Ablauf der Löschfrist gelöscht.', {
+            status: 410,
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+          })
+        }
         const ascii = file.filename.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_')
         return new Response(Readable.toWeb(openStored(file.storageKey)) as ReadableStream, {
           headers: {

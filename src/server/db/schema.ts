@@ -372,6 +372,7 @@ export const requestEventType = pgEnum('request_event_type', [
   'invoice_recorded',
   'offer_created',
   'offer_accepted',
+  'files_purged',
 ])
 
 export const requestEvents = pgTable(
@@ -421,6 +422,8 @@ export const requestFiles = pgTable(
     pageWidthMm: integer('page_width_mm'),
     pageHeightMm: integer('page_height_mm'),
     mixedPageSizes: boolean('mixed_page_sizes').notNull().default(false),
+    // Nach Ablauf der Löschfrist von der Platte entfernt (Issue #172). Die Zeile bleibt für Verlauf und Anzeige.
+    purgedAt: timestamp('purged_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
