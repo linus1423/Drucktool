@@ -27,7 +27,9 @@ bearbeiten sie über einen Status-Workflow bis zur Auslieferung.
   beschränken. Vor dem ersten Auftrag hinterlegen Kunden im **Profil** ihre Rechnungsadresse, optional eine
   Lieferadresse für die Hauspost. Die Rechnungsadresse wird beim Absenden als Kopie am Auftrag gespeichert.
 - **Mitarbeiter und Admins** melden sich über OpenID Connect (z. B. Microsoft Entra ID) oder mit Passwort an, siehe
-  unten.
+  unten. Wer ein Passwort hat, bekommt keinen Anmeldelink (sonst würde der Link die Sperre nach Fehlversuchen
+  umgehen); ein vergessenes Passwort setzt ein Superadmin neu. Der **Superadmin** meldet sich immer mit Passwort an,
+  nie über OIDC. Während ein Konto nach Fehlversuchen gesperrt ist, gibt es auch keinen Anmeldelink.
 - Organisationen sind optional. Ein Kunde kann keiner, einer oder mehreren Organisationen angehören und wählt beim
   Bestellen eine davon (oder keine). Im Profil kann er eine Organisation anfragen; Mitarbeiter und Admins ordnen ihn
   unter „Organisationsanfragen“ einer bestehenden zu, legen eine neue an oder lehnen ab. Der Kunde bekommt jeweils eine
@@ -306,8 +308,8 @@ Gesperrte oder abgelehnte Konten kommen auch über OIDC nicht herein.
 **Rollen vom Anbieter (z. B. Entra-App-Rollen):** Sind `OIDC_ADMIN_ROLES` und/oder `OIDC_STAFF_ROLES` gesetzt
 (kommagetrennte Werte aus dem Claim `OIDC_ROLE_CLAIM`, Standard `roles`), bestimmt der Anbieter bei jeder Anmeldung die
 Rolle: Wer eine passende Rolle hat, wird ohne Freigabe als Admin bzw. Mitarbeiter angelegt oder umgestellt. Verliert ein
-Mitarbeiter oder Admin die Rolle, wird die Anmeldung abgelehnt und seine Sitzungen werden beendet. Der Superadmin wird
-nie verändert und bleibt als lokaler Notfallzugang mit Passwort erhalten. Mit `OIDC_ENFORCE_FOR_STAFF=true` können sich
+Mitarbeiter oder Admin die Rolle, wird die Anmeldung abgelehnt und seine Sitzungen werden beendet. Der Superadmin bleibt
+der lokale Notfallzugang mit Passwort: Er wird nie mit einem Anbieter verknüpft und kommt über OIDC nicht herein. Mit `OIDC_ENFORCE_FOR_STAFF=true` können sich
 Mitarbeiter und Admins nur noch über den Anbieter anmelden.
 
 ### Kunden-Anmeldung über den TUM-Keycloak
