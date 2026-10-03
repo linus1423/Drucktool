@@ -31,6 +31,7 @@ const { users, oidcAccounts, sessions } = schema
 const INACTIVE = 'Ihr Konto ist nicht aktiv. Bitte wenden Sie sich an die Druckerei.'
 const STAFF_ELSEWHERE =
   'Mitarbeiter der Druckerei melden sich bitte über die Mitarbeiter-Anmeldung an, nicht mit der Kunden-Anmeldung.'
+const SUPERADMIN_LOCAL = 'Superadmins melden sich mit E-Mail-Adresse und Passwort an, nicht über Single Sign-on.'
 const NO_ROLE = 'Ihr Firmenkonto ist nicht (mehr) für das Drucktool freigeschaltet. Bitte wenden Sie sich an die IT.'
 
 const claimText = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
@@ -61,10 +62,12 @@ async function decide(userId: string, claims: OidcClaims, options: ResolveOption
   const [row] = await db.select({ status: users.status, role: users.role }).from(users).where(eq(users.id, userId))
   if (!row) return { kind: 'denied', message: INACTIVE }
   if (options.customersOnly && row.role !== 'customer') return { kind: 'denied', message: STAFF_ELSEWHERE }
+  // Der Superadmin ist der lokale Notfallzugang. Über OIDC kommt er nie herein, auch nicht über eine
+  // alte Verknüpfung: Wer beim Anbieter die Adresse des Superadmins bekommt, hätte sonst alle Rechte.
+  if (row.role === 'superadmin') return { kind: 'denied', message: SUPERADMIN_LOCAL }
 
-  // Die Rollen der Mitarbeiter kommen bei jeder Anmeldung neu vom Anbieter. Der Superadmin
-  // (lokaler Notfallzugang) wird nie angefasst.
-  if (options.roles && row.role !== 'superadmin') {
+  // Die Rollen der Mitarbeiter kommen bei jeder Anmeldung neu vom Anbieter.
+  if (options.roles) {
     const mapped = roleFromClaims(claims, options.roles)
     if (!mapped && (row.role === 'admin' || row.role === 'staff')) {
       await db.delete(sessions).where(eq(sessions.userId, userId))
@@ -122,6 +125,8 @@ export async function resolveOidcUser(issuer: string, claims: OidcClaims, option
   if (existing && options.customersOnly && existing.role !== 'customer') {
     return { kind: 'denied', message: STAFF_ELSEWHERE }
   }
+  // Der Superadmin wird nie mit einem Anbieter verknüpft.
+  if (existing?.role === 'superadmin') return { kind: 'denied', message: SUPERADMIN_LOCAL }
   if (existing) {
     await db.insert(oidcAccounts).values({ userId: existing.id, issuer, subject: claims.sub }).onConflictDoNothing()
     return decide(existing.id, claims, options)

@@ -167,7 +167,7 @@ describe.skipIf(!url)('OpenID Connect: Benutzerzuordnung (Integration)', async (
     expect(left).toHaveLength(0)
   })
 
-  it('lässt den Superadmin bei der Rollenzuordnung unangetastet', async () => {
+  it('lässt den Superadmin nicht über OIDC herein und verknüpft ihn nicht', async () => {
     const roles = { claim: 'roles', adminValues: ['Druck.Admin'], staffValues: ['Druck.Staff'] }
     const [su] = await getDb()
       .insert(schema.users)
@@ -178,9 +178,18 @@ describe.skipIf(!url)('OpenID Connect: Benutzerzuordnung (Integration)', async (
       { sub: `su-${stamp}`, email: email('super'), email_verified: true },
       { policy: 'reject', roles },
     )
-    expect(result).toEqual({ kind: 'login', userId: su!.id })
+    expect(result.kind).toBe('denied')
     const [after] = await getDb().select().from(schema.users).where(eq(schema.users.id, su!.id))
     expect(after!.role).toBe('superadmin')
+    const links = await getDb().select().from(schema.oidcAccounts).where(eq(schema.oidcAccounts.userId, su!.id))
+    expect(links).toHaveLength(0)
+
+    // Auch eine ältere Verknüpfung hilft nicht mehr.
+    await getDb()
+      .insert(schema.oidcAccounts)
+      .values({ userId: su!.id, issuer: ISS, subject: `su-alt-${stamp}` })
+    const linked = await resolveOidcUser(ISS, { sub: `su-alt-${stamp}` }, { policy: 'reject', roles })
+    expect(linked.kind).toBe('denied')
   })
 
   describe('Kunden-Anmeldung über den TUM-Keycloak (Issue #60)', () => {

@@ -57,7 +57,7 @@ export function accountBlockMs(failures: number) {
 }
 
 /** Verbleibende Sperrzeit eines Kontos in Millisekunden (0 = nicht gesperrt). */
-export async function accountBlockedMs(email: string, db: Db = getDb()) {
+export async function accountBlockedMs(email: string, db: Db | Tx = getDb()) {
   const [row] = await db
     .select({ ms: sql<number>`greatest(0, extract(epoch from (${rateLimits.blockedUntil} - now())) * 1000)::float8` })
     .from(rateLimits)
