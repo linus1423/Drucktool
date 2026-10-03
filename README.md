@@ -538,6 +538,7 @@ holt einen älteren Stand.
 | `APP_ENVIRONMENT`                                                                   | `production`, `staging` (Banner „Testsystem“) oder `development`                     |
 | `UPLOAD_DIR`                                                                        | Ablage für Druckdateien, Standard `data/uploads` (im Image `/app/uploads`)           |
 | `UPLOAD_MAX_MB`                                                                     | Größte erlaubte Druckdatei in MB, Standard 500                                       |
+| `UPLOAD_PENDING_MAX_MB`                                                             | Offene Uploads pro Person zusammen in MB, Standard 3 × `UPLOAD_MAX_MB`               |
 | `CLAMAV_HOST`, `CLAMAV_PORT`                                                        | Virenprüfung mit clamd; Compose/Ansible: `clamav`, leer = keine Prüfung              |
 | `LEXWARE_ARTICLE_NUMBER`, `LEXWARE_TAX_RATE`                                        | Lexware-Export: Stammartikel (Standard `DRUCK`) und Steuersatz in % (Standard 19)    |
 | `ATTACHMENT_MAX_MB`, `ATTACHMENT_TYPES`                                             | Anhänge an Nachrichten: Größe in MB (Standard 25), erlaubte Endungen (kommagetrennt) |

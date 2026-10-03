@@ -204,10 +204,17 @@ export async function listActiveOrganisations() {
     .orderBy(asc(organisations.name))
 }
 
+export class OrganisationNotFoundError extends Error {
+  constructor() {
+    super('Organisation nicht gefunden')
+    this.name = 'OrganisationNotFoundError'
+  }
+}
+
 export async function getOrganisation(id: string) {
   const db = getDb()
   const [org] = await db.select().from(organisations).where(eq(organisations.id, id))
-  if (!org) throw new Error('Organisation nicht gefunden')
+  if (!org) throw new OrganisationNotFoundError()
   const members = await db
     .select({
       id: users.id,

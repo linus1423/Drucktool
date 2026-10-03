@@ -1,3 +1,4 @@
+import { notFound } from '@tanstack/react-router'
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { requireAdmin, requireStaff, requireSuperadmin } from '../auth/guards.server'
@@ -11,6 +12,7 @@ import {
   listOrganisations,
   listPendingRegistrations,
   listUsers,
+  OrganisationNotFoundError,
   rejectRegistration,
   saveOrganisation,
   saveOrganisationSchema,
@@ -54,7 +56,13 @@ export const getOrganisationFn = createServerFn({ method: 'GET' })
   .validator(z.object({ id: z.uuid() }))
   .handler(async ({ data }) => {
     await requireAdmin()
-    return getOrganisation(data.id)
+    try {
+      return await getOrganisation(data.id)
+    } catch (e) {
+      // HTTP 404 statt 500 für unbekannte Organisationen (Issue #141).
+      if (e instanceof OrganisationNotFoundError) throw notFound()
+      throw e
+    }
   })
 
 export const setOrganisationAdminFn = createServerFn({ method: 'POST' })
