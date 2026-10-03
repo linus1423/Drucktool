@@ -1,0 +1,13 @@
+# Konfiguration für gitleaks (Suche nach Zugangsdaten im Repository, siehe .github/workflows/security.yml).
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Feste Testpasswörter und Platzhalter aus Beispieldateien, keine echten Zugangsdaten"
+regexTarget = "line"
+regexes = [
+  '''e2e-passwort-1234''',
+  '''smoke-test-passwort-123''',
+  '''geheimes-passwort-1''',
+  '''bitte-aendern-mindestens-12-zeichen''',
+]
