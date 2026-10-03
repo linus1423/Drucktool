@@ -36,6 +36,8 @@ import { accountQuery, activeOrganisationsQuery, orderCatalogQuery } from '~/lib
 import { isStaffRole } from '~/lib/roles'
 import { createOfferFn, createRequestFn, prepareReorderFn } from '~/server/requests/requests.functions'
 import { describeScriptFn } from '~/server/scripts/scripts.functions'
+import { draftFilesFn } from '~/server/files/files.functions'
+import { DRAFT_VERSION, clearDraft, draftStorageKey, loadDraft, saveDraft } from '~/lib/order-draft'
 
 export const Route = createFileRoute('/_app/auftraege/neu')({
   // ?vorlage=<id>: Nachbestellung eines früheren Auftrags (Issue #10); ?skript=<id>: Bestellung für ein Skript der SVK
@@ -193,7 +195,7 @@ function NewOrderPage() {
     refetchOnWindowFocus: false,
   })
   const applied = useRef<string | null>(null)
-  const [draft, setDraft] = useState<Draft>(() => ({
+  const emptyDraft = (): Draft => ({
     mainFile: null,
     manualPages: '',
     formatId: '',
@@ -223,14 +225,142 @@ function NewOrderPage() {
     customerLastName: '',
     priceOverride: null,
     priceReason: '',
-  }))
+  })
+  const [draft, setDraft] = useState<Draft>(emptyDraft)
+  const initialOrganisationId = () => (!staff && user.organisations.length === 1 ? user.organisations[0]!.id : '')
+
+  // Zwischenspeicher im Browser (Issue #175). Nachbestellungen und Skript-Bestellungen kommen aus ihrer Vorlage und
+  // werden nicht gespeichert; Angebote haben einen eigenen Schlüssel. So überschreibt keiner den Entwurf des anderen.
+  const draftKey = vorlage || skript ? null : draftStorageKey(user.id, staff && angebot ? 'offer' : 'order')
+  // Erst speichern, wenn der Benutzer etwas eingegeben hat oder ein Entwurf wiederhergestellt ist; sonst würde das
+  // leere Formular beim Öffnen einen gespeicherten Entwurf überschreiben, bevor er geladen ist.
+  const touched = useRef(false)
+  const [restored, setRestored] = useState<{ missingFiles: boolean } | null>(null)
 
   // Eine Fehlermeldung vom Absenden gilt nur für den abgeschickten Stand; sobald der Kunde etwas ändert,
   // ist sie überholt (Issue #117). Nicht per Effekt auf den Entwurf, weil normalize() nach dem Neuladen
   // des Katalogs ein neues Objekt liefert und die Meldung sonst sofort verschwände.
   const update = (patch: Partial<Draft>) => {
     setError(null)
+    touched.current = true
     setDraft((d) => normalize(catalog, { ...d, ...patch }))
+  }
+
+  // Gespeicherten Entwurf nur im Browser laden; die Dateien prüft der Server (eigene, noch nicht abgeschickte Uploads).
+  useEffect(() => {
+    if (!draftKey) return
+    const stored = loadDraft(draftKey)
+    if (!stored) return
+    let cancelled = false
+    void (async () => {
+      const wanted = { main: stored.mainFileId, cover: stored.coverFileId }
+      let files: { main: UploadedFile | null; cover: UploadedFile | null } = { main: null, cover: null }
+      if (wanted.main || wanted.cover) {
+        try {
+          files = await draftFilesFn({ data: wanted })
+        } catch {
+          // Ohne Antwort die Dateien weglassen; der Rest des Entwurfs ist trotzdem nützlich.
+        }
+      }
+      // Hat der Benutzer inzwischen selbst angefangen, gilt seine Eingabe.
+      if (cancelled || touched.current) return
+      const base = emptyDraft()
+      const next = normalize(catalog, {
+        ...base,
+        mainFile: files.main,
+        manualPages: stored.manualPages,
+        formatId: stored.formatId,
+        customWidth: stored.customWidth,
+        customHeight: stored.customHeight,
+        bindingId: stored.bindingId,
+        duplex: stored.duplex,
+        paperId: stored.paperId,
+        coverEnabled: stored.coverEnabled,
+        coverPaperId: stored.coverPaperId,
+        coverFile: files.cover,
+        coverFromMain: stored.coverFromMain,
+        coverColorId: stored.coverColorId,
+        coverBackColorId: stored.coverBackColorId,
+        borderless: stored.borderless,
+        copies: stored.copies,
+        title: stored.title,
+        notes: stored.notes,
+        delivery: stored.delivery,
+        deliveryAddress: stored.deliveryAddress,
+        // Die Zustimmung zu den Auftragsbedingungen gilt nur für das Absenden selbst, sie wird neu abgefragt.
+        acceptTerms: false,
+        offer: staff && stored.offer,
+        customerEmail: stored.customerEmail,
+        customerFirstName: stored.customerFirstName,
+        customerLastName: stored.customerLastName,
+        priceOverride: stored.priceOverride,
+        priceReason: stored.priceReason,
+      })
+      touched.current = true
+      setDraft(next)
+      // Nur Organisationen, die noch zur Auswahl stehen; Mitarbeiter laden ihre Liste nach und wählen ggf. neu.
+      if (staff || user.organisations.some((o) => o.id === stored.organisationId)) setOrganisationId(stored.organisationId)
+      // Zum gespeicherten Schritt, höchstens bis zum ersten noch offenen (z. B. wenn eine Datei fehlt).
+      const firstOpen = stepBlockers(catalog, next, null).findIndex((b) => b !== null)
+      setStep(Math.min(stored.step, firstOpen === -1 ? STEPS.length - 1 : firstOpen, STEPS.length - 1))
+      setRestored({ missingFiles: (!!wanted.main && !files.main) || (!!wanted.cover && !files.cover) })
+    })()
+    return () => {
+      cancelled = true
+    }
+    // Nur beim Öffnen des Assistenten; der Katalog ist dann schon geladen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey])
+
+  useEffect(() => {
+    if (!draftKey || !touched.current) return
+    saveDraft(draftKey, {
+      version: DRAFT_VERSION,
+      step,
+      organisationId,
+      mainFileId: draft.mainFile?.id ?? null,
+      coverFileId: draft.coverFile?.id ?? null,
+      manualPages: draft.manualPages,
+      formatId: draft.formatId,
+      customWidth: draft.customWidth,
+      customHeight: draft.customHeight,
+      bindingId: draft.bindingId,
+      duplex: draft.duplex,
+      paperId: draft.paperId,
+      coverEnabled: draft.coverEnabled,
+      coverPaperId: draft.coverPaperId,
+      coverFromMain: draft.coverFromMain,
+      coverColorId: draft.coverColorId,
+      coverBackColorId: draft.coverBackColorId,
+      borderless: draft.borderless,
+      copies: draft.copies,
+      title: draft.title,
+      notes: draft.notes,
+      delivery: draft.delivery,
+      deliveryAddress: { ...EMPTY_DELIVERY, ...draft.deliveryAddress },
+      offer: draft.offer,
+      customerEmail: draft.customerEmail,
+      customerFirstName: draft.customerFirstName,
+      customerLastName: draft.customerLastName,
+      priceOverride: draft.priceOverride,
+      priceReason: draft.priceReason,
+    })
+  }, [draftKey, draft, step, organisationId])
+
+  /** Löscht den gespeicherten Entwurf und speichert nichts mehr, bis wieder etwas eingegeben wird. */
+  const forgetDraft = () => {
+    touched.current = false
+    if (draftKey) clearDraft(draftKey)
+  }
+
+  /** Verwirft den gespeicherten Entwurf und beginnt mit einem leeren Assistenten. */
+  const startOver = () => {
+    forgetDraft()
+    setError(null)
+    setRestored(null)
+    setDraft(emptyDraft())
+    setOrganisationId(initialOrganisationId())
+    setStep(0)
   }
 
   useEffect(() => {
@@ -309,6 +439,7 @@ function NewOrderPage() {
             priceReason: draft.priceReason,
           },
         })
+        forgetDraft()
         await queryClient.invalidateQueries({ queryKey: ['requests'] })
         await navigate({ to: '/auftraege/$requestId', params: { requestId: offered.id } })
         return
@@ -328,6 +459,7 @@ function NewOrderPage() {
           scriptId: script.data?.id,
         },
       })
+      forgetDraft()
       await queryClient.invalidateQueries({ queryKey: ['requests'] })
       await navigate({ to: '/auftraege/$requestId', params: { requestId: created.id } })
     } catch (e) {
@@ -397,6 +529,23 @@ function NewOrderPage() {
           ) : null}
         </div>
       ) : null}
+      {restored ? (
+        <div className="mb-4">
+          <Alert tone="info">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span>
+                Entwurf wiederhergestellt.
+                {restored.missingFiles
+                  ? ' Hochgeladene Dateien sind nicht mehr vorhanden, bitte erneut hochladen.'
+                  : ' Ihre letzten Eingaben sind übernommen.'}
+              </span>
+              <Button variant="secondary" onClick={startOver}>
+                Neu beginnen
+              </Button>
+            </div>
+          </Alert>
+        </div>
+      ) : null}
 
       <nav aria-label="Schritte" className="mb-4 overflow-x-auto">
         <ol className="flex min-w-max gap-1 text-sm">
@@ -455,6 +604,7 @@ function NewOrderPage() {
                           value={organisationId}
                           onChange={(e) => {
                             setError(null)
+                            touched.current = true
                             setOrganisationId(e.target.value)
                           }}
                         >
