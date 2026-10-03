@@ -4,6 +4,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { and, asc, count, eq, gt, isNull } from 'drizzle-orm'
 import { z } from 'zod'
+import { isStaffRole } from '~/lib/roles'
 import { organisationDetailsSchema } from '~/lib/validation'
 import { writeAudit } from '../audit/audit.server'
 import { getDb, schema, type Tx } from '../db/client.server'
@@ -38,7 +39,6 @@ export function managedOrganisationIds(db: Db, userId: string, organisationId?: 
 
 /** Name und ID der verwalteten Organisationen, etwa für den Filter der Auftragsliste. */
 export async function listManagedOrganisations(user: Principal) {
-  if (user.role !== 'customer') return []
   return getDb()
     .select({ id: organisations.id, name: organisations.name })
     .from(organisationMembers)
@@ -54,7 +54,8 @@ export async function listManagedOrganisations(user: Principal) {
  * Entspricht readVisibilityFilter und steuert Spalte „Angelegt von“ und Organisationsfilter der Auftragsliste.
  */
 export async function listReadableOrganisations(user: Principal) {
-  if (user.role !== 'customer') return []
+  // Mitarbeiter sehen ohnehin alle Aufträge.
+  if (isStaffRole(user.role)) return []
   const db = getDb()
   const [managed, svk] = await Promise.all([listManagedOrganisations(user), svkOrganisations(db, user.id)])
   const byId = new Map([...managed, ...svk].map((o) => [o.id, o]))
@@ -70,7 +71,6 @@ export class NotOrganisationAdminError extends Error {
 }
 
 async function assertOrgAdmin(db: Db, user: Principal, organisationId: string) {
-  if (user.role !== 'customer') throw new NotOrganisationAdminError()
   const [row] = await managedOrganisationIds(db, user.id, organisationId)
   if (!row) throw new NotOrganisationAdminError()
 }
@@ -210,13 +210,11 @@ export async function describeInvite(user: Principal, token: string) {
     organisationId: row.invite.organisationId,
     organisationName: row.organisationName,
     alreadyMember: !!member,
-    canJoin: user.role === 'customer',
   }
 }
 
-/** Nimmt eine Einladung an. Nur Kunden; der Link ist danach verbraucht. */
+/** Nimmt eine Einladung an, auch Mitarbeiter können Mitglied sein (Issue #164); der Link ist danach verbraucht. */
 export async function acceptInvite(user: Principal, token: string) {
-  if (user.role !== 'customer') throw new Error('Mitarbeiter der Druckerei können keiner Kunden-Organisation beitreten.')
   return getDb().transaction(async (tx) => {
     const row = await findInvite(tx, token, true)
     if (!row) throw new Error(INVALID_INVITE)

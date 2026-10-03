@@ -45,7 +45,7 @@ function ProfilePage() {
         </Alert>
       ) : null}
       <ProfileForm account={account} next={neu && weiter ? safeRedirect(weiter) : null} />
-      {customer ? <OrganisationsCard account={account} /> : null}
+      <OrganisationsCard account={account} />
       <NotificationsCard initial={account.emailNotifications} customer={customer} />
       <SessionsCard sessions={account.sessions} />
     </div>

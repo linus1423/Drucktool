@@ -105,7 +105,7 @@ function UserForm({ editing, actorRole, onDone }: { editing: Editing; actorRole:
           lastName: value.lastName,
           email: value.email,
           role: value.role,
-          organisationIds: value.role === 'customer' ? value.organisationIds : [],
+          organisationIds: value.organisationIds,
           canManageScripts: value.role === 'staff' && value.canManageScripts,
         }
         if (existing) {
@@ -181,55 +181,31 @@ function UserForm({ editing, actorRole, onDone }: { editing: Editing; actorRole:
             </Field>
           )}
         </form.Field>
-        <form.Subscribe selector={(s) => s.values.role}>
-          {(role) =>
-            role === 'customer' ? (
-              <form.Field name="organisationIds">
-                {(field) => (
-                  <fieldset className="space-y-1 text-sm">
-                    <legend className="mb-1 font-medium text-slate-700">Organisationen (optional)</legend>
-                    {organisationOptions.length === 0 ? <p className="text-slate-500">Keine Organisationen angelegt.</p> : null}
-                    <div className="max-h-48 space-y-1 overflow-y-auto">
-                      {organisationOptions.map((o) => (
-                        <label key={o.id} className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={field.state.value.includes(o.id)}
-                            onChange={(e) =>
-                              field.handleChange(
-                                e.target.checked ? [...field.state.value, o.id] : field.state.value.filter((id) => id !== o.id),
-                              )
-                            }
-                          />
-                          {o.name}
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
-                )}
-              </form.Field>
-            ) : role === 'staff' ? (
-              <form.Field name="canManageScripts">
-                {(field) => (
-                  <label className="flex items-start gap-2 self-end text-sm text-slate-700">
+        {/* Auch Mitarbeiter können Mitglied oder Verwalter einer Organisation sein (Issue #164). */}
+        <form.Field name="organisationIds">
+          {(field) => (
+            <fieldset className="space-y-1 text-sm">
+              <legend className="mb-1 font-medium text-slate-700">Organisationen (optional)</legend>
+              {organisationOptions.length === 0 ? <p className="text-slate-500">Keine Organisationen angelegt.</p> : null}
+              <div className="max-h-48 space-y-1 overflow-y-auto">
+                {organisationOptions.map((o) => (
+                  <label key={o.id} className="flex items-center gap-2">
                     <input
                       type="checkbox"
-                      className="mt-1"
-                      checked={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.checked)}
+                      checked={field.state.value.includes(o.id)}
+                      onChange={(e) =>
+                        field.handleChange(
+                          e.target.checked ? [...field.state.value, o.id] : field.state.value.filter((id) => id !== o.id),
+                        )
+                      }
                     />
-                    <span>
-                      Darf Skripte der SVK verwalten
-                      <span className="block text-slate-500">Administratoren dürfen das immer.</span>
-                    </span>
+                    {o.name}
                   </label>
-                )}
-              </form.Field>
-            ) : (
-              <div />
-            )
-          }
-        </form.Subscribe>
+                ))}
+              </div>
+            </fieldset>
+          )}
+        </form.Field>
         {existing ? (
           <form.Field name="status">
             {(field) => (
@@ -270,6 +246,28 @@ function UserForm({ editing, actorRole, onDone }: { editing: Editing; actorRole:
             </Field>
           )}
         </form.Field>
+        <form.Subscribe selector={(s) => s.values.role}>
+          {(role) =>
+            role === 'staff' ? (
+              <form.Field name="canManageScripts">
+                {(field) => (
+                  <label className="flex items-start gap-2 self-end text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.checked)}
+                    />
+                    <span>
+                      Darf Skripte der SVK verwalten
+                      <span className="block text-slate-500">Administratoren dürfen das immer.</span>
+                    </span>
+                  </label>
+                )}
+              </form.Field>
+            ) : null
+          }
+        </form.Subscribe>
         <div className="flex justify-end gap-2 sm:col-span-2">
           <Button variant="secondary" onClick={onDone}>
             Abbrechen
