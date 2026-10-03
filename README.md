@@ -343,7 +343,7 @@ darunter weiter die Anmeldung per E-Mail-Link für Externe.
 
 ## Lokale Entwicklung
 
-Voraussetzungen: Node.js 22, pnpm, PostgreSQL 16 (oder `docker compose up db`).
+Voraussetzungen: Node.js 22 (ab 22.9), pnpm, PostgreSQL 16 (oder `docker compose up db`).
 
 ```sh
 cp .env.example .env
@@ -354,6 +354,8 @@ pnpm db:seed      # ersten Superadmin aus SUPERADMIN_EMAIL/SUPERADMIN_PASSWORD a
 pnpm dev          # http://localhost:3000
 pnpm mail:worker  # optional, in einem zweiten Terminal: verschickt E-Mails
 ```
+
+Alle Befehle lesen die `.env`; schon gesetzte Umgebungsvariablen haben Vorrang.
 
 Weitere Befehle:
 
