@@ -40,6 +40,8 @@ describe.skipIf(!url)('Anmeldung per E-Mail-Link (Integration)', async () => {
       status: 'active',
       passwordHash: null,
     })
+    // Auch die erste Anmeldung zählt als letzte Anmeldung (Issue #147).
+    expect((await userByEmail(email('neu')))?.lastLoginAt).toBeInstanceOf(Date)
   })
 
   it('lässt jeden Link nur einmal zu', async () => {
