@@ -293,6 +293,7 @@ export async function getRequestDetail(user: Principal, id: string) {
   const creator = alias(users, 'creator')
   const assignee = alias(users, 'assignee')
   const confirmer = alias(users, 'confirmer')
+  const invoicer = alias(users, 'invoicer')
 
   const [found] = await db
     .select({
@@ -302,12 +303,14 @@ export async function getRequestDetail(user: Principal, id: string) {
       creatorEmail: creator.email,
       assigneeName: assignee.name,
       confirmedByName: confirmer.name,
+      invoiceCreatedByName: invoicer.name,
     })
     .from(requests)
     .leftJoin(organisations, eq(organisations.id, requests.organisationId))
     .innerJoin(creator, eq(creator.id, requests.createdById))
     .leftJoin(assignee, eq(assignee.id, requests.assigneeId))
     .leftJoin(confirmer, eq(confirmer.id, requests.confirmedById))
+    .leftJoin(invoicer, eq(invoicer.id, requests.invoiceCreatedById))
     .where(and(eq(requests.id, id), readVisibilityFilter(user)))
     .limit(1)
   if (!found) notFound()
@@ -402,6 +405,10 @@ export async function getRequestDetail(user: Principal, id: string) {
     // Übergabe an Lexware (Issue #53) ist intern.
     invoiceExportedAt: isStaff ? r.invoiceExportedAt : null,
     invoiceExportedById: null,
+    invoiceCreatedAt: isStaff ? r.invoiceCreatedAt : null,
+    invoiceCreatedById: null,
+    invoiceCreatedByName: isStaff ? found.invoiceCreatedByName : null,
+    invoiceNumber: isStaff ? r.invoiceNumber : null,
     printSheetOptions: isStaff ? await printSheetOptions(db, r.order) : { inner: [], cover: [] },
     reorderOf: reorderOf ?? null,
     attention: attentionFor({ ...r, internalDueDate }, deadlines),

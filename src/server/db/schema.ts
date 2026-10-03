@@ -277,6 +277,10 @@ export const requests = pgTable(
     // Übergabe an Lexware zur Rechnungsstellung (Issue #53); null heißt noch nicht übergeben.
     invoiceExportedAt: timestamp('invoice_exported_at', { withTimezone: true }),
     invoiceExportedById: uuid('invoice_exported_by_id').references(() => users.id, { onDelete: 'set null' }),
+    // Rechnung in Lexware angelegt (Issue #157), von Mitarbeitern eingetragen; die Nummer ist optional.
+    invoiceCreatedAt: timestamp('invoice_created_at', { withTimezone: true }),
+    invoiceCreatedById: uuid('invoice_created_by_id').references(() => users.id, { onDelete: 'set null' }),
+    invoiceNumber: text('invoice_number'),
     // Optimistic Locking: jede Änderung erhöht die Version, Updates prüfen die erwartete Version.
     version: integer('version').notNull().default(1),
     ...timestamps,
@@ -363,6 +367,7 @@ export const requestEventType = pgEnum('request_event_type', [
   'change_withdrawn',
   'dates_changed',
   'print_sheet_changed',
+  'invoice_recorded',
 ])
 
 export const requestEvents = pgTable(

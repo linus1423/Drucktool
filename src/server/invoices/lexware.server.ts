@@ -3,13 +3,14 @@
 // daraus Rechnungen an und neue Kunden aus der Rechnungsadresse. Jede Position braucht einen Artikel, den es in Lexware
 // schon gibt (LEXWARE_ARTICLE_NUMBER).
 import { and, asc, count, eq, inArray, isNull } from 'drizzle-orm'
+import { z } from 'zod'
 import type { StoredBillingAddress } from '~/lib/address'
 import { formatRequestNumber } from '~/lib/format'
 import { DELIVERY_LABELS, type DeliveryMethod } from '~/lib/order'
 import { describeOrder, type OrderSnapshot } from '~/lib/snapshot'
 import { getDb, schema } from '../db/client.server'
 
-const { requests, users } = schema
+const { requests, requestEvents, users } = schema
 
 export function lexwareConfig() {
   const article = process.env.LEXWARE_ARTICLE_NUMBER?.trim() || 'DRUCK'
@@ -193,26 +194,62 @@ const selection = {
   email: users.email,
 }
 
+/** Noch abzurechnen: fertig, weder exportiert noch als in Lexware angelegt eingetragen. */
+const awaitingInvoice = and(
+  eq(requests.status, 'completed'),
+  isNull(requests.invoiceExportedAt),
+  isNull(requests.invoiceCreatedAt),
+)
+
 /** Fertige Aufträge, die noch nicht an Lexware übergeben wurden. */
 export async function pendingLexwareCount() {
-  const [row] = await getDb()
-    .select({ count: count() })
-    .from(requests)
-    .where(and(eq(requests.status, 'completed'), isNull(requests.invoiceExportedAt)))
+  const [row] = await getDb().select({ count: count() }).from(requests).where(awaitingInvoice)
   return row?.count ?? 0
 }
 
+export const invoiceRecordSchema = z.object({
+  id: z.uuid(),
+  created: z.boolean(),
+  invoiceNumber: z.string().trim().max(50, 'Die Rechnungsnummer ist zu lang').default(''),
+})
+
 /**
- * Erstellt die Importdatei und merkt sich die enthaltenen Aufträge als übergeben. Ohne ids: alle fertigen, noch nicht
- * übergebenen Aufträge; wer keinen Preis oder keine Rechnungsadresse hat (z. B. von Mitarbeitern angelegt), wird
+ * Trägt ein, dass die Rechnung in Lexware angelegt ist (Issue #157), oder nimmt das zurück. Geht auch ohne Export,
+ * z. B. wenn der Auftrag von Hand erfasst wurde; danach zählt er nicht mehr als offen.
+ */
+export async function recordInvoice(actorId: string, input: z.infer<typeof invoiceRecordSchema>) {
+  return getDb().transaction(async (tx) => {
+    const [current] = await tx.select({ status: requests.status }).from(requests).where(eq(requests.id, input.id)).for('update')
+    if (!current) throw new Error('Auftrag nicht gefunden')
+    if (current.status !== 'completed') throw new Error('Rechnungen gibt es nur für fertige Aufträge.')
+    const invoiceNumber = input.created ? input.invoiceNumber || null : null
+    await tx
+      .update(requests)
+      .set(
+        input.created
+          ? { invoiceCreatedAt: new Date(), invoiceCreatedById: actorId, invoiceNumber }
+          : { invoiceCreatedAt: null, invoiceCreatedById: null, invoiceNumber: null },
+      )
+      .where(eq(requests.id, input.id))
+    await tx.insert(requestEvents).values({
+      requestId: input.id,
+      actorId,
+      type: 'invoice_recorded',
+      internal: true,
+      data: { created: input.created, invoiceNumber },
+    })
+  })
+}
+
+/**
+ * Erstellt die Importdatei und merkt sich die enthaltenen Aufträge als übergeben. Ohne ids: alle fertigen, weder
+ * übergebenen noch als angelegt eingetragenen Aufträge; wer keinen Preis oder keine Rechnungsadresse hat (z. B. von Mitarbeitern angelegt), wird
  * übersprungen und in `skipped` genannt, damit ein einzelner Auftrag nicht den ganzen Export blockiert (Issue #130).
  * Mit ids: genau diese (auch erneut), solange sie fertig und vollständig sind.
  */
 export async function exportForLexware(actorId: string, ids?: string[]) {
   return getDb().transaction(async (tx) => {
-    const where = ids
-      ? and(inArray(requests.id, ids), eq(requests.status, 'completed'))
-      : and(eq(requests.status, 'completed'), isNull(requests.invoiceExportedAt))
+    const where = ids ? and(inArray(requests.id, ids), eq(requests.status, 'completed')) : awaitingInvoice
     const rows = await tx
       .select(selection)
       .from(requests)

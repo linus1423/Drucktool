@@ -227,6 +227,9 @@ oder Preise abtippen.
 - **Importieren:** in Lexware über die Shopschnittstelle (Menü eCommerce bzw. „Ebusiness – Standard Shopschnittstelle
   – Importieren“) die Datei wählen und als Belegart „Rechnung“ einstellen. Unbekannte Kunden legt Lexware aus der
   Rechnungsadresse an, bekannte schlägt es zur Zuordnung vor.
+- **Rechnung angelegt:** Ist die Rechnung in Lexware erstellt, trägt ein Mitarbeiter das auf der Detailseite mit
+  „In Lexware angelegt“ ein, optional mit Rechnungsnummer (intern, im Verlauf sichtbar, zurücknehmbar). Das geht auch
+  ohne Export, etwa für von Hand erfasste Aufträge; solche Aufträge zählen dann nicht mehr als offen.
 - Aufträge, die beim Einspielen dieser Version schon fertig waren, gelten als übergeben und lassen sich bei Bedarf
   einzeln exportieren.
 
