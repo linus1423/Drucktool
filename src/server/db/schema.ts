@@ -271,6 +271,8 @@ export const requests = pgTable(
     internalDueDate: date('internal_due_date'),
     // Nur für Mitarbeiter sichtbar, solange der Auftrag bestätigt ist.
     internalStatus: internalStatus('internal_status'),
+    // Mitarbeiter, der den Auftrag als Angebot für den Kunden angelegt hat (Issue #165); null, wenn der Kunde selbst bestellt.
+    offeredById: uuid('offered_by_id').references(() => users.id, { onDelete: 'set null' }),
     // Die Druckerei nimmt einen Auftrag immer durch einen Mitarbeiter an.
     confirmedById: uuid('confirmed_by_id').references(() => users.id, { onDelete: 'set null' }),
     confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
@@ -368,6 +370,8 @@ export const requestEventType = pgEnum('request_event_type', [
   'dates_changed',
   'print_sheet_changed',
   'invoice_recorded',
+  'offer_created',
+  'offer_accepted',
 ])
 
 export const requestEvents = pgTable(

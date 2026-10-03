@@ -14,7 +14,7 @@ import { formatDate, formatDateTime, formatMoney, formatRequestNumber } from '~/
 import { formatSheetSize, type SheetSize } from '~/lib/catalog'
 import { DELIVERY_LABELS, coverPagesFromMainFile } from '~/lib/order'
 import { describeOrder } from '~/lib/snapshot'
-import { assignableStaffQuery, requestDetailQuery } from '~/lib/queries'
+import { accountQuery, assignableStaffQuery, orderCatalogQuery, requestDetailQuery } from '~/lib/queries'
 import { isStaffRole } from '~/lib/roles'
 import {
   INTERNAL_STATUSES,
@@ -28,6 +28,7 @@ import {
   type RequestStatus,
 } from '~/lib/status'
 import {
+  acceptOfferFn,
   addCommentFn,
   assignRequestFn,
   changeStatusFn,
@@ -109,7 +110,7 @@ function RequestDetailPage() {
   const [editing, setEditing] = useState(false)
   const [proposing, setProposing] = useState(false)
   const refresh = useRefresh(requestId)
-  const canPropose = staff && !!request.order && !TERMINAL_STATUSES.has(request.status)
+  const canPropose = staff && !!request.order && !TERMINAL_STATUSES.has(request.status) && request.status !== 'offered'
   const isNew = useUnreadMarker(request)
 
   return (
@@ -132,7 +133,9 @@ function RequestDetailPage() {
           ) : null}
         </div>
         <p className="mt-1 text-sm text-slate-600">
-          {request.organisationName ? `${request.organisationName} · ` : ''}angelegt von {request.creatorName}
+          {request.organisationName ? `${request.organisationName} · ` : ''}
+          {request.offeredById ? `Angebot von ${request.offeredByName ?? 'der Druckerei'} für ` : 'angelegt von '}
+          {request.creatorName}
           {request.creatorEmail ? ` (${request.creatorEmail})` : ''} am {formatDateTime(request.createdAt)}
           {request.confirmedAt
             ? ` · bestätigt von ${request.confirmedByName ?? 'der Druckerei'} am ${formatDateTime(request.confirmedAt)}`
@@ -179,6 +182,7 @@ function RequestDetailPage() {
       )}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          {request.status === 'offered' ? <OfferCard request={request} staff={staff} /> : null}
           {proposing ? (
             <ProposeChangeForm request={request} onDone={() => setProposing(false)} onChanged={refresh} />
           ) : (
@@ -451,6 +455,97 @@ function StatusActions({ request, staff }: { request: Detail; staff: boolean }) 
           </form>
         )}
       </div>
+    </Card>
+  )
+}
+
+/**
+ * Angebot der Druckerei (Issue #165). Der Kunde nimmt es an, sobald seine Rechnungsadresse hinterlegt ist und er den
+ * Auftragsbedingungen zugestimmt hat; ablehnen geht über „Nächster Schritt“.
+ */
+function OfferCard({ request, staff }: { request: Detail; staff: boolean }) {
+  const refresh = useRefresh(request.id)
+  const queryClient = useQueryClient()
+  const [accepted, setAccepted] = useState(false)
+  const account = useQuery({ ...accountQuery, enabled: request.canAcceptOffer })
+  const catalog = useQuery({ ...orderCatalogQuery, enabled: request.canAcceptOffer })
+  const mutation = useMutation({
+    mutationFn: () => acceptOfferFn({ data: { id: request.id, version: request.version, acceptTerms: true } }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['requests', 'dashboard'] })
+      await refresh()
+    },
+  })
+
+  if (!request.canAcceptOffer) {
+    return (
+      <Alert tone="info">
+        {staff
+          ? `Angebot an ${request.creatorName}. Es wartet darauf, dass der Kunde Rechnungsadresse und Auftragsbedingungen bestätigt; danach ist der Auftrag bestätigt.`
+          : 'Angebot der Druckerei. Annehmen kann es nur der Kunde, für den es erstellt wurde.'}
+      </Alert>
+    )
+  }
+
+  const billingAddress = account.data?.billingAddress
+  const terms = catalog.data?.texts.terms
+  return (
+    <Card title="Angebot der Druckerei">
+      <form
+        className="space-y-3 text-sm"
+        onSubmit={(e) => {
+          e.preventDefault()
+          mutation.mutate()
+        }}
+      >
+        <p>
+          {request.offeredByName ?? 'Die Druckerei'} hat diesen Auftrag für Sie angelegt. Bitte prüfen Sie Optionen, Dateien und
+          Preis. Mit der Annahme wird der Auftrag verbindlich und die Druckerei legt los.
+        </p>
+        {account.isPending ? null : billingAddress ? (
+          <div>
+            <p className="font-medium text-slate-500">Rechnungsadresse</p>
+            {formatBillingAddress(billingAddress).map((line) => (
+              <span key={line} className="block">
+                {line}
+              </span>
+            ))}
+            <Link to="/profil" className="text-xs underline">
+              Im Profil ändern
+            </Link>
+          </div>
+        ) : (
+          <Alert>
+            Bitte hinterlegen Sie vor der Annahme eine Rechnungsadresse in Ihrem{' '}
+            <Link to="/profil" className="underline">
+              Profil
+            </Link>
+            .
+          </Alert>
+        )}
+        {terms ? (
+          <details className="rounded-md bg-slate-50 p-3 text-slate-700">
+            <summary className="cursor-pointer font-medium">Auftragsbedingungen lesen</summary>
+            <p className="mt-2 whitespace-pre-line">{terms}</p>
+          </details>
+        ) : null}
+        <label className="flex items-start gap-2">
+          <input type="checkbox" className="mt-1" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
+          <span>Ich habe die Auftragsbedingungen gelesen und stimme ihnen zu.</span>
+        </label>
+        <ErrorBox
+          error={mutation.error}
+          onReload={() => {
+            mutation.reset()
+            void refresh()
+          }}
+        />
+        <div className="flex justify-end">
+          <Button type="submit" disabled={!accepted || !billingAddress || mutation.isPending}>
+            Angebot verbindlich annehmen
+          </Button>
+        </div>
+      </form>
     </Card>
   )
 }
@@ -871,6 +966,12 @@ function Comments({ request, staff, isNew }: { request: Detail; staff: boolean; 
 
 function describeEvent(e: Detail['events'][number]) {
   switch (e.type) {
+    case 'offer_created':
+      return e.data.newCustomer === true
+        ? 'hat das Angebot erstellt und dafür ein Kundenkonto angelegt'
+        : 'hat das Angebot erstellt'
+    case 'offer_accepted':
+      return 'hat das Angebot angenommen'
     case 'created':
       return typeof e.data.reorderOfNumber === 'number'
         ? `hat den Auftrag als Nachbestellung von ${formatRequestNumber(e.data.reorderOfNumber)} eingereicht`
@@ -1093,7 +1194,7 @@ function PriceCard({ request, staff }: { request: Detail; staff: boolean }) {
         </div>
       </dl>
       <p className="mt-2 text-xs text-slate-500">
-        Preis zum Zeitpunkt des Absendens
+        {request.offeredById ? 'Preis laut Angebot der Druckerei' : 'Preis zum Zeitpunkt des Absendens'}
         {request.termsAcceptedAt ? `, Bedingungen akzeptiert am ${formatDateTime(request.termsAcceptedAt)}` : ''}.
       </p>
     </Card>

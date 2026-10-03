@@ -224,6 +224,7 @@ function CustomerView({ data }: { data: CustomerDashboard }) {
                 </Link>
                 <span className="flex gap-1">
                   {r.status === 'on_hold' ? <Badge className="bg-amber-100 text-amber-900">Rückfrage beantworten</Badge> : null}
+                  {r.status === 'offered' ? <Badge className="bg-violet-100 text-violet-900">Angebot annehmen</Badge> : null}
                   {r.hasProposal ? <Badge className="bg-amber-100 text-amber-900">Änderung zustimmen</Badge> : null}
                 </span>
               </li>
@@ -231,7 +232,7 @@ function CustomerView({ data }: { data: CustomerDashboard }) {
           </ul>
         )}
       </Card>
-      <section aria-label="Offene Aufträge" className="grid gap-4 sm:grid-cols-3">
+      <section aria-label="Offene Aufträge" className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {data.byStatus.map((s) => (
           <Stat key={s.status} label={STATUS_LABELS[s.status]} value={s.count} />
         ))}

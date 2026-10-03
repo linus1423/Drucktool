@@ -13,6 +13,7 @@ import {
   changeProposedMail,
   commentMail,
   mentionMail,
+  offerCreatedMail,
   organisationRequestDecisionMail,
   organisationRequestedMail,
   promisedDateMail,
@@ -139,6 +140,24 @@ export async function notifyRequestCreated(tx: Tx, actor: Actor, requestId: stri
   if (!isStaff(actor)) {
     await enqueueMail(tx, await customerRecipients(tx, request, null), requestReceivedMail(request))
   }
+}
+
+/**
+ * Angebot an den Kunden (Issue #165). Geht unabhängig von seinen Benachrichtigungseinstellungen raus, weil ohne
+ * diese Mail niemand von dem Angebot erfährt; für neue Kunden ist es die erste Mail des Drucktools.
+ */
+export async function notifyOfferCreated(tx: Tx, actor: Actor, requestId: string) {
+  const request = await loadRequest(tx, requestId)
+  const [customer] = await tx
+    .select({ email: users.email })
+    .from(users)
+    .where(and(eq(users.id, request.createdById), eq(users.status, 'active')))
+  if (!customer) return
+  await enqueueMail(
+    tx,
+    [customer.email],
+    offerCreatedMail({ ...request, actorName: await actorName(tx, actor.id), email: customer.email }),
+  )
 }
 
 export async function notifyStatusChanged(

@@ -60,7 +60,12 @@ describe.skipIf(!url)('Übersicht (Integration)', async () => {
   it('zeigt Kunden nur ihre eigenen offenen Aufträge und Rückfragen', async () => {
     const d = await getDashboard(customer)
     if (d.kind !== 'customer') throw new Error('falsche Sicht')
-    expect(Object.fromEntries(d.byStatus.map((s) => [s.status, s.count]))).toEqual({ submitted: 1, confirmed: 0, on_hold: 1 })
+    expect(Object.fromEntries(d.byStatus.map((s) => [s.status, s.count]))).toEqual({
+      offered: 0,
+      submitted: 1,
+      confirmed: 0,
+      on_hold: 1,
+    })
     expect(d.waiting.map((w) => w.id)).toEqual([ids.frage])
     expect(JSON.stringify(d)).not.toContain('fremd')
   })

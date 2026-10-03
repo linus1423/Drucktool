@@ -4,6 +4,7 @@ import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { FileUpload, type UploadedFile } from '~/components/FileUpload'
 import { HelpTip } from '~/components/HelpTip'
+import { MoneyInput } from '~/components/MoneyInput'
 import { Alert, Button, Card, Field, Input, PageHeader, Select, Textarea, cx } from '~/components/ui'
 import { EMPTY_DELIVERY, deliveryAddressSchema, formatDeliveryAddress, type DeliveryAddress } from '~/lib/address'
 import { errorMessage } from '~/lib/errors'
@@ -33,7 +34,7 @@ import {
 import { calculatePrice } from '~/lib/pricing'
 import { accountQuery, activeOrganisationsQuery, orderCatalogQuery } from '~/lib/queries'
 import { isStaffRole } from '~/lib/roles'
-import { createRequestFn, prepareReorderFn } from '~/server/requests/requests.functions'
+import { createOfferFn, createRequestFn, prepareReorderFn } from '~/server/requests/requests.functions'
 import { describeScriptFn } from '~/server/scripts/scripts.functions'
 
 export const Route = createFileRoute('/_app/auftraege/neu')({
@@ -42,6 +43,8 @@ export const Route = createFileRoute('/_app/auftraege/neu')({
   validateSearch: z.object({
     vorlage: z.uuid().optional().catch(undefined),
     skript: z.uuid().optional().catch(undefined),
+    // Mitarbeiter legen den Auftrag als Angebot für einen Kunden an (Issue #165).
+    angebot: z.boolean().optional().catch(undefined),
   }),
   loader: ({ context }) =>
     Promise.all([context.queryClient.ensureQueryData(orderCatalogQuery), context.queryClient.ensureQueryData(accountQuery)]),
@@ -74,6 +77,13 @@ type Draft = {
   delivery: DeliveryMethod
   deliveryAddress: DeliveryAddress
   acceptTerms: boolean
+  /** Nur Mitarbeiter: Angebot an einen Kunden statt eigener Bestellung (Issue #165). */
+  offer: boolean
+  customerEmail: string
+  customerFirstName: string
+  customerLastName: string
+  priceOverride: number | null
+  priceReason: string
 }
 
 const int = (v: string) => (/^\d+$/.test(v.trim()) ? Number(v.trim()) : null)
@@ -165,7 +175,7 @@ function NewOrderPage() {
   const [step, setStep] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const { vorlage, skript } = Route.useSearch()
+  const { vorlage, skript, angebot } = Route.useSearch()
   const script = useQuery({
     queryKey: ['scripts', 'order', skript],
     queryFn: () => describeScriptFn({ data: { id: skript! } }),
@@ -203,8 +213,16 @@ function NewOrderPage() {
     title: '',
     notes: '',
     delivery: 'pickup',
-    deliveryAddress: account.deliveryAddress ?? { ...EMPTY_DELIVERY, recipient: account.name },
+    // Beim Angebot ist der Kunde der Empfänger, nicht der Mitarbeiter.
+    deliveryAddress:
+      staff && angebot ? EMPTY_DELIVERY : (account.deliveryAddress ?? { ...EMPTY_DELIVERY, recipient: account.name }),
     acceptTerms: false,
+    offer: staff && !!angebot && !skript,
+    customerEmail: '',
+    customerFirstName: '',
+    customerLastName: '',
+    priceOverride: null,
+    priceReason: '',
   }))
 
   // Eine Fehlermeldung vom Absenden gilt nur für den abgeschickten Stand; sobald der Kunde etwas ändert,
@@ -266,7 +284,7 @@ function NewOrderPage() {
   const spec = toSpec(catalog, draft)
   const priced = useMemo(() => (spec ? calculatePrice(catalog, spec) : null), [catalog, spec && JSON.stringify(spec)])
 
-  const blockers = stepBlockers(catalog, draft)
+  const blockers = stepBlockers(catalog, draft, priced?.ok ? priced.price.totalCents : null)
   const firstBlocked = blockers.findIndex((b) => b !== null)
   const canOpen = (i: number) => firstBlocked === -1 || i <= firstBlocked
 
@@ -275,6 +293,25 @@ function NewOrderPage() {
     setError(null)
     setSubmitting(true)
     try {
+      if (draft.offer) {
+        const offered = await createOfferFn({
+          data: {
+            customer: { email: draft.customerEmail, firstName: draft.customerFirstName, lastName: draft.customerLastName },
+            title: draft.title,
+            notes: draft.notes,
+            spec,
+            mainFileId: draft.mainFile.id,
+            coverFileId: draft.coverEnabled && draft.coverFile ? draft.coverFile.id : null,
+            deliveryAddress: draft.delivery === 'house_post' ? draft.deliveryAddress : null,
+            expectedTotalCents: priced.price.totalCents,
+            priceOverrideCents: draft.priceOverride,
+            priceReason: draft.priceReason,
+          },
+        })
+        await queryClient.invalidateQueries({ queryKey: ['requests'] })
+        await navigate({ to: '/auftraege/$requestId', params: { requestId: offered.id } })
+        return
+      }
       const created = await createRequestFn({
         data: {
           title: draft.title,
@@ -304,8 +341,12 @@ function NewOrderPage() {
   return (
     <div>
       <PageHeader
-        title="Neuer Auftrag"
-        description="Schritt für Schritt zum Druckauftrag. Verbindlich wird er erst, wenn die Druckerei ihn bestätigt."
+        title={draft.offer ? 'Neues Angebot' : 'Neuer Auftrag'}
+        description={
+          draft.offer
+            ? 'Auftrag für einen Kunden anlegen, der vorbeigekommen ist oder geschrieben hat. Der Kunde bekommt eine E-Mail und nimmt das Angebot im Drucktool an.'
+            : 'Schritt für Schritt zum Druckauftrag. Verbindlich wird er erst, wenn die Druckerei ihn bestätigt.'
+        }
       />
       {!staff && !account.billingAddress ? (
         <div className="mb-4">
@@ -392,8 +433,13 @@ function NewOrderPage() {
                   draft={draft}
                   update={update}
                   catalog={catalog}
+                  offerField={
+                    staff && !skript ? (
+                      <OfferFields draft={draft} update={update} calculatedCents={priced?.ok ? priced.price.totalCents : null} />
+                    ) : null
+                  }
                   organisationField={
-                    script.data ? (
+                    draft.offer ? null : script.data ? (
                       <p className="text-sm text-slate-600">
                         Bestellt für die SVK <strong>{script.data.organisationName}</strong>.
                       </p>
@@ -431,7 +477,11 @@ function NewOrderPage() {
                   </Button>
                 ) : (
                   <Button disabled={firstBlocked !== -1 || !priced?.ok || submitting} onClick={() => void submit()}>
-                    {submitting ? 'Wird gesendet …' : 'Auftrag verbindlich absenden'}
+                    {submitting
+                      ? 'Wird gesendet …'
+                      : draft.offer
+                        ? 'Angebot an den Kunden senden'
+                        : 'Auftrag verbindlich absenden'}
                   </Button>
                 )}
               </div>
@@ -465,7 +515,7 @@ const STEP_TITLES = [
 ] as const
 
 /** Warum ein Schritt noch nicht fertig ist, oder null. */
-function stepBlockers(catalog: OrderCatalog, d: Draft): (string | null)[] {
+function stepBlockers(catalog: OrderCatalog, d: Draft, calculatedCents: number | null): (string | null)[] {
   const format = findFormat(catalog, d.formatId)
   const size = format ? formatSize(format, { customWidthMm: int(d.customWidth), customHeightMm: int(d.customHeight) }) : null
   const file = !d.mainFile ? 'Bitte die Druckdatei hochladen.' : !pagesOf(d) ? 'Bitte die Seitenzahl angeben.' : null
@@ -493,8 +543,17 @@ function stepBlockers(catalog: OrderCatalog, d: Draft): (string | null)[] {
       : null
   const address = d.delivery === 'house_post' ? deliveryAddressSchema.safeParse(d.deliveryAddress) : null
   const delivery = address && !address.success ? `${address.error.issues[0]!.message}.` : null
-  const terms = !d.acceptTerms ? 'Bitte den Auftragsbedingungen zustimmen.' : null
+  const terms = d.offer ? offerBlocker(d, calculatedCents) : !d.acceptTerms ? 'Bitte den Auftragsbedingungen zustimmen.' : null
   return [file, fmt, bind, paper, options, delivery, terms]
+}
+
+function offerBlocker(d: Draft, calculatedCents: number | null) {
+  if (!z.email().safeParse(d.customerEmail.trim()).success) return 'Bitte die E-Mail-Adresse des Kunden angeben.'
+  if (!d.customerLastName.trim()) return 'Bitte den Nachnamen des Kunden angeben.'
+  if (d.priceOverride != null && d.priceOverride !== calculatedCents && !d.priceReason.trim()) {
+    return 'Bitte den abweichenden Preis für den Kunden begründen.'
+  }
+  return null
 }
 
 type StepProps = { draft: Draft; update: (patch: Partial<Draft>) => void; catalog: OrderCatalog }
@@ -935,20 +994,102 @@ function DeliveryStep({ draft, update }: StepProps) {
   )
 }
 
-function SubmitStep({ draft, update, catalog, organisationField }: StepProps & { organisationField: ReactNode }) {
+/** Kunde und Preis für ein Angebot der Druckerei (Issue #165). */
+function OfferFields({
+  draft,
+  update,
+  calculatedCents,
+}: Pick<StepProps, 'draft' | 'update'> & { calculatedCents: number | null }) {
+  return (
+    <fieldset className="space-y-3 rounded-md border border-slate-200 p-3">
+      <legend className="px-1 text-sm font-medium">Für wen?</legend>
+      <div className="flex flex-wrap gap-4 text-sm">
+        <label className="flex items-center gap-2">
+          <input type="radio" name="offer" checked={!draft.offer} onChange={() => update({ offer: false })} />
+          Eigene Bestellung
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="radio" name="offer" checked={draft.offer} onChange={() => update({ offer: true })} />
+          Angebot an einen Kunden
+        </label>
+      </div>
+      {draft.offer ? (
+        <>
+          <Field
+            label="E-Mail-Adresse des Kunden"
+            htmlFor="customerEmail"
+            hint="Gibt es noch kein Konto, wird eins angelegt. Der Kunde meldet sich mit dieser Adresse an."
+          >
+            <Input
+              id="customerEmail"
+              type="email"
+              autoComplete="off"
+              value={draft.customerEmail}
+              onChange={(e) => update({ customerEmail: e.target.value })}
+            />
+          </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Vorname" htmlFor="customerFirstName">
+              <Input
+                id="customerFirstName"
+                autoComplete="off"
+                value={draft.customerFirstName}
+                onChange={(e) => update({ customerFirstName: e.target.value })}
+              />
+            </Field>
+            <Field label="Nachname" htmlFor="customerLastName">
+              <Input
+                id="customerLastName"
+                autoComplete="off"
+                value={draft.customerLastName}
+                onChange={(e) => update({ customerLastName: e.target.value })}
+              />
+            </Field>
+          </div>
+          <Field
+            label="Preis manuell festlegen (optional)"
+            htmlFor="offerPrice"
+            hint={`Leer lassen, um den berechneten Preis${calculatedCents != null ? ` von ${formatMoney(calculatedCents)}` : ''} zu übernehmen. Die Differenz erscheint als Korrektur.`}
+          >
+            <MoneyInput
+              id="offerPrice"
+              nullable
+              value={draft.priceOverride}
+              onChange={(priceOverride) => update({ priceOverride })}
+            />
+          </Field>
+          {draft.priceOverride != null && draft.priceOverride !== calculatedCents ? (
+            <Field label="Begründung für den Kunden" htmlFor="priceReason">
+              <Textarea
+                id="priceReason"
+                rows={2}
+                value={draft.priceReason}
+                onChange={(e) => update({ priceReason: e.target.value })}
+              />
+            </Field>
+          ) : null}
+          <p className="text-sm text-slate-600">
+            Der Kunde bekommt eine E-Mail mit dem Angebot. Er hinterlegt seine Rechnungsadresse, stimmt den Auftragsbedingungen zu
+            und nimmt an; dann ist der Auftrag bestätigt.
+          </p>
+        </>
+      ) : null}
+    </fieldset>
+  )
+}
+
+function SubmitStep({
+  draft,
+  update,
+  catalog,
+  organisationField,
+  offerField,
+}: StepProps & { organisationField: ReactNode; offerField: ReactNode }) {
   return (
     <>
+      {offerField}
       {organisationField}
-      <Alert tone="info">
-        Mit dem Absenden geben Sie ein verbindliches Angebot zum angezeigten Preis ab. Der Auftrag kommt erst zustande, wenn ein
-        Mitarbeiter der Druckerei ihn bestätigt.
-      </Alert>
-      {catalog.texts.terms ? (
-        <details className="rounded-md bg-slate-50 p-3 text-sm text-slate-700">
-          <summary className="cursor-pointer font-medium">Auftragsbedingungen lesen</summary>
-          <p className="mt-2 whitespace-pre-line">{catalog.texts.terms}</p>
-        </details>
-      ) : null}
+      {draft.offer ? null : <SubmitTerms draft={draft} update={update} catalog={catalog} />}
       <dl className="space-y-2 rounded-md border border-slate-200 p-3 text-sm">
         <div>
           <dt className="text-slate-500">Titel</dt>
@@ -965,20 +1106,41 @@ function SubmitStep({ draft, update, catalog, organisationField }: StepProps & {
           <dd>
             {draft.delivery === 'house_post'
               ? formatDeliveryAddress(draft.deliveryAddress).map((line) => <div key={line}>{line}</div>)
-              : 'Sie holen den Auftrag im Regal der Druckerei ab.'}
+              : draft.offer
+                ? 'Der Kunde holt den Auftrag im Regal der Druckerei ab.'
+                : 'Sie holen den Auftrag im Regal der Druckerei ab.'}
           </dd>
         </div>
       </dl>
-      <label className="flex items-start gap-2 text-sm">
-        <input
-          type="checkbox"
-          className="mt-1"
-          checked={draft.acceptTerms}
-          onChange={(e) => update({ acceptTerms: e.target.checked })}
-        />
-        <span>Ich habe die Auftragsbedingungen gelesen und stimme ihnen zu.</span>
-      </label>
+      {draft.offer ? null : (
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={draft.acceptTerms}
+            onChange={(e) => update({ acceptTerms: e.target.checked })}
+          />
+          <span>Ich habe die Auftragsbedingungen gelesen und stimme ihnen zu.</span>
+        </label>
+      )}
       {catalog.texts.turnaround ? <p className="text-sm text-slate-500">{catalog.texts.turnaround}</p> : null}
+    </>
+  )
+}
+
+function SubmitTerms({ catalog }: StepProps) {
+  return (
+    <>
+      <Alert tone="info">
+        Mit dem Absenden geben Sie ein verbindliches Angebot zum angezeigten Preis ab. Der Auftrag kommt erst zustande, wenn ein
+        Mitarbeiter der Druckerei ihn bestätigt.
+      </Alert>
+      {catalog.texts.terms ? (
+        <details className="rounded-md bg-slate-50 p-3 text-sm text-slate-700">
+          <summary className="cursor-pointer font-medium">Auftragsbedingungen lesen</summary>
+          <p className="mt-2 whitespace-pre-line">{catalog.texts.terms}</p>
+        </details>
+      ) : null}
     </>
   )
 }
