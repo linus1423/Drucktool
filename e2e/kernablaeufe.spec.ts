@@ -48,7 +48,17 @@ test('Kunde legt einen Auftrag an', async ({ page }) => {
   await page.getByRole('radio', { name: 'Standardpapier 80 g/m²' }).click()
   await next()
   await page.locator('#copies').fill('20')
+  await page.locator('#notes').fill('Bitte gut verpacken.')
   await check(page, 'Wizard Optionen')
+  // Neu laden verliert nichts: der Entwurf kommt aus dem Browser zurück, samt Datei (Issue #175).
+  await expect
+    .poll(() => page.evaluate(() => Object.values(localStorage).some((v) => v.includes('Bitte gut verpacken.'))))
+    .toBe(true)
+  await page.reload()
+  await expect(page.getByText('Entwurf wiederhergestellt.')).toBeVisible()
+  await expect(page.locator('#copies')).toHaveValue('20')
+  await expect(page.locator('#notes')).toHaveValue('Bitte gut verpacken.')
+  await check(page, 'Wizard Entwurf wiederhergestellt')
   await next()
   await page.getByRole('radio', { name: /Abholung/ }).click()
   await next()
@@ -58,6 +68,10 @@ test('Kunde legt einen Auftrag an', async ({ page }) => {
   await page.waitForURL(/\/auftraege\/[0-9a-f-]{36}$/)
   requestPath = new URL(page.url()).pathname
   await check(page, 'Auftrag (Kunde)')
+  // Nach dem Absenden ist der Entwurf weg.
+  await page.goto('/auftraege/neu')
+  await expect(page.getByRole('heading', { name: 'Druckdatei hochladen' })).toBeVisible()
+  await expect(page.getByText('Entwurf wiederhergestellt.')).toHaveCount(0)
 })
 
 test('Kunde schreibt eine Nachricht', async ({ page }) => {

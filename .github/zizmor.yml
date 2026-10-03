@@ -1,0 +1,7 @@
+# Konfiguration für zizmor (Prüfung der GitHub-Workflows, siehe security.yml).
+rules:
+  cache-poisoning:
+    ignore:
+      # Der pnpm-Cache von setup-node wird nur in den Prüf-Jobs benutzt. Das veröffentlichte Image baut der Job
+      # "image" im Docker-Build ohne diesen Cache.
+      - ci.yml
