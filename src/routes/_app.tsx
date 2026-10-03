@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createFileRoute, Link, Outlet, redirect, useRouter, useRouterState } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { ROLE_LABELS, isAdminRole, isStaffRole } from '~/lib/roles'
@@ -34,6 +34,19 @@ function AppLayout() {
     await router.navigate({ to: '/login' })
   }
 
+  const adminLinks = [
+    ...(user.role === 'superadmin' ? [{ to: '/admin/freigaben', label: 'Freigaben' } as const] : []),
+    ...(isAdminRole(user.role)
+      ? ([
+          { to: '/admin/organisationen', label: 'Organisationen' },
+          { to: '/admin/benutzer', label: 'Benutzer' },
+          { to: '/admin/katalog', label: 'Katalog und Preise' },
+          { to: '/admin/emails', label: 'E-Mails' },
+        ] as const)
+      : []),
+    ...(user.role === 'superadmin' ? [{ to: '/admin/protokoll', label: 'Protokoll' } as const] : []),
+  ]
+
   const links = (
     <>
       <Link to="/uebersicht" className={navLink} activeProps={navActive}>
@@ -47,39 +60,18 @@ function AppLayout() {
           Skripte
         </Link>
       ) : null}
-      {user.role === 'superadmin' ? (
-        <Link to="/admin/freigaben" className={navLink} activeProps={navActive}>
-          Freigaben
-        </Link>
-      ) : null}
       {isStaffRole(user.role) ? (
         <Link to="/organisationsanfragen" className={navLink} activeProps={navActive}>
           Organisationsanfragen
         </Link>
       ) : null}
-      {isAdminRole(user.role) ? (
-        <>
-          <Link to="/admin/organisationen" className={navLink} activeProps={navActive}>
-            Organisationen
-          </Link>
-          <Link to="/admin/benutzer" className={navLink} activeProps={navActive}>
-            Benutzer
-          </Link>
-          <Link to="/admin/katalog" className={navLink} activeProps={navActive}>
-            Katalog und Preise
-          </Link>
-          <Link to="/admin/emails" className={navLink} activeProps={navActive}>
-            E-Mails
-          </Link>
-        </>
-      ) : null}
-      {user.role === 'superadmin' ? (
-        <Link to="/admin/protokoll" className={navLink} activeProps={navActive}>
-          Protokoll
-        </Link>
-      ) : null}
     </>
   )
+  const adminLinkList = adminLinks.map((link) => (
+    <Link key={link.to} to={link.to} className={navLink} activeProps={navActive}>
+      {link.label}
+    </Link>
+  ))
   const account = (
     <>
       <Link to="/profil" className="leading-tight hover:underline md:text-right">
@@ -104,27 +96,34 @@ function AppLayout() {
       </a>
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-4 py-3">
-          <Link to="/uebersicht" className="mr-auto text-lg font-semibold tracking-tight md:mr-4">
+          <Link to="/uebersicht" className="mr-auto text-lg font-semibold tracking-tight lg:mr-4">
             Drucktool
           </Link>
-          {/* Auf schmalen Bildschirmen klappt die Navigation hinter einem Menüknopf zusammen (Issue #20). */}
+          {/* Unter 1024 px klappt die Navigation hinter einem Menüknopf zusammen (Issue #20, #152). */}
           <button
             type="button"
-            className="rounded-md px-3 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 md:hidden"
+            className="rounded-md px-3 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 lg:hidden"
             aria-expanded={menuOpen}
             aria-controls="hauptmenue"
             onClick={() => setMenuOpen((o) => !o)}
           >
             {menuOpen ? 'Menü schließen' : 'Menü'}
           </button>
-          <nav aria-label="Hauptnavigation" className="hidden flex-1 flex-wrap gap-1 md:flex">
+          <nav aria-label="Hauptnavigation" className="hidden flex-1 flex-wrap gap-1 lg:flex">
             {links}
+            {adminLinks.length > 0 ? <AdminMenu pathname={pathname} links={adminLinks} /> : null}
           </nav>
-          <div className="hidden items-center gap-3 text-sm md:flex">{account}</div>
+          <div className="hidden items-center gap-3 text-sm lg:flex">{account}</div>
           {menuOpen ? (
-            <div id="hauptmenue" className="w-full md:hidden">
+            <div id="hauptmenue" className="w-full lg:hidden">
               <nav aria-label="Hauptnavigation" className="flex flex-col gap-1">
                 {links}
+                {adminLinks.length > 0 ? (
+                  <>
+                    <p className="mt-2 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Verwaltung</p>
+                    {adminLinkList}
+                  </>
+                ) : null}
               </nav>
               <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-200 pt-3 text-sm">{account}</div>
             </div>
@@ -136,6 +135,62 @@ function AppLayout() {
       </main>
       <LegalLinks className="pb-8" />
       {isAdminRole(user.role) ? <VersionInfo /> : null}
+    </div>
+  )
+}
+
+type AdminPath =
+  '/admin/freigaben' | '/admin/organisationen' | '/admin/benutzer' | '/admin/katalog' | '/admin/emails' | '/admin/protokoll'
+
+/**
+ * Verwaltungsseiten als Aufklappmenü, damit die Navigation auch für Superadmins in eine Zeile passt (Issue #152).
+ * Schließt beim Klick auf einen Eintrag, mit Escape und bei Klick außerhalb.
+ */
+function AdminMenu({ pathname, links }: { pathname: string; links: readonly { to: AdminPath; label: string }[] }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const active = pathname.startsWith('/admin/')
+  useEffect(() => {
+    if (!open) return
+    const onClick = (event: MouseEvent) => {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false)
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setOpen(false)
+      ref.current?.querySelector('button')?.focus()
+    }
+    document.addEventListener('mousedown', onClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        className={`${navLink} ${active ? navActive.className : ''}`}
+        aria-expanded={open}
+        aria-controls="verwaltungsmenue"
+        onClick={() => setOpen((o) => !o)}
+      >
+        Verwaltung <span aria-hidden>▾</span>
+      </button>
+      {open ? (
+        <div
+          id="verwaltungsmenue"
+          className="absolute left-0 z-20 mt-1 flex min-w-48 flex-col gap-1 rounded-md bg-white p-1 shadow-lg ring-1 ring-slate-200"
+        >
+          {links.map((link) => (
+            <Link key={link.to} to={link.to} className={navLink} activeProps={navActive} onClick={() => setOpen(false)}>
+              {link.label}
+            </Link>
+          ))}
+        </div>
+      ) : null}
     </div>
   )
 }
