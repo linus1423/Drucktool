@@ -634,6 +634,8 @@ export async function changeStatus(user: Principal, input: z.infer<typeof change
       throw new Error('Dieser Statuswechsel ist nicht erlaubt')
     }
     if (input.to === 'on_hold' && !input.note) throw new Error('Bitte die Rückfrage an den Kunden formulieren')
+    // Beim Ablehnen erfährt der Kunde den Grund (Issue #144); Stornieren geht weiter ohne Text.
+    if (input.to === 'rejected' && !input.note) throw new Error('Bitte begründen Sie die Ablehnung für den Kunden')
     // Ein offener Änderungsvorschlag wird angenommen, abgelehnt oder zurückgezogen, nicht übergangen.
     // Stornieren und Ablehnen bleiben möglich und verwerfen den Vorschlag.
     const endsOrder = input.to === 'cancelled' || input.to === 'rejected'

@@ -119,6 +119,8 @@ Abgelehnt / Storniert
 - **Rückfrage**: Die Druckerei braucht eine Antwort; der Kunde beantwortet sie und der Auftrag geht zurück auf
   „Eingereicht“.
 - Kunden können stornieren, bis der Auftrag bestätigt ist.
+- **Abgelehnt**: Die Druckerei nimmt den Auftrag nicht an. Mitarbeiter müssen dabei eine Begründung schreiben; sie
+  steht als Nachricht am Auftrag und in der Mail an den Kunden.
 
 Die Übersicht zeigt Mitarbeitern standardmäßig die Warteschlange aller offenen Aufträge, daneben die fertigen.
 Die erlaubten Übergänge je Rolle stehen in `src/lib/status.ts`.

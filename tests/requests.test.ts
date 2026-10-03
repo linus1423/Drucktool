@@ -144,7 +144,7 @@ describe.skipIf(!url)('Anfragen (Integration)', () => {
     const { id } = await placeOrder(customer)
     const results = await Promise.allSettled([
       changeStatus(staff, { id, version: 1, to: 'confirmed' }),
-      changeStatus(staff, { id, version: 1, to: 'rejected' }),
+      changeStatus(staff, { id, version: 1, to: 'rejected', note: 'Datei fehlt' }),
       changeStatus(customer, { id, version: 1, to: 'cancelled' }),
     ])
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
@@ -157,6 +157,7 @@ describe.skipIf(!url)('Anfragen (Integration)', () => {
     const { id } = await placeOrder(customer)
     await expect(changeStatus(customer, { id, version: 1, to: 'confirmed' })).rejects.toThrow('nicht erlaubt')
     await expect(changeStatus(staff, { id, version: 1, to: 'on_hold' })).rejects.toThrow('Rückfrage')
+    await expect(changeStatus(staff, { id, version: 1, to: 'rejected' })).rejects.toThrow('Ablehnung')
     await changeStatus(staff, { id, version: 1, to: 'on_hold', note: 'Welches Papier?' })
     await changeStatus(customer, { id, version: 2, to: 'submitted', note: '120 g' })
     const res = await changeStatus(staff, { id, version: 3, to: 'confirmed' })
