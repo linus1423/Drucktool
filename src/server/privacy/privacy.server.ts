@@ -138,6 +138,14 @@ export async function exportUserData(actor: Principal, userId: string) {
       db
         .select({
           name: organisationRequests.name,
+          email: organisationRequests.email,
+          phone: organisationRequests.phone,
+          street: organisationRequests.street,
+          zip: organisationRequests.zip,
+          city: organisationRequests.city,
+          country: organisationRequests.country,
+          vatId: organisationRequests.vatId,
+          costCenter: organisationRequests.costCenter,
           details: organisationRequests.details,
           status: organisationRequests.status,
           note: organisationRequests.note,

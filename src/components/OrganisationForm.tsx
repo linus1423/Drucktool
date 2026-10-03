@@ -32,7 +32,8 @@ export const emptyOrganisation: OrganisationValues = {
   status: 'active',
 }
 
-const textFields = [
+/** Die Textfelder einer Organisation, auch für die Organisationsanfrage (Issue #176). */
+export const organisationTextFields = [
   { name: 'name', label: 'Name', span: true },
   { name: 'email', label: 'E-Mail', span: false },
   { name: 'phone', label: 'Telefon', span: false },
@@ -49,12 +50,15 @@ export function OrganisationForm({
   onSubmit,
   submitLabel,
   forCustomer = false,
+  withStatus = true,
 }: {
   initial: OrganisationValues
   onSubmit: (values: OrganisationValues) => Promise<void>
   submitLabel: string
   /** Verwalter einer Organisation (Issue #12): Name und Status ändert nur die Druckerei. */
   forCustomer?: boolean
+  /** Ohne Auswahl des Status, etwa beim Anlegen aus einer Organisationsanfrage (immer aktiv). */
+  withStatus?: boolean
 }) {
   const [error, setError] = useState<string | null>(null)
   const form = useForm({
@@ -83,7 +87,7 @@ export function OrganisationForm({
           <Alert>{error}</Alert>
         </div>
       ) : null}
-      {textFields
+      {organisationTextFields
         .filter((f) => !forCustomer || f.name !== 'name')
         .map((f) => (
           <form.Field key={f.name} name={f.name}>
@@ -101,7 +105,7 @@ export function OrganisationForm({
             )}
           </form.Field>
         ))}
-      {forCustomer ? null : (
+      {forCustomer || !withStatus ? null : (
         <form.Field name="status">
           {(field) => (
             <Field label="Status" htmlFor={field.name}>

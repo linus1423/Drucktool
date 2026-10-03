@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useRouter } from '@tanstack/react-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { organisationTextFields } from '~/components/OrganisationForm'
 import { Alert, Badge, Button, Card, Field, Input, Textarea } from '~/components/ui'
 import { errorMessage } from '~/lib/errors'
 import { formatDate } from '~/lib/format'
@@ -9,6 +10,25 @@ import { ORG_STATUS } from '~/lib/roles'
 import { requestOrganisationFn, withdrawOrganisationRequestFn, type getMyAccountFn } from '~/server/account/account.functions'
 
 type Account = Awaited<ReturnType<typeof getMyAccountFn>>
+
+const emptyRequest = {
+  name: '',
+  email: '',
+  phone: '',
+  street: '',
+  zip: '',
+  city: '',
+  country: 'DE',
+  vatId: '',
+  costCenter: '',
+  details: '',
+}
+
+const FIELD_HINTS: Partial<Record<keyof typeof emptyRequest, string>> = {
+  name: 'z. B. Lehrstuhl, Institut, Fachschaft oder Firma',
+  email: 'Allgemeine Adresse der Organisation, etwa für Rechnungen',
+  costCenter: 'Falls über eine Kostenstelle abgerechnet wird',
+}
 
 const REQUEST_STATUS = {
   open: { label: 'Wartet auf Bearbeitung', className: 'bg-amber-100 text-amber-800' },
@@ -24,8 +44,8 @@ export function OrganisationsCard({ account }: { account: Pick<Account, 'members
   const queryClient = useQueryClient()
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [name, setName] = useState('')
-  const [details, setDetails] = useState('')
+  const [values, setValues] = useState(emptyRequest)
+  const set = (key: keyof typeof emptyRequest, value: string) => setValues((v) => ({ ...v, [key]: value }))
   const [sent, setSent] = useState(false)
 
   const refresh = async () => {
@@ -35,10 +55,9 @@ export function OrganisationsCard({ account }: { account: Pick<Account, 'members
     await router.invalidate()
   }
   const request = useMutation({
-    mutationFn: () => requestOrganisationFn({ data: { name, details } }),
+    mutationFn: () => requestOrganisationFn({ data: values }),
     onSuccess: async () => {
-      setName('')
-      setDetails('')
+      setValues(emptyRequest)
       setOpen(false)
       setSent(true)
       await refresh()
@@ -113,31 +132,50 @@ export function OrganisationsCard({ account }: { account: Pick<Account, 'members
               request.mutate()
             }}
           >
-            <Field
-              label="Name der Organisation"
-              htmlFor="org-request-name"
-              hint="z. B. Lehrstuhl, Institut, Fachschaft oder Firma"
-            >
-              <Input id="org-request-name" value={name} maxLength={200} onChange={(e) => setName(e.target.value)} required />
-            </Field>
-            <Field
-              label="Weitere Angaben (optional)"
-              htmlFor="org-request-details"
-              hint="z. B. Adresse, Kostenstelle oder Ansprechpartner"
-            >
-              <Textarea
-                id="org-request-details"
-                rows={3}
-                maxLength={2000}
-                value={details}
-                onChange={(e) => setDetails(e.target.value)}
-              />
-            </Field>
+            <p className="text-slate-600">
+              Bitte geben Sie die Daten der Organisation möglichst vollständig an. Die Druckerei legt sie daraus an oder ordnet
+              Sie einer bestehenden zu.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {organisationTextFields.map((f) => (
+                <div key={f.name} className={f.span ? 'sm:col-span-2' : ''}>
+                  <Field
+                    label={f.name === 'name' ? 'Name der Organisation' : f.label}
+                    htmlFor={`org-request-${f.name}`}
+                    hint={FIELD_HINTS[f.name]}
+                  >
+                    <Input
+                      id={`org-request-${f.name}`}
+                      type={f.name === 'email' ? 'email' : 'text'}
+                      value={values[f.name]}
+                      maxLength={f.name === 'country' ? 2 : 200}
+                      onChange={(e) => set(f.name, e.target.value)}
+                      required={f.name === 'name' || f.name === 'country'}
+                    />
+                  </Field>
+                </div>
+              ))}
+              <div className="sm:col-span-2">
+                <Field
+                  label="Anmerkungen (optional)"
+                  htmlFor="org-request-details"
+                  hint="z. B. Ansprechpartner oder Hinweise zur Abrechnung"
+                >
+                  <Textarea
+                    id="org-request-details"
+                    rows={3}
+                    maxLength={2000}
+                    value={values.details}
+                    onChange={(e) => set('details', e.target.value)}
+                  />
+                </Field>
+              </div>
+            </div>
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setOpen(false)}>
                 Abbrechen
               </Button>
-              <Button type="submit" disabled={request.isPending || !name.trim()}>
+              <Button type="submit" disabled={request.isPending || !values.name.trim()}>
                 {request.isPending ? 'Wird gesendet …' : 'Anfrage senden'}
               </Button>
             </div>

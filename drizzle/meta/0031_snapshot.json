@@ -1,6 +1,6 @@
 {
-  "id": "9bc77fb0-ba4e-4e0d-9d6a-f9772fe47f23",
-  "prevId": "fff39202-8fdc-45e5-9e51-27b6632f47be",
+  "id": "93a308e9-ca0c-4671-8d8d-69f98e9d8943",
+  "prevId": "10c7f2a8-fff8-4fb9-8e62-98c7084cc60f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1151,6 +1151,55 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "street": {
+          "name": "street",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "zip": {
+          "name": "zip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "city": {
+          "name": "city",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "country": {
+          "name": "country",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'DE'"
+        },
+        "vat_id": {
+          "name": "vat_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cost_center": {
+          "name": "cost_center",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "details": {
           "name": "details",

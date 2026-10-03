@@ -393,7 +393,7 @@ export const MAIL_TEMPLATES = {
       kunde: 'Name des Kunden',
       email: 'E-Mail-Adresse des Kunden',
       organisation: 'Angefragte Organisation',
-      angaben: 'Weitere Angaben des Kunden, falls vorhanden',
+      angaben: 'Angaben des Kunden: Adresse, Kontakt, USt-IdNr., Kostenstelle und Freitext',
       link: 'Link zu den Organisationsanfragen',
     },
     subject: 'Organisation angefragt: {{organisation}}',
