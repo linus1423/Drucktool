@@ -565,6 +565,26 @@ docker compose up -d --no-build
   scannt das Image mit Trivy (bricht bei behebbaren kritischen Lücken ab) und veröffentlicht es mit SBOM und
   Provenance-Nachweis. Tags: `latest` (main), `sha-<commit>`, bei Releases `v1.2.0` und `1.2.0`.
 
+### Sicherheits-CI
+
+`.github/workflows/security.yml` läuft bei jedem Pull Request, auf `main` und jeden Montag (neue Lücken fallen so auch
+ohne Codeänderung auf; schlägt der Lauf fehl, schickt GitHub eine Mail):
+
+- **Abhängigkeiten**: `pnpm audit --prod` darf keine Lücke finden, `pnpm audit` für die Entwicklungswerkzeuge keine
+  hohe oder kritische.
+- **Zugangsdaten im Repository**: [gitleaks](https://github.com/gitleaks/gitleaks) durchsucht die ganze Git-Historie und
+  den Arbeitsstand. Feste Testpasswörter sind in `.gitleaks.toml` ausgenommen.
+- **GitHub-Workflows**: [zizmor](https://docs.zizmor.sh) prüft die Workflows auf Skript-Injection, zu weite Rechte und
+  nicht festgelegte Actions. Alle Actions sind deshalb auf einen Commit festgelegt (Dependabot aktualisiert sie samt
+  Versionskommentar). Ausnahmen stehen in `.github/zizmor.yml`.
+- **Code-Analyse**: [CodeQL](https://codeql.github.com) mit den erweiterten Sicherheitsregeln. Befunde stehen unter
+  _Security → Code scanning_ und als Anmerkungen im Pull Request. Ist dort „Default setup“ eingeschaltet, muss es
+  aus, sonst lehnt GitHub den Upload ab.
+- **Docker-Image und Konfiguration**: Trivy prüft das Image auf behebbare hohe und kritische Lücken und Dockerfile und
+  Compose-Dateien auf Fehlkonfiguration. npm, npx, corepack und yarn sind aus dem Laufzeit-Image entfernt.
+
+Lokal: `pnpm audit`, `gitleaks git .`, `zizmor .github/workflows`.
+
 Dependabot (`.github/dependabot.yml`) schlägt montags gruppierte Updates für npm-Pakete, GitHub Actions und
 Docker-Images vor. Patch-Updates können automatisch gemergt werden, wenn die CI grün ist: dazu die Repository-Variable
 `DEPENDABOT_AUTOMERGE=true` setzen, „Allow auto-merge“ aktivieren und `main` mit Pflicht-Checks schützen.
