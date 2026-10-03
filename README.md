@@ -380,6 +380,10 @@ Der Container spielt beim Start die Migrationen ein und legt den Superadmin an, 
 und verschickt die E-Mails. Druckdateien liegen im Volume `uploads`. Der Dienst `clamav` prüft die Uploads auf
 Schadsoftware und startet automatisch mit (siehe Virenprüfung unter Sicherheit).
 
+App und Worker übernehmen alle Einstellungen aus der `.env` (z. B. `OIDC_*` und `CUSTOMER_OIDC_*` für die Anmeldung,
+siehe `.env.example`). Datenbank-URL und Upload-Verzeichnis setzt die Compose-Datei selbst, die für `pnpm dev`
+gedachten Werte aus der `.env` gelten im Container also nicht.
+
 ## Logs und Überwachung
 
 - **Logs:** Die App schreibt in Produktion eine JSON-Zeile pro Eintrag (`LOG_FORMAT=text` für lesbaren Text, lokal

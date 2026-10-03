@@ -34,6 +34,12 @@ services:
       clamav:
         condition: service_started
         required: false
+    # Alle übrigen Einstellungen (OIDC_*, CUSTOMER_*, ATTACHMENT_* …) kommen aus der .env, wie auf dem Server (Issue #160).
+    # Die Einträge unter environment haben Vorrang, damit die für "pnpm dev" gedachten Werte der .env
+    # (DATABASE_URL mit localhost, UPLOAD_DIR) im Container nicht greifen.
+    env_file:
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgres://drucktool:${POSTGRES_PASSWORD:-drucktool}@db:5432/drucktool
       APP_URL: ${APP_URL:-http://localhost:3000}
@@ -48,6 +54,7 @@ services:
       PRIVACY_URL: ${PRIVACY_URL:-}
       IMPRINT_URL: ${IMPRINT_URL:-}
       APP_ENVIRONMENT: ${APP_ENVIRONMENT:-production}
+      UPLOAD_DIR: /app/uploads
       # Uploads werden vom clamav-Container geprüft. CLAMAV_HOST= (leer, z. B. in .env) schaltet die Prüfung ab.
       CLAMAV_HOST: ${CLAMAV_HOST-clamav}
       CLAMAV_PORT: ${CLAMAV_PORT:-3310}
@@ -64,6 +71,9 @@ services:
     command: worker
     logging: *logging
     restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
     depends_on:
       app:
         condition: service_healthy
@@ -78,6 +88,7 @@ services:
       SESSION_IP_RETENTION_DAYS: ${SESSION_IP_RETENTION_DAYS:-30}
       REJECTED_REGISTRATION_RETENTION_DAYS: ${REJECTED_REGISTRATION_RETENTION_DAYS:-30}
       MAIL_REDIRECT_TO: ${MAIL_REDIRECT_TO:-}
+      UPLOAD_DIR: /app/uploads
     healthcheck:
       disable: true
 
