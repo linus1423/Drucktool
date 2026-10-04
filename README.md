@@ -135,6 +135,16 @@ letzten 14 Tagen fertig gewordenen. Karten lassen sich in eine erlaubte Spalte z
 „Status …“ an der Karte verschieben. Eine Rückfrage fragt dabei nach dem Text an den Kunden. Ablehnen und Stornieren
 gehen weiter über die Detailseite. Hat jemand den Auftrag inzwischen geändert, lädt das Board neu und meldet das.
 
+**Abholung und Zustellung:** „Fertig“ bleibt der letzte Status. Ist ein fertiger Auftrag abgeholt bzw. per Hauspost
+zugestellt, markiert ein Mitarbeiter das auf der Detailseite oder an der Karte im Board („Als abgeholt markieren“ bzw.
+„Als zugestellt markieren“); Zeitpunkt und Mitarbeiter stehen im Verlauf, auch für den Kunden, und lassen sich
+zurücknehmen. Die Ansicht „Liegt zur Abholung bereit“ in der Liste und der gleichnamige Filter im Board zeigen alle
+fertigen Aufträge, die noch in der Druckerei liegen. Liegt ein Abholauftrag länger als die unter „Katalog und Preise“
+→ „Preise und Texte“ eingestellten Tage (Standard 7), ist er intern als „Nicht abgeholt“ markiert, und der Kunde
+bekommt einmal eine Erinnerung (Vorlage „Erinnerung an die Abholung“). Die Erinnerungen verschickt der Mail-Worker mit
+dem stündlichen Aufräumen. Bei der Einführung (Migration `0031_pickup_handover.sql`) gelten Aufträge, die seit mehr als 14 Tagen fertig
+sind, als übergeben; jüngere bleiben offen, bekommen aber keine Erinnerung.
+
 ## Übersicht
 
 Nach dem Anmelden landet man auf der Übersicht (`/uebersicht`). Mitarbeiter sehen dort die offenen Aufträge je Status

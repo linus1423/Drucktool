@@ -142,6 +142,8 @@ export const listFilterSchema = z.object({
   watching: z.boolean().optional(),
   /** Aufträge mit Aktivität anderer seit dem letzten Öffnen (Issue #18). */
   unread: z.boolean().optional(),
+  /** Fertige Aufträge, die noch nicht abgeholt bzw. zugestellt sind (Issue #173). */
+  readyForPickup: z.boolean().optional(),
   sort: z.enum(LIST_SORTS).optional(),
   dir: z.enum(['asc', 'desc']).optional(),
   page: z.number().int().min(1).max(100_000).optional(),
@@ -156,6 +158,8 @@ export type ListFilter = z.infer<typeof listFilterSchema>
 
 const creatorAlias = alias(users, 'creator')
 const assigneeAlias = alias(users, 'assignee')
+/** Fertig, aber noch nicht abgeholt bzw. zugestellt (Issue #173). */
+const awaitingHandover = and(eq(requests.status, 'completed'), isNull(requests.handedOverAt))
 
 function listConditions(user: Principal, filter: ListFilter) {
   const staff = isStaffRole(user.role)
@@ -163,6 +167,7 @@ function listConditions(user: Principal, filter: ListFilter) {
   if (filter.status) conditions.push(eq(requests.status, filter.status))
   if (filter.open) conditions.push(inArray(requests.status, OPEN_STATUSES))
   if (filter.done) conditions.push(eq(requests.status, 'completed'))
+  if (filter.readyForPickup) conditions.push(awaitingHandover)
   if (filter.assignedToMe) conditions.push(eq(requests.assigneeId, user.id))
   if (filter.watching) conditions.push(watchedBy(user.id, requests))
   if (filter.unread) conditions.push(unreadExpression(user))
@@ -227,6 +232,7 @@ function listSelection(user: Principal) {
     quantity: requests.quantity,
     totalCents: requests.totalCents,
     deliveryMethod: requests.deliveryMethod,
+    handedOverAt: requests.handedOverAt,
     createdAt: requests.createdAt,
     updatedAt: requests.updatedAt,
     statusChangedAt: requests.statusChangedAt,
@@ -270,8 +276,10 @@ export async function listRequests(user: Principal, filter: ListFilter) {
     getDeadlineSettings(),
   ])
   const now = new Date()
+  // „Nicht abgeholt“ ist nur für Mitarbeiter ein Hinweis (Issue #173).
+  const staff = isStaffRole(user.role)
   return {
-    rows: rows.map((r) => ({ ...r, attention: attentionFor(r, deadlines, now) })),
+    rows: rows.map((r) => ({ ...r, attention: attentionFor(staff ? r : { ...r, handedOverAt: undefined }, deadlines, now) })),
     total: counted?.count ?? 0,
     page,
     pageSize,
@@ -296,6 +304,7 @@ export async function getRequestDetail(user: Principal, id: string) {
   const confirmer = alias(users, 'confirmer')
   const invoicer = alias(users, 'invoicer')
   const offerer = alias(users, 'offerer')
+  const handedOverBy = alias(users, 'handed_over_by')
 
   const [found] = await db
     .select({
@@ -307,6 +316,7 @@ export async function getRequestDetail(user: Principal, id: string) {
       confirmedByName: confirmer.name,
       invoiceCreatedByName: invoicer.name,
       offeredByName: offerer.name,
+      handedOverByName: handedOverBy.name,
     })
     .from(requests)
     .leftJoin(organisations, eq(organisations.id, requests.organisationId))
@@ -315,6 +325,7 @@ export async function getRequestDetail(user: Principal, id: string) {
     .leftJoin(confirmer, eq(confirmer.id, requests.confirmedById))
     .leftJoin(invoicer, eq(invoicer.id, requests.invoiceCreatedById))
     .leftJoin(offerer, eq(offerer.id, requests.offeredById))
+    .leftJoin(handedOverBy, eq(handedOverBy.id, requests.handedOverById))
     .where(and(eq(requests.id, id), readVisibilityFilter(user)))
     .limit(1)
   if (!found) notFound()
@@ -415,7 +426,11 @@ export async function getRequestDetail(user: Principal, id: string) {
     invoiceNumber: isStaff ? r.invoiceNumber : null,
     printSheetOptions: isStaff ? await printSheetOptions(db, r.order) : { inner: [], cover: [] },
     reorderOf: reorderOf ?? null,
-    attention: attentionFor({ ...r, internalDueDate }, deadlines),
+    attention: attentionFor({ ...r, internalDueDate, handedOverAt: isStaff ? r.handedOverAt : undefined }, deadlines),
+    // Abholung bzw. Zustellung (Issue #173) sehen auch Kunden; die Erinnerung ist intern.
+    handedOverById: null,
+    handedOverByName: found.handedOverByName,
+    pickupReminderSentAt: isStaff ? r.pickupReminderSentAt : null,
     confirmedByName: found.confirmedByName,
     offeredByName: found.offeredByName,
     comments: comments.map(({ mentionedIds, ...c }) => ({
@@ -1242,6 +1257,8 @@ const BOARD_LIMIT = 500
 export const boardFilterSchema = z.object({
   mine: z.boolean().optional(),
   search: z.string().trim().max(200).optional(),
+  /** Nur fertige Aufträge, die noch nicht abgeholt bzw. zugestellt sind, ohne Begrenzung auf 14 Tage (Issue #173). */
+  ready: z.boolean().optional(),
 })
 
 /** Aufträge für das Board der Mitarbeiter, gruppiert wird im Client. */
@@ -1262,13 +1279,15 @@ export async function listBoard(user: Principal, filter: z.infer<typeof boardFil
     .where(
       and(
         base,
-        or(
-          inArray(requests.status, OPEN_STATUSES),
-          and(
-            eq(requests.status, 'completed'),
-            sql`${requests.statusChangedAt} > now() - make_interval(days => ${BOARD_DONE_DAYS})`,
-          ),
-        ),
+        filter.ready
+          ? awaitingHandover
+          : or(
+              inArray(requests.status, OPEN_STATUSES),
+              and(
+                eq(requests.status, 'completed'),
+                sql`${requests.statusChangedAt} > now() - make_interval(days => ${BOARD_DONE_DAYS})`,
+              ),
+            ),
       ),
     )
     .orderBy(asc(requests.promisedDate), asc(requests.number))

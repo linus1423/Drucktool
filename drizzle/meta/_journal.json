@@ -199,6 +199,13 @@
       "breakpoints": true
     },
     {
+      "idx": 31,
+      "version": "7",
+      "when": 1791090000000,
+      "tag": "0031_pickup_handover",
+      "breakpoints": true
+    },
+    {
       "idx": 33,
       "version": "7",
       "when": 1791110000000,

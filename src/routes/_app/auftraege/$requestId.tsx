@@ -6,13 +6,14 @@ import { formatBytes, uploadFile, type UploadedFile } from '~/components/FileUpl
 import { AttentionBadge } from '~/components/AttentionBadge'
 import { LexwareExportButton } from '~/components/LexwareExport'
 import { recordInvoiceFn } from '~/server/invoices/lexware.functions'
+import { recordHandoverFn } from '~/server/requests/handover.functions'
 import { ProposalCard, ProposeChangeForm } from '~/components/ChangeProposal'
 import { RequestFields, useRequestForm } from '~/components/RequestFields'
 import { Alert, Badge, Button, Card, Field, Input, Select, StatusBadge, Textarea, cx } from '~/components/ui'
 import { errorMessage, isConflictError } from '~/lib/errors'
 import { formatDate, formatDateTime, formatMoney, formatRequestNumber } from '~/lib/format'
 import { formatSheetSize, type SheetSize } from '~/lib/catalog'
-import { DELIVERY_LABELS, coverPagesFromMainFile } from '~/lib/order'
+import { DELIVERY_LABELS, HANDOVER_LABELS, coverPagesFromMainFile } from '~/lib/order'
 import { describeOrder } from '~/lib/snapshot'
 import { accountQuery, assignableStaffQuery, orderCatalogQuery, requestDetailQuery } from '~/lib/queries'
 import { isStaffRole } from '~/lib/roles'
@@ -277,6 +278,9 @@ function RequestDetailPage() {
         <div className="space-y-6">
           <PriceCard request={request} staff={staff} />
           <StatusActions request={request} staff={staff} />
+          {request.status === 'completed' && (staff || request.handedOverAt) ? (
+            <HandoverCard request={request} staff={staff} />
+          ) : null}
           {staff && request.status === 'completed' ? <InvoiceCard request={request} /> : null}
           {staff && hasInternalStatus(request.status) ? <InternalStatusCard request={request} /> : null}
           {staff && !TERMINAL_STATUSES.has(request.status) ? <DatesCard request={request} /> : null}
@@ -1026,6 +1030,15 @@ function describeEvent(e: Detail['events'][number]) {
       const nr = typeof e.data.invoiceNumber === 'string' ? e.data.invoiceNumber : null
       return nr ? `hat die Rechnung ${nr} in Lexware angelegt` : 'hat die Rechnung in Lexware angelegt'
     }
+    case 'handed_over': {
+      const house = e.data.deliveryMethod === 'house_post'
+      if (e.data.handedOver !== true) return house ? 'hat die Zustellung zurückgenommen' : 'hat die Abholung zurückgenommen'
+      return house ? 'hat den Auftrag als zugestellt markiert' : 'hat den Auftrag als abgeholt markiert'
+    }
+    case 'pickup_reminder_sent':
+      return e.data.emailed === true
+        ? 'hat den Kunden per E-Mail an die Abholung erinnert'
+        : 'hat nicht an die Abholung erinnert, weil der Kunde keine E-Mails bekommt'
     case 'dates_changed': {
       const what = e.data.field === 'internalDueDate' ? 'die interne Frist' : 'den zugesagten Termin'
       const to = typeof e.data.to === 'string' ? e.data.to : null
@@ -1106,6 +1119,49 @@ function Files({ request, staff }: { request: Detail; staff: boolean }) {
           {coverFromMain.back ? `, hinten ${coverFromMain.back}` : ''}.
         </p>
       ) : null}
+    </Card>
+  )
+}
+
+/** Abholung bzw. Zustellung eines fertigen Auftrags (Issue #173). Erfassen und zurücknehmen dürfen nur Mitarbeiter. */
+function HandoverCard({ request, staff }: { request: Detail; staff: boolean }) {
+  const refresh = useRefresh(request.id)
+  const house = request.deliveryMethod === 'house_post'
+  const label = HANDOVER_LABELS[request.deliveryMethod]
+  const record = useMutation({
+    mutationFn: (handedOver: boolean) => recordHandoverFn({ data: { id: request.id, handedOver } }),
+    onSuccess: () => refresh(),
+  })
+  return (
+    <Card title={house ? 'Zustellung' : 'Abholung'}>
+      <div className="space-y-3 text-sm">
+        {record.error ? <Alert>{errorMessage(record.error)}</Alert> : null}
+        {request.handedOverAt ? (
+          <p className="flex flex-wrap items-center gap-2">
+            <Badge className="bg-emerald-100 text-emerald-800">{label}</Badge>
+            <span>
+              am {formatDateTime(request.handedOverAt)}
+              {request.handedOverByName ? `, erfasst von ${request.handedOverByName}` : ''}
+            </span>
+          </p>
+        ) : (
+          <p>{house ? 'Wartet auf die Hauspost.' : 'Liegt zur Abholung im Regal bereit.'}</p>
+        )}
+        {staff && request.pickupReminderSentAt && !request.handedOverAt ? (
+          <p className="text-slate-600">Erinnerung an den Kunden am {formatDateTime(request.pickupReminderSentAt)}.</p>
+        ) : null}
+        {staff ? (
+          request.handedOverAt ? (
+            <Button variant="ghost" disabled={record.isPending} onClick={() => record.mutate(false)}>
+              Zurücknehmen
+            </Button>
+          ) : (
+            <Button variant="secondary" disabled={record.isPending} onClick={() => record.mutate(true)}>
+              {house ? 'Als zugestellt markieren' : 'Als abgeholt markieren'}
+            </Button>
+          )
+        ) : null}
+      </div>
     </Card>
   )
 }

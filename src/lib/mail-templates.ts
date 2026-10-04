@@ -271,6 +271,26 @@ export const MAIL_TEMPLATES = {
     ],
     sample: REQUEST_SAMPLE,
   },
+  pickup_reminder: {
+    label: 'Erinnerung an die Abholung (an Kunden)',
+    description:
+      'Geht einmal an den Kunden, wenn ein fertiger Abholauftrag länger als die in den Fristen eingestellten Tage in der Druckerei liegt (Issue #173).',
+    audience: 'Kunden',
+    variables: { ...REQUEST_VARS, fertigSeit: 'Datum, seit dem der Auftrag fertig ist', tage: 'Tage seitdem' },
+    subject: 'Erinnerung: {{auftrag}} liegt zur Abholung bereit',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'Ihr Auftrag {{auftrag}} ist seit {{fertigSeit}} fertig und liegt zur Abholung im Regal der Druckerei bereit.',
+      },
+      {
+        kind: 'p',
+        text: 'Bitte holen Sie ihn bald ab. Falls Sie ihn schon abgeholt haben, können Sie diese Nachricht ignorieren.',
+      },
+      OPEN,
+    ],
+    sample: { ...REQUEST_SAMPLE, akteur: '', fertigSeit: '01.10.2026', tage: '8' },
+  },
   comment: {
     label: 'Neue Nachricht',
     description: 'Neue Nachricht oder interne Notiz an einem Auftrag.',

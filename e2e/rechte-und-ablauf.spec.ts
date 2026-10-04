@@ -150,3 +150,28 @@ test('Mitarbeiter schließt den Auftrag ab, der Kunde sieht „Fertig“', async
     order by created_at`
   expect(mails.length).toBeGreaterThanOrEqual(2)
 })
+
+test('Mitarbeiter erfasst die Abholung, der Kunde sieht sie im Verlauf (Issue #173)', async ({ page, browser }) => {
+  await loginWithPassword(page, staff)
+  await page.goto('/auftraege?ansicht=abholbereit')
+  await expect(page.getByRole('link', { name: title })).toBeVisible()
+  await page.goto('/auftraege/board?bereit=true')
+  await expect(page.getByRole('button', { name: /Als abgeholt markieren/ })).toBeVisible()
+  await check(page, 'Board: Liegt zur Abholung bereit')
+
+  await page.goto(requestPath)
+  await page.getByRole('button', { name: 'Als abgeholt markieren' }).click()
+  await expect(page.getByRole('button', { name: 'Zurücknehmen' }).first()).toBeVisible()
+  await expect(page.getByText('hat den Auftrag als abgeholt markiert')).toBeVisible()
+  await expect(statusBadge(page)).toHaveText('Fertig')
+  await check(page, 'Abholung erfasst')
+  await page.goto('/auftraege?ansicht=abholbereit')
+  await expect(page.getByRole('link', { name: title })).toHaveCount(0)
+
+  const customerPage = await newSession(browser)
+  await loginAsCustomer(customerPage, owner)
+  await customerPage.goto(requestPath)
+  await expect(customerPage.getByText('hat den Auftrag als abgeholt markiert')).toBeVisible()
+  await expect(customerPage.getByRole('button', { name: 'Als abgeholt markieren' })).toHaveCount(0)
+  await customerPage.context().close()
+})
