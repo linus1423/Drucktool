@@ -1,6 +1,6 @@
 {
-  "id": "fcef8603-7317-443b-977e-c38f599ec596",
-  "prevId": "41e34a87-2338-4850-a24b-3e9a4ce77fb3",
+  "id": "41e34a87-2338-4850-a24b-3e9a4ce77fb3",
+  "prevId": "93a308e9-ca0c-4671-8d8d-69f98e9d8943",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2021,12 +2021,6 @@
           "notNull": true,
           "default": false
         },
-        "purged_at": {
-          "name": "purged_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -3363,8 +3357,7 @@
         "offer_accepted",
         "handed_over",
         "pickup_reminder_sent",
-        "reminder_sent",
-        "files_purged"
+        "reminder_sent"
       ]
     },
     "public.request_status": {

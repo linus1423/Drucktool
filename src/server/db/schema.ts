@@ -272,6 +272,9 @@ export const requests = pgTable(
     status: requestStatus('status').notNull().default('submitted'),
     // Seit wann der Auftrag im aktuellen Status steht (für „wartet lange“, Issue #14).
     statusChangedAt: timestamp('status_changed_at', { withTimezone: true }).notNull().defaultNow(),
+    // Letzte Erinnerung an den Kunden bei Rückfrage, Angebot oder Änderungsvorschlag (Issue #174). Liegt sie vor
+    // dem Beginn der aktuellen Wartephase, ist für diese Phase noch keine Erinnerung verschickt.
+    remindedAt: timestamp('reminded_at', { withTimezone: true }),
     // Von der Druckerei zugesagter Termin, für Kunden sichtbar.
     promisedDate: date('promised_date'),
     // Bogen, auf dem gedruckt wird, nur für Mitarbeiter (Issue #88). Kopie der Katalogwerte, null heißt: wie berechnet.
@@ -393,6 +396,7 @@ export const requestEventType = pgEnum('request_event_type', [
   'offer_accepted',
   'handed_over',
   'pickup_reminder_sent',
+  'reminder_sent',
   'files_purged',
 ])
 

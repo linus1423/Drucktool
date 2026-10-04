@@ -67,6 +67,21 @@ const REQUEST_SAMPLE = {
 }
 const SUMMARY_SAMPLE =
   'Format: A4\nBindung: Leimbindung\nSeiten: 120 Seiten, doppelseitig\nPapier: Standardpapier 80 g/m²\nPreis: 104,80 €'
+// Erinnerungen verschickt das System, deshalb ohne {{akteur}}.
+const REMINDER_VARS = {
+  auftrag: REQUEST_VARS.auftrag,
+  nummer: REQUEST_VARS.nummer,
+  titel: REQUEST_VARS.titel,
+  link: REQUEST_VARS.link,
+  dauer: 'Wie lange die Druckerei schon wartet, z. B. „7 Tagen“ (passt hinter „vor“ oder „seit“)',
+}
+const REMINDER_SAMPLE = {
+  auftrag: REQUEST_SAMPLE.auftrag,
+  nummer: REQUEST_SAMPLE.nummer,
+  titel: REQUEST_SAMPLE.titel,
+  link: REQUEST_SAMPLE.link,
+  dauer: '7 Tagen',
+}
 const OPEN: MailBlock = { kind: 'button', label: 'Auftrag öffnen', href: '{{link}}' }
 
 export const MAIL_TEMPLATES = {
@@ -249,6 +264,54 @@ export const MAIL_TEMPLATES = {
       vermerk: 'Ablehnung per Telefon am 01.10.2026',
       zusammenfassung: SUMMARY_SAMPLE,
     },
+  },
+  // Erinnerungen an den Kunden, wenn die Druckerei auf ihn wartet (Issue #174). Verschickt der stündliche Job im
+  // Mail-Worker, höchstens einmal je Wartephase; die Tage stellen Admins bei den Fristen ein.
+  reminder_on_hold: {
+    label: 'Erinnerung an Rückfrage (an Kunden)',
+    description: 'Der Auftrag steht seit einigen Tagen auf „Rückfrage“, die Druckerei wartet auf eine Antwort.',
+    audience: 'Kunden',
+    variables: REMINDER_VARS,
+    subject: 'Erinnerung: Rückfrage zu {{auftrag}}',
+    blocks: [
+      { kind: 'p', text: 'Zu Ihrem Auftrag {{auftrag}} haben wir vor {{dauer}} eine Rückfrage gestellt.' },
+      { kind: 'p', text: 'Bitte antworten Sie im Drucktool, damit wir weitermachen können.' },
+      OPEN,
+    ],
+    sample: REMINDER_SAMPLE,
+  },
+  reminder_offered: {
+    label: 'Erinnerung an Angebot (an Kunden)',
+    description: 'Ein Angebot der Druckerei ist seit einigen Tagen weder angenommen noch abgelehnt.',
+    audience: 'Kunden',
+    variables: { ...REMINDER_VARS, email: 'E-Mail-Adresse des Kunden, mit der er sich anmeldet' },
+    subject: 'Erinnerung: Ihr Angebot {{auftrag}}',
+    blocks: [
+      { kind: 'p', text: 'Vor {{dauer}} haben wir Ihnen das Angebot {{auftrag}} geschickt.' },
+      {
+        kind: 'p',
+        text: 'Bitte melden Sie sich mit {{email}} im Drucktool an und nehmen Sie das Angebot an oder lehnen Sie es ab. Erst nach Ihrer Zusage drucken wir.',
+      },
+      { kind: 'button', label: 'Angebot ansehen', href: '{{link}}' },
+    ],
+    sample: { ...REMINDER_SAMPLE, email: 'erika@example.com' },
+  },
+  reminder_proposal: {
+    label: 'Erinnerung an Änderungsvorschlag (an Kunden)',
+    description: 'Ein Änderungsvorschlag der Druckerei wartet seit einigen Tagen auf die Zustimmung des Kunden.',
+    audience: 'Kunden',
+    variables: { ...REMINDER_VARS, grund: 'Begründung der Druckerei' },
+    subject: 'Erinnerung: Änderungsvorschlag zu {{auftrag}}',
+    blocks: [
+      { kind: 'p', text: 'Vor {{dauer}} haben wir eine Änderung an Ihrem Auftrag {{auftrag}} vorgeschlagen:' },
+      { kind: 'quote', text: '{{grund}}' },
+      {
+        kind: 'p',
+        text: 'Die Änderung gilt erst, wenn Sie zustimmen. Bitte nehmen Sie den Vorschlag im Drucktool an oder lehnen Sie ihn ab.',
+      },
+      OPEN,
+    ],
+    sample: { ...REMINDER_SAMPLE, grund: 'Laut Telefonat 30 statt 20 Exemplare.' },
   },
   promised_date_set: {
     label: 'Termin zugesagt (an Kunden)',
