@@ -18,6 +18,8 @@ export const ADMIN = {
 /** WCAG 2.1 AA ohne schwere oder kritische Befunde (Akzeptanzkriterium Issue #20). */
 export async function expectAccessible(page: Page, name: string) {
   await page.waitForLoadState('networkidle')
+  // Laufende Übergänge abwarten, sonst misst axe mitten in transition-colors (z. B. „Zurück“ wird gerade aktiv).
+  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined))))
   const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()
   const serious = result.violations
     .filter((v) => v.impact === 'serious' || v.impact === 'critical')
