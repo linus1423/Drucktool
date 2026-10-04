@@ -9,6 +9,7 @@ import { Alert, Badge, Button, Input, PageHeader, Select, Textarea, cx } from '~
 import { errorMessage, isConflictError } from '~/lib/errors'
 import { formatDate, formatRequestNumber } from '~/lib/format'
 import { requestBoardQuery } from '~/lib/queries'
+import { HANDOVER_LABELS } from '~/lib/order'
 import { isStaffRole } from '~/lib/roles'
 import {
   INTERNAL_STATUS_LABELS,
@@ -18,11 +19,13 @@ import {
   transitionLabel,
   type RequestStatus,
 } from '~/lib/status'
+import { recordHandoverFn } from '~/server/requests/handover.functions'
 import { changeStatusFn } from '~/server/requests/requests.functions'
 
 const searchSchema = z.object({
   meine: z.boolean().optional().catch(undefined),
   q: z.string().optional().catch(undefined),
+  bereit: z.boolean().optional().catch(undefined),
 })
 
 export const Route = createFileRoute('/_app/auftraege/board')({
@@ -56,7 +59,7 @@ function BoardPage() {
   const search = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
   const queryClient = useQueryClient()
-  const filter = { mine: search.meine || undefined, search: search.q || undefined }
+  const filter = { mine: search.meine || undefined, search: search.q || undefined, ready: search.bereit || undefined }
   const { data, isPending, error } = useQuery(requestBoardQuery(filter))
   const [dragging, setDragging] = useState<Card | null>(null)
   const [pending, setPending] = useState<Move | null>(null)
@@ -78,6 +81,19 @@ function BoardPage() {
           : errorMessage(e),
       })
     },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['requests'] }),
+  })
+
+  // Abholung bzw. Zustellung erfassen (Issue #173).
+  const handover = useMutation({
+    mutationFn: (card: Card) => recordHandoverFn({ data: { id: card.id, handedOver: true } }),
+    onSuccess: (_r, card) => {
+      setMessage({
+        tone: 'success',
+        text: `${formatRequestNumber(card.number)} ist als „${HANDOVER_LABELS[card.deliveryMethod]}“ erfasst.`,
+      })
+    },
+    onError: (e) => setMessage({ tone: 'error', text: errorMessage(e) }),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['requests'] }),
   })
 
@@ -128,6 +144,14 @@ function BoardPage() {
           />
           Nur mir zugewiesen
         </label>
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={!!search.bereit}
+            onChange={(e) => void navigate({ search: (s) => ({ ...s, bereit: e.target.checked || undefined }) })}
+          />
+          Liegt zur Abholung bereit
+        </label>
       </div>
       <div aria-live="polite">{message ? <Alert tone={message.tone}>{message.text}</Alert> : null}</div>
       {error ? <Alert>{errorMessage(error)}</Alert> : null}
@@ -165,7 +189,12 @@ function BoardPage() {
             >
               <h2 className="flex items-baseline justify-between px-1 pb-2 text-sm font-semibold text-slate-700">
                 <span>
-                  {col.title} {col.hint ? <span className="font-normal text-slate-600">({col.hint})</span> : null}
+                  {col.title}{' '}
+                  {col.status === 'completed' && search.bereit ? (
+                    <span className="font-normal text-slate-600">(noch nicht übergeben)</span>
+                  ) : col.hint ? (
+                    <span className="font-normal text-slate-600">({col.hint})</span>
+                  ) : null}
                 </span>
                 <span className="text-slate-600">{isPending ? '…' : cards.length}</span>
               </h2>
@@ -174,10 +203,17 @@ function BoardPage() {
                   <BoardCard
                     key={card.id}
                     card={card}
-                    busy={move.isPending && move.variables?.card.id === card.id}
+                    busy={
+                      (move.isPending && move.variables?.card.id === card.id) ||
+                      (handover.isPending && handover.variables?.id === card.id)
+                    }
                     onDragStart={() => setDragging(card)}
                     onDragEnd={() => setDragging(null)}
                     onMove={(to) => request(card, to)}
+                    onHandover={() => {
+                      setMessage(null)
+                      handover.mutate(card)
+                    }}
                   />
                 ))}
               </ul>
@@ -195,12 +231,14 @@ function BoardCard({
   onDragStart,
   onDragEnd,
   onMove,
+  onHandover,
 }: {
   card: Card
   busy: boolean
   onDragStart: () => void
   onDragEnd: () => void
   onMove: (to: RequestStatus) => void
+  onHandover: () => void
 }) {
   const targets = boardTargets(card)
   return (
@@ -237,7 +275,16 @@ function BoardCard({
           <Badge className={INTERNAL_STATUS_TONES[card.internalStatus]}>{INTERNAL_STATUS_LABELS[card.internalStatus]}</Badge>
         ) : null}
         {card.hasProposal ? <Badge className="bg-amber-100 text-amber-900">Vorschlag offen</Badge> : null}
+        {card.status === 'completed' && card.handedOverAt ? (
+          <Badge className="bg-emerald-100 text-emerald-800">{HANDOVER_LABELS[card.deliveryMethod]}</Badge>
+        ) : null}
       </div>
+      {card.status === 'completed' && !card.handedOverAt ? (
+        <Button variant="secondary" disabled={busy} onClick={onHandover} className="mt-2 w-full">
+          {card.deliveryMethod === 'house_post' ? 'Als zugestellt markieren' : 'Als abgeholt markieren'}
+          <span className="sr-only"> ({formatRequestNumber(card.number)})</span>
+        </Button>
+      ) : null}
       {targets.length ? (
         <Select
           aria-label={`Status von ${formatRequestNumber(card.number)} ändern`}

@@ -689,10 +689,11 @@ function PricingTab({ catalog }: { catalog: Catalog }) {
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-slate-900">Hinweis „wartet lange“</h3>
           <p className="text-sm text-slate-600">
-            Aufträge, die länger als hier angegeben im selben Status stehen, werden in der Liste hervorgehoben.
+            Aufträge, die länger als hier angegeben im selben Status stehen oder nicht abgeholt werden, werden in der Liste
+            hervorgehoben.
           </p>
           {DEADLINE_FIELDS.map((f) => (
-            <Field key={f.key} label={f.label} htmlFor={`deadline-${f.key}`}>
+            <Field key={f.key} label={f.label} htmlFor={`deadline-${f.key}`} hint={f.hint}>
               <Input
                 id={`deadline-${f.key}`}
                 type="number"
@@ -734,10 +735,15 @@ function PricingTab({ catalog }: { catalog: Catalog }) {
   )
 }
 
-const DEADLINE_FIELDS: { key: keyof DeadlineSettings; label: string }[] = [
+const DEADLINE_FIELDS: { key: keyof DeadlineSettings; label: string; hint?: string }[] = [
   { key: 'staleSubmittedDays', label: 'Tage bis „Eingereicht“ als lange wartend gilt' },
   { key: 'staleOnHoldDays', label: 'Tage bis „Rückfrage“ als lange wartend gilt' },
   { key: 'staleConfirmedDays', label: 'Tage bis „Bestätigt“ als lange wartend gilt' },
+  {
+    key: 'pickupReminderDays',
+    label: 'Tage bis ein fertiger Abholauftrag als nicht abgeholt gilt',
+    hint: 'Danach bekommt der Kunde einmal eine Erinnerung per E-Mail (Vorlage unter E-Mails).',
+  },
 ]
 
 // Erinnerungen an Kunden (Issue #174).
@@ -807,6 +813,7 @@ const FIELD_LABELS: Record<string, string> = {
   staleSubmittedDays: 'Wartet lange: Eingereicht',
   staleOnHoldDays: 'Wartet lange: Rückfrage',
   staleConfirmedDays: 'Wartet lange: Bestätigt',
+  pickupReminderDays: 'Nicht abgeholt',
 }
 
 const SETTING_LABELS: Record<string, string> = { pricing: 'Preise', texts: 'Hilfetexte', deadlines: 'Fristen' }

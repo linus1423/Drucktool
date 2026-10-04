@@ -66,6 +66,8 @@ export const DELIVERY_LABELS: Record<DeliveryMethod, string> = {
   pickup: 'Abholung im Regal',
   house_post: 'Lieferung per Hauspost',
 }
+/** Wie die Übergabe eines fertigen Auftrags je Lieferart heißt (Issue #173). */
+export const HANDOVER_LABELS: Record<DeliveryMethod, string> = { pickup: 'Abgeholt', house_post: 'Zugestellt' }
 
 /** Größtes Sonderformat: ein SRA3-Bogen. */
 export const CUSTOM_MAX_MM = { short: 320, long: 450 }

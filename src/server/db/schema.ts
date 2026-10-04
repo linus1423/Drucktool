@@ -296,6 +296,11 @@ export const requests = pgTable(
     invoiceCreatedAt: timestamp('invoice_created_at', { withTimezone: true }),
     invoiceCreatedById: uuid('invoice_created_by_id').references(() => users.id, { onDelete: 'set null' }),
     invoiceNumber: text('invoice_number'),
+    // Fertiger Auftrag abgeholt bzw. per Hauspost zugestellt (Issue #173); null heißt, er liegt noch in der Druckerei.
+    handedOverAt: timestamp('handed_over_at', { withTimezone: true }),
+    handedOverById: uuid('handed_over_by_id').references(() => users.id, { onDelete: 'set null' }),
+    // Wann der Kunde an die Abholung erinnert wurde (Issue #173); es gibt nur eine Erinnerung je Auftrag.
+    pickupReminderSentAt: timestamp('pickup_reminder_sent_at', { withTimezone: true }),
     // Optimistic Locking: jede Änderung erhöht die Version, Updates prüfen die erwartete Version.
     version: integer('version').notNull().default(1),
     ...timestamps,
@@ -309,6 +314,10 @@ export const requests = pgTable(
     index('requests_invoice_pending_idx')
       .on(t.status)
       .where(sql`invoice_exported_at is null`),
+    // Fertige Aufträge, die noch in der Druckerei liegen (Filter „Liegt zur Abholung bereit“, Erinnerungen).
+    index('requests_awaiting_handover_idx')
+      .on(t.statusChangedAt)
+      .where(sql`status = 'completed' and handed_over_at is null`),
   ],
 )
 
@@ -385,6 +394,8 @@ export const requestEventType = pgEnum('request_event_type', [
   'invoice_recorded',
   'offer_created',
   'offer_accepted',
+  'handed_over',
+  'pickup_reminder_sent',
   'reminder_sent',
 ])
 

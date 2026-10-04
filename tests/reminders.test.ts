@@ -24,7 +24,12 @@ describe('Erinnerungen an Kunden (Issue #174)', () => {
 
   it('sind ohne Einstellung aus, auch bei älteren gespeicherten Fristen', () => {
     expect(dueReminder(base, DEFAULT_DEADLINE_SETTINGS, now)).toBeNull()
-    const old = deadlineSettingsSchema.parse({ staleSubmittedDays: 2, staleOnHoldDays: 5, staleConfirmedDays: 10 })
+    const old = deadlineSettingsSchema.parse({
+      staleSubmittedDays: 2,
+      staleOnHoldDays: 5,
+      staleConfirmedDays: 10,
+      pickupReminderDays: 7,
+    })
     expect(old.remindOnHoldDays).toBe(0)
     expect(deadlineSettingsSchema.safeParse({ ...old, remindOfferedDays: -1 }).success).toBe(false)
   })
