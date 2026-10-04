@@ -763,10 +763,12 @@ export async function prepareReorder(user: Principal, id: string, scriptId?: str
   if (!source) notFound()
   if (!source.order) throw new Error('Aufträge aus der Zeit vor dem Bestell-Wizard können nicht nachbestellt werden.')
   const files = await db.select().from(schema.requestFiles).where(eq(schema.requestFiles.requestId, id))
-  const main = files.find((f) => f.role === 'main')
-  const cover = files.find((f) => f.role === 'cover')
+  // Nach Ablauf der Löschfrist (Issue #172) gibt es nichts mehr zu kopieren; der Wizard verlangt dann einen neuen Upload.
+  const main = files.find((f) => f.role === 'main' && !f.purgedAt)
+  const cover = files.find((f) => f.role === 'cover' && !f.purgedAt)
   return {
     source: { id: source.id, number: source.number },
+    filesPurged: files.some((f) => f.role !== 'attachment' && f.purgedAt),
     title: source.title,
     notes: source.description,
     spec: source.order.spec,

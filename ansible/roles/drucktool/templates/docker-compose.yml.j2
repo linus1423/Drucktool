@@ -61,6 +61,9 @@ services:
     depends_on:
       app:
         condition: service_healthy
+    # Der Aufräumjob löscht Dateien nach Ablauf der Löschfristen (Issue #172) und braucht dafür die Ablage.
+    volumes:
+      - ./uploads:/app/uploads
     healthcheck:
       disable: true
 {% if drucktool_clamav_enabled %}
