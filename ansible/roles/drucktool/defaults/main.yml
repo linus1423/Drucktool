@@ -25,6 +25,11 @@ drucktool_audit_log_retention_days: 365
 # Löschfristen in Tagen (0 = nie): IP-Adressen an Sitzungen, abgelehnte Registrierungen
 drucktool_session_ip_retention_days: 30
 drucktool_rejected_registration_retention_days: 30
+# Dateien (Druckdatei, Deckblatt, Anhänge) von Aufträgen, die so lange fertig, abgelehnt oder storniert sind (0 = nie).
+# Auftrag, Preis und Verlauf bleiben erhalten.
+drucktool_request_file_retention_days: 90
+# Hochgeladene, aber nie abgeschickte Dateien (mindestens 1 Tag)
+drucktool_unsubmitted_upload_retention_days: 1
 # Links auf Datenschutzerklärung und Impressum in der Fußzeile (leer = ausblenden)
 drucktool_privacy_url: ''
 drucktool_imprint_url: ''

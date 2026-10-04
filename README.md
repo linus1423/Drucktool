@@ -80,7 +80,8 @@ Im Profil sieht jeder seine angemeldeten Geräte und kann sie einzeln oder alle 
   (den Container dann mit `docker compose up -d --scale clamav=0` weglassen). Bei `pnpm dev` wird ohne
   `CLAMAV_HOST` nicht geprüft.
 - **Aufräumen:** Der Worker löscht beim Start und dann stündlich abgelaufene Sitzungen, Anmeldelinks,
-  Rate-Limit-Zähler und alte Audit-Einträge, dazu die Daten mit Löschfrist (siehe Datenschutz). Die Löschungen sind idempotent, mehrere Worker stören sich nicht.
+  Rate-Limit-Zähler und alte Audit-Einträge, dazu die Daten und Dateien mit Löschfrist (siehe Datenschutz). Dafür
+  ist die Ablage `uploads` auch im Worker eingebunden. Die Löschungen sind idempotent, mehrere Worker stören sich nicht.
 - **Server-Härtung (Ansible-Rolle `hardening`):** Firewall `ufw` lässt eingehend nur SSH, HTTP und HTTPS zu. Weil
   Docker die Firewall für veröffentlichte Ports umgeht, bindet die Compose-Datei die App immer an `127.0.0.1:3000`
   (ohne Domain erreichbar per `ssh -L 3000:127.0.0.1:3000 deploy@server`); nur `drucktool_expose_app_port: true` gibt
@@ -208,8 +209,10 @@ Auftragsbedingungen wird mit Zeitpunkt und Fassung (Hash des Textes) gespeichert
 
 **Dateien** liegen unter `UPLOAD_DIR` (Standard `data/uploads`), in der Datenbank stehen Name, Größe, SHA-256 und
 das Ergebnis der PDF-Prüfung. Auch verschlüsselte oder nicht lesbare PDFs werden angenommen; die Druckerei sieht
-dann einen Hinweis. Hochgeladene Dateien, die nach 24 Stunden zu keinem Auftrag gehören, werden gelöscht.
-Herunterladen dürfen Mitarbeiter und der Kunde, dem der Auftrag gehört.
+dann einen Hinweis. Hochgeladene Dateien, die nach `UNSUBMITTED_UPLOAD_RETENTION_DAYS` (Standard 1 Tag) zu keinem
+Auftrag gehören, werden gelöscht. Dateien von Aufträgen, die seit `REQUEST_FILE_RETENTION_DAYS` (Standard 90 Tage)
+fertig, abgelehnt oder storniert sind, löscht der Worker ebenfalls (siehe Datenschutz). Herunterladen dürfen
+Mitarbeiter und der Kunde, dem der Auftrag gehört.
 
 An Nachrichten lassen sich bis zu zehn Dateien anhängen (z. B. korrigierte Druckdaten, Logos, Fotos). Sie liegen in
 derselben Ablage. Anhänge interner Notizen sehen nur Mitarbeiter.
@@ -357,6 +360,13 @@ darunter weiter die Anmeldung per E-Mail-Link für Externe.
   Registrierungen samt nie freigegebener Organisation nach `REJECTED_REGISTRATION_RETENTION_DAYS` (Standard 30 Tage),
   Audit-Log nach `AUDIT_LOG_RETENTION_DAYS` (Standard 365 Tage). Abgelaufene Sitzungen und Anmeldelinks verschwinden
   stündlich.
+- **Löschfrist für Druckdateien (Issue #172):** Druckdatei, Deckblatt und Anhänge eines Auftrags werden gelöscht,
+  wenn der Auftrag seit `REQUEST_FILE_RETENTION_DAYS` Tagen (Standard 90, `0` = nie) fertig, abgelehnt oder storniert
+  ist. Auftrag, Preis, Nachrichten und Verlauf bleiben erhalten; im Auftrag steht statt des Download-Links „gelöscht“,
+  der Verlauf vermerkt das Löschen. Eine Nachbestellung verlangt dann einen neuen Upload. Ausgenommen sind Aufträge,
+  die Vorlage eines nicht archivierten Skripts sind. Hochgeladene, nie abgeschickte Dateien werden nach
+  `UNSUBMITTED_UPLOAD_RETENTION_DAYS` Tagen (Standard 1) gelöscht. In Backups bleiben gelöschte Dateien bis zu deren
+  Ablauf enthalten. Diese Fristen gehören auch in die Datenschutzerklärung (`PRIVACY_URL`).
 - **Datenschutzerklärung und Impressum:** `PRIVACY_URL` und `IMPRINT_URL` erscheinen als Links in der Fußzeile und
   auf der Anmeldeseite.
 
@@ -722,6 +732,8 @@ holt einen älteren Stand.
 | `AUDIT_LOG_RETENTION_DAYS`                                                          | Aufbewahrung des Audit-Logs in Tagen, Standard 365, `0` = unbegrenzt                 |
 | `SESSION_IP_RETENTION_DAYS`                                                         | IP-Adressen an Sitzungen nach so vielen Tagen löschen, Standard 30                   |
 | `REJECTED_REGISTRATION_RETENTION_DAYS`                                              | Abgelehnte Registrierungen nach so vielen Tagen löschen, Standard 30                 |
+| `REQUEST_FILE_RETENTION_DAYS`                                                       | Dateien fertiger/abgelehnter/stornierter Aufträge löschen, Standard 90, `0` = nie    |
+| `UNSUBMITTED_UPLOAD_RETENTION_DAYS`                                                 | Nie abgeschickte Uploads löschen, Standard 1 (mindestens 1)                          |
 | `PRIVACY_URL`, `IMPRINT_URL`                                                        | Links auf Datenschutzerklärung und Impressum in der Fußzeile                         |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`                               | OpenID Connect, siehe oben                                                           |
 | `OIDC_DISPLAY_NAME`, `OIDC_NEW_USERS`, `OIDC_TRUST_EMAIL`                           | Beschriftung und Verhalten der OIDC-Anmeldung                                        |

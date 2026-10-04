@@ -156,7 +156,8 @@ test('Mitarbeiter erfasst die Abholung, der Kunde sieht sie im Verlauf (Issue #1
   await page.goto('/auftraege?ansicht=abholbereit')
   await expect(page.getByRole('link', { name: title })).toBeVisible()
   await page.goto('/auftraege/board?bereit=true')
-  await expect(page.getByRole('button', { name: /Als abgeholt markieren/ })).toBeVisible()
+  // Andere Abläufe (z. B. die Löschfrist) legen ebenfalls fertige Abholaufträge an.
+  await expect(page.getByRole('button', { name: /Als abgeholt markieren/ }).first()).toBeVisible()
   await check(page, 'Board: Liegt zur Abholung bereit')
 
   await page.goto(requestPath)

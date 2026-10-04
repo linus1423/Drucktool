@@ -20,7 +20,15 @@ Bitte aktuell halten. Bei Änderungen diese Datei per Pull Request anpassen.
 - Ein Debian/Ubuntu-Server je Umgebung (`production`, `staging`), eingerichtet mit Ansible aus `ansible/`.
 - Unter `/opt/drucktool`: `docker-compose.yml`, `.env` und `Caddyfile`. Container `app` (Webanwendung), `worker`
   (E-Mails), `db` (PostgreSQL), `caddy` (HTTPS, nur mit Domain).
-- Druckdateien im Ordner `uploads` neben der Compose-Datei, Backups unter `/var/backups/drucktool`.
+- Druckdateien im Ordner `uploads` neben der Compose-Datei (eingebunden in `app` und `worker`), Backups unter
+  `/var/backups/drucktool`.
+- Löschfristen für Druckdateien (Issue #172): Der Worker löscht stündlich Druckdatei, Deckblatt und Anhänge von
+  Aufträgen, die seit `drucktool_request_file_retention_days` Tagen (Standard 90, `0` = nie) fertig, abgelehnt oder
+  storniert sind, und nie abgeschickte Uploads nach `drucktool_unsubmitted_upload_retention_days` Tagen (Standard 1).
+  Der Auftrag samt Preis und Verlauf bleibt, die Oberfläche zeigt „gelöscht“. Vorlagen nicht archivierter Skripte
+  bleiben. Gelöschte Dateien lassen sich nur aus einem Backup zurückholen, solange es noch existiert. Ändert sich die
+  Frist, auch die Datenschutzerklärung anpassen. Findet der Worker die Ablage nicht, überspringt er das Löschen und
+  schreibt eine Warnung ins Log (`docker compose logs worker`).
 - Skripte auf dem Server: `drucktool-backup`, `drucktool-restore`, auf dem Testsystem `drucktool-update`.
 - Logs: `docker compose logs app worker` in `/opt/drucktool`, Backup-Log in `/var/log/drucktool-backup.log`.
 
