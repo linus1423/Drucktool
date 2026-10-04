@@ -282,7 +282,9 @@ hervorgehoben. Interne Einträge zählen für Kunden nicht, eigene Aktionen nie.
 Die Mails werden in derselben Transaktion wie die Änderung in die Tabelle `email_outbox` geschrieben und von einem
 eigenen Worker-Prozess verschickt (`pnpm mail:worker`, im Container `worker`). Scheitert der Versand, versucht der
 Worker es mit wachsendem Abstand bis zu acht Mal erneut. Ohne `SMTP_URL` werden Mails nur ins Log geschrieben. Derselbe
-Worker räumt stündlich abgelaufene Daten auf (siehe Sicherheit).
+Worker räumt stündlich abgelaufene Daten auf (siehe Sicherheit). Außerdem erinnert er Kunden stündlich an offene Rückfragen,
+Angebote und Änderungsvorschläge, höchstens einmal je Wartephase; die Tage stellen Admins im Katalog unter „Fristen und
+Erinnerungen“ ein (Standard: aus). Die Erinnerung steht im Auftragsverlauf.
 
 ### Vorlagen anpassen
 

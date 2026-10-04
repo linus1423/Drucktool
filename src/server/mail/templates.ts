@@ -19,7 +19,7 @@ export function appUrl(path = '') {
   return `${base}${path}`
 }
 
-function compose(key: MailTemplateKey, vars: Record<string, string>): MailContent {
+export function compose(key: MailTemplateKey, vars: Record<string, string>): MailContent {
   return { ...renderMail(defaultTemplate(key), vars, DEFAULT_MAIL_LAYOUT), template: { key, vars } }
 }
 
@@ -34,7 +34,7 @@ function orderSummary(r: OrderRef) {
   return rows.join('\n')
 }
 
-function requestVars(r: RequestRef & { actorName?: string }) {
+export function requestVars(r: RequestRef & { actorName?: string }) {
   return {
     auftrag: `${formatRequestNumber(r.number)} ${r.title}`,
     nummer: formatRequestNumber(r.number),

@@ -968,6 +968,13 @@ function Comments({ request, staff, isNew }: { request: Detail; staff: boolean; 
   )
 }
 
+// Erinnerungen an den Kunden (Issue #174).
+const REMINDER_SUBJECTS: Record<string, string> = {
+  on_hold: 'die Rückfrage',
+  offered: 'das Angebot',
+  proposal: 'den Änderungsvorschlag',
+}
+
 function describeEvent(e: Detail['events'][number]) {
   switch (e.type) {
     case 'offer_created':
@@ -1031,6 +1038,8 @@ function describeEvent(e: Detail['events'][number]) {
       return e.data.emailed === true
         ? 'hat den Kunden per E-Mail an die Abholung erinnert'
         : 'hat nicht an die Abholung erinnert, weil der Kunde keine E-Mails bekommt'
+    case 'reminder_sent':
+      return `hat per E-Mail an ${REMINDER_SUBJECTS[e.data.kind as string] ?? 'die offene Frage'} erinnert`
     case 'dates_changed': {
       const what = e.data.field === 'internalDueDate' ? 'die interne Frist' : 'den zugesagten Termin'
       const to = typeof e.data.to === 'string' ? e.data.to : null

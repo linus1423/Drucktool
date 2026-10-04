@@ -5,6 +5,7 @@ import { and, eq, inArray, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-o
 import { schema, type getDb, type Tx } from '../db/client.server'
 import { logger } from '../log.server'
 import { sendPickupReminders } from '../requests/pickup-reminders.server'
+import { runWaitingReminders } from '../requests/reminders.server'
 
 type Db = ReturnType<typeof getDb>
 const { sessions, loginTokens, rateLimits, auditLog, users, organisations, organisationMembers } = schema
@@ -162,4 +163,6 @@ export async function runCleanup(db: Db) {
   } catch (error) {
     logger.error('Erinnerungen zur Abholung fehlgeschlagen', { err: error })
   }
+  // Erinnerungen an Kunden bei Rückfrage, Angebot und Änderungsvorschlag (Issue #174).
+  await runWaitingReminders(db)
 }

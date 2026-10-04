@@ -188,7 +188,7 @@ describe.skipIf(!url)('Abholung erfassen und erinnern (Integration)', async () =
           .insert(schema.settings)
           .values({ key: 'deadlines', value: old })
           .onConflictDoUpdate({ target: schema.settings.key, set: { value: old } })
-        expect(await getDeadlineSettings(tx)).toEqual({ ...old, pickupReminderDays: 7 })
+        expect(await getDeadlineSettings(tx)).toEqual({ ...DEFAULT_DEADLINE_SETTINGS, ...old })
         throw rollback
       }),
     ).rejects.toBe(rollback)

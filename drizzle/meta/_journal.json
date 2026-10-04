@@ -204,6 +204,13 @@
       "when": 1791090000000,
       "tag": "0031_pickup_handover",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1791100000000,
+      "tag": "0032_waiting_reminders",
+      "breakpoints": true
     }
   ]
 }

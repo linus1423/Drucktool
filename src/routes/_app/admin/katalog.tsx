@@ -685,8 +685,9 @@ function PricingTab({ catalog }: { catalog: Catalog }) {
           />
         </div>
       </Card>
-      <Card title="Hinweis „wartet lange“">
+      <Card title="Fristen und Erinnerungen">
         <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-slate-900">Hinweis „wartet lange“</h3>
           <p className="text-sm text-slate-600">
             Aufträge, die länger als hier angegeben im selben Status stehen oder nicht abgeholt werden, werden in der Liste
             hervorgehoben.
@@ -700,6 +701,25 @@ function PricingTab({ catalog }: { catalog: Catalog }) {
                 max={365}
                 className="w-28"
                 value={deadlines[f.key]}
+                onChange={(e) => setDeadlines({ ...deadlines, [f.key]: Number(e.target.value) })}
+              />
+            </Field>
+          ))}
+          <h3 className="pt-2 text-sm font-semibold text-slate-900">Erinnerungen an Kunden</h3>
+          <p className="text-sm text-slate-600">
+            Wartet die Druckerei so viele Tage auf den Kunden, bekommt er einmal eine Erinnerung per E-Mail. 0 oder leer schaltet
+            die Erinnerung ab. Die Texte stehen bei den E-Mail-Vorlagen.
+          </p>
+          {REMINDER_FIELDS.map((f) => (
+            <Field key={f.key} label={f.label} htmlFor={`deadline-${f.key}`}>
+              <Input
+                id={`deadline-${f.key}`}
+                type="number"
+                min={0}
+                max={365}
+                className="w-28"
+                value={deadlines[f.key] || ''}
+                placeholder="aus"
                 onChange={(e) => setDeadlines({ ...deadlines, [f.key]: Number(e.target.value) })}
               />
             </Field>
@@ -724,6 +744,13 @@ const DEADLINE_FIELDS: { key: keyof DeadlineSettings; label: string; hint?: stri
     label: 'Tage bis ein fertiger Abholauftrag als nicht abgeholt gilt',
     hint: 'Danach bekommt der Kunde einmal eine Erinnerung per E-Mail (Vorlage unter E-Mails).',
   },
+]
+
+// Erinnerungen an Kunden (Issue #174).
+const REMINDER_FIELDS: { key: keyof DeadlineSettings; label: string }[] = [
+  { key: 'remindOnHoldDays', label: 'Tage bis zur Erinnerung an eine Rückfrage' },
+  { key: 'remindOfferedDays', label: 'Tage bis zur Erinnerung an ein Angebot' },
+  { key: 'remindProposalDays', label: 'Tage bis zur Erinnerung an einen Änderungsvorschlag' },
 ]
 
 function TextField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {

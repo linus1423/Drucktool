@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
 import { PDFDocument } from 'pdf-lib'
-import { check, createCustomer, loginAsAdmin, loginAsCustomer } from './helpers'
+import { check, createCustomer, db, loginAsAdmin, loginAsCustomer } from './helpers'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -133,6 +133,25 @@ test('Verwaltungsseiten sind barrierefrei', async ({ page }) => {
     await page.goto(path)
     await check(page, path)
   }
+})
+
+test('Admin stellt Erinnerungen an Kunden ein (Issue #174)', async ({ page }) => {
+  await loginAsAdmin(page)
+  await page.goto('/admin/katalog?tab=preise')
+  const field = page.getByLabel('Tage bis zur Erinnerung an eine Rückfrage')
+  await expect(field).toHaveValue('')
+  await field.fill('7')
+  const card = page.locator('section', { has: page.getByRole('heading', { name: 'Fristen und Erinnerungen' }) })
+  await card.getByRole('button', { name: 'Speichern' }).click()
+  await expect(card.getByRole('button', { name: 'Speichern' })).toBeDisabled()
+  const [row] = await db<{ value: { remindOnHoldDays: number } }[]>`select value from settings where key = 'deadlines'`
+  expect(row!.value.remindOnHoldDays).toBe(7)
+  await check(page, 'Fristen und Erinnerungen')
+  // Leer schaltet die Erinnerung wieder ab.
+  await field.fill('')
+  await card.getByRole('button', { name: 'Speichern' }).click()
+  await expect(card.getByRole('button', { name: 'Speichern' })).toBeDisabled()
+  await expect(field).toHaveValue('')
 })
 
 test('Navigation passt für den Superadmin auf Tablet und Desktop in eine Zeile', async ({ page }) => {
