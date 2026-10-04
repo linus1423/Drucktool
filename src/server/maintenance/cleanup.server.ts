@@ -4,6 +4,7 @@
 import { and, eq, inArray, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm'
 import { schema, type getDb, type Tx } from '../db/client.server'
 import { logger } from '../log.server'
+import { sendPickupReminders } from '../requests/pickup-reminders.server'
 
 type Db = ReturnType<typeof getDb>
 const { sessions, loginTokens, rateLimits, auditLog, users, organisations, organisationMembers } = schema
@@ -153,5 +154,12 @@ export async function runCleanup(db: Db) {
     if (removed.length) logger.info('Abgelaufene Daten gelöscht', Object.fromEntries(removed))
   } catch (error) {
     logger.error('Aufräumen fehlgeschlagen', { err: error })
+  }
+  // Erinnerungen an nicht abgeholte Aufträge (Issue #173), unabhängig davon, ob das Aufräumen geklappt hat.
+  try {
+    const reminded = await sendPickupReminders(db)
+    if (reminded) logger.info('An Abholung erinnert', { requests: reminded })
+  } catch (error) {
+    logger.error('Erinnerungen zur Abholung fehlgeschlagen', { err: error })
   }
 }

@@ -128,6 +128,12 @@ export function promisedDateMail(r: RequestRef & { actorName: string; date: stri
     : compose('promised_date_removed', requestVars(r))
 }
 
+/** Einmalige Erinnerung an einen nicht abgeholten Auftrag (Issue #173). */
+export function pickupReminderMail(r: RequestRef & { completedAt: Date; now?: Date }): MailContent {
+  const days = Math.floor(((r.now ?? new Date()).getTime() - r.completedAt.getTime()) / (24 * 60 * 60 * 1000))
+  return compose('pickup_reminder', { ...requestVars(r), fertigSeit: formatDate(r.completedAt), tage: String(days) })
+}
+
 export function commentMail(
   r: RequestRef & { actorName: string; body: string; internal: boolean; attachmentNames?: string[] },
 ): MailContent {

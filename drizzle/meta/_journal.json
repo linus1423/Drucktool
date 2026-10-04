@@ -197,6 +197,13 @@
       "when": 1791080000000,
       "tag": "0030_organisation_request_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1791090000000,
+      "tag": "0031_pickup_handover",
+      "breakpoints": true
     }
   ]
 }

@@ -33,10 +33,11 @@ export function getTexts(db: Db = getDb()): Promise<CatalogTexts> {
   return readSetting(db, 'texts', (v) => textsSchema.parse(v))
 }
 
-/** Schwellwerte für „wartet lange“; fehlt die Einstellung, gelten die Standardwerte. */
+/** Schwellwerte für „wartet lange“; fehlt die Einstellung oder ein später ergänzter Wert, gilt der Standardwert. */
 export async function getDeadlineSettings(db: Db = getDb()): Promise<DeadlineSettings> {
   const [row] = await db.select({ value: settings.value }).from(settings).where(eq(settings.key, 'deadlines'))
-  const parsed = deadlineSettingsSchema.safeParse(row?.value)
+  const stored = row?.value && typeof row.value === 'object' ? row.value : {}
+  const parsed = deadlineSettingsSchema.safeParse({ ...DEFAULT_DEADLINE_SETTINGS, ...stored })
   return parsed.success ? parsed.data : DEFAULT_DEADLINE_SETTINGS
 }
 
