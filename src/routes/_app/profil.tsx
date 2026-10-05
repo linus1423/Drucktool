@@ -18,6 +18,7 @@ import {
   updateMyNotificationsFn,
   updateMyProfileFn,
 } from '~/server/account/account.functions'
+import { pageTitle } from '~/lib/design'
 
 export const Route = createFileRoute('/_app/profil')({
   validateSearch: z.object({
@@ -26,7 +27,7 @@ export const Route = createFileRoute('/_app/profil')({
     weiter: z.string().max(500).optional().catch(undefined),
   }),
   loader: ({ context }) => context.queryClient.ensureQueryData(accountQuery),
-  head: () => ({ meta: [{ title: 'Profil · Drucktool' }] }),
+  head: ({ match }) => ({ meta: [{ title: pageTitle('Profil', match.context.design) }] }),
   component: ProfilePage,
 })
 

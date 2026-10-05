@@ -6,12 +6,13 @@ import { AuthLayout } from '~/components/AuthLayout'
 import { Alert, Button } from '~/components/ui'
 import { errorMessage } from '~/lib/errors'
 import { redeemLoginLinkFn } from '~/server/auth/auth.functions'
+import { pageTitle } from '~/lib/design'
 
 // Der Link aus der Mail führt hierher. Eingelöst wird erst per Klick, damit Link-Vorschauen
 // von Mailprogrammen den Einmal-Link nicht verbrauchen.
 export const Route = createFileRoute('/anmelden')({
   validateSearch: z.object({ token: z.string().max(200).optional().catch(undefined) }),
-  head: () => ({ meta: [{ title: 'Anmelden · Drucktool' }] }),
+  head: ({ match }) => ({ meta: [{ title: pageTitle('Anmelden', match.context.design) }] }),
   component: RedeemPage,
 })
 

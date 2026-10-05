@@ -21,6 +21,7 @@ import {
 } from '~/lib/status'
 import { recordHandoverFn } from '~/server/requests/handover.functions'
 import { changeStatusFn } from '~/server/requests/requests.functions'
+import { pageTitle } from '~/lib/design'
 
 const searchSchema = z.object({
   meine: z.boolean().optional().catch(undefined),
@@ -33,7 +34,7 @@ export const Route = createFileRoute('/_app/auftraege/board')({
   beforeLoad: ({ context }) => {
     if (!isStaffRole(context.user.role)) throw redirect({ to: '/auftraege' })
   },
-  head: () => ({ meta: [{ title: 'Board · Drucktool' }] }),
+  head: ({ match }) => ({ meta: [{ title: pageTitle('Board', match.context.design) }] }),
   component: BoardPage,
 })
 
@@ -176,7 +177,7 @@ function BoardPage() {
               aria-label={col.title}
               className={cx(
                 'flex min-h-40 flex-col rounded-lg bg-slate-100 p-2 ring-1 ring-slate-200 transition',
-                dragging && (canDrop ? 'ring-2 ring-sky-400' : dragging.status !== col.status && 'opacity-50'),
+                dragging && (canDrop ? 'ring-2 ring-accent' : dragging.status !== col.status && 'opacity-50'),
               )}
               onDragOver={(e: DragEvent) => {
                 if (canDrop) e.preventDefault()

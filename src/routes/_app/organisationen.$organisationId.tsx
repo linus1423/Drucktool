@@ -13,6 +13,7 @@ import {
   setMemberAdminFn,
   updateOrganisationDetailsFn,
 } from '~/server/organisations/org-admin.functions'
+import { pageTitle } from '~/lib/design'
 
 // Verwalter einer Organisation pflegen Mitglieder und Stammdaten selbst (Issue #12).
 export const Route = createFileRoute('/_app/organisationen/$organisationId')({
@@ -20,7 +21,7 @@ export const Route = createFileRoute('/_app/organisationen/$organisationId')({
     if (!UUID.test(params.organisationId)) throw notFound()
     return context.queryClient.ensureQueryData(managedOrganisationQuery(params.organisationId))
   },
-  head: ({ loaderData }) => ({ meta: [{ title: `${loaderData?.name ?? 'Organisation'} · Drucktool` }] }),
+  head: ({ loaderData, match }) => ({ meta: [{ title: pageTitle(loaderData?.name ?? 'Organisation', match.context.design) }] }),
   notFoundComponent: () => (
     <div className="space-y-4">
       <Alert>Organisation nicht gefunden</Alert>
@@ -112,7 +113,7 @@ function ManageOrganisationPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {m.isAdmin ? <Badge className="bg-sky-100 text-sky-800">Verwalter</Badge> : null}
+                      {m.isAdmin ? <Badge className="bg-accent-soft text-accent-strong">Verwalter</Badge> : null}
                       <Button
                         variant="ghost"
                         disabled={busy}

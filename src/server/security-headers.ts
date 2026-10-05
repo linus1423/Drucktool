@@ -49,10 +49,19 @@ export function securityHeaders(options: { nonce: string; https: boolean; csp: b
   return headers
 }
 
+/** Header, die eine Route selbst setzen darf, z. B. das öffentliche Logo für E-Mails (Issue #188). */
+const ROUTE_OVERRIDABLE = new Set(['content-security-policy', 'cross-origin-resource-policy'])
+
 /** Setzt die Header auf eine Antwort. Unveränderliche Header (z. B. bei Redirects) werden kopiert. */
 export function withSecurityHeaders(response: Response, headers: Record<string, string>): Response {
+  const apply = (target: Headers) => {
+    for (const [name, value] of Object.entries(headers)) {
+      if (ROUTE_OVERRIDABLE.has(name.toLowerCase()) && response.headers.has(name)) continue
+      target.set(name, value)
+    }
+  }
   try {
-    for (const [name, value] of Object.entries(headers)) response.headers.set(name, value)
+    apply(response.headers)
     return response
   } catch {
     const copy = new Response(response.body, {
@@ -60,7 +69,7 @@ export function withSecurityHeaders(response: Response, headers: Record<string, 
       statusText: response.statusText,
       headers: new Headers(response.headers),
     })
-    for (const [name, value] of Object.entries(headers)) copy.headers.set(name, value)
+    apply(copy.headers)
     return copy
   }
 }

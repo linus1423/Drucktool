@@ -9,6 +9,7 @@ import { STRONG_MATCH_THRESHOLD } from '~/lib/organisation-match'
 import { activeOrganisationsQuery, organisationRequestsQuery } from '~/lib/queries'
 import { isStaffRole } from '~/lib/roles'
 import { resolveOrganisationRequestFn } from '~/server/admin/admin.functions'
+import { pageTitle } from '~/lib/design'
 
 // Kunden fragen im Profil eine Organisation an; hier ordnen Mitarbeiter sie zu (Issue #68).
 export const Route = createFileRoute('/_app/organisationsanfragen')({
@@ -16,7 +17,7 @@ export const Route = createFileRoute('/_app/organisationsanfragen')({
     if (!isStaffRole(context.user.role)) throw redirect({ to: '/auftraege' })
   },
   loader: ({ context }) => context.queryClient.ensureQueryData(organisationRequestsQuery),
-  head: () => ({ meta: [{ title: 'Organisationsanfragen · Drucktool' }] }),
+  head: ({ match }) => ({ meta: [{ title: pageTitle('Organisationsanfragen', match.context.design) }] }),
   component: OrganisationRequestsPage,
 })
 
@@ -122,7 +123,7 @@ function RequestCard({ request: r }: { request: OrganisationRequest }) {
           ))}
         </fieldset>
         {best ? (
-          <p className="rounded-md bg-sky-50 px-3 py-2 text-sky-900">
+          <p className="rounded-md bg-accent-soft px-3 py-2 text-accent-strong">
             Vorschlag: „{best.name}“ ({Math.round(best.score * 100)} % Übereinstimmung)
             {action !== 'assign' ? (
               <>

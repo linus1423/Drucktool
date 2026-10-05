@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AnmeldenRouteImport } from './routes/anmelden'
+import { Route as DatenschutzRouteImport } from './routes/datenschutz'
+import { Route as ImpressumRouteImport } from './routes/impressum'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as RegistrierenRouteImport } from './routes/registrieren'
 import { Route as AppAdminRouteRouteImport } from './routes/_app/admin/route'
@@ -24,6 +26,7 @@ import { Route as AnfragenIndexRouteImport } from './routes/anfragen/index'
 import { Route as AnfragenSplatRouteImport } from './routes/anfragen/$'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppAdminBenutzerRouteImport } from './routes/_app/admin/benutzer'
+import { Route as AppAdminDesignRouteImport } from './routes/_app/admin/design'
 import { Route as AppAdminEmailsRouteImport } from './routes/_app/admin/emails'
 import { Route as AppAdminFreigabenRouteImport } from './routes/_app/admin/freigaben'
 import { Route as AppAdminKatalogRouteImport } from './routes/_app/admin/katalog'
@@ -38,6 +41,7 @@ import { Route as AppOrganisationenOrganisationIdRouteImport } from './routes/_a
 import { Route as ApiAuftraegeExportRouteImport } from './routes/api/auftraege/export'
 import { Route as ApiDateienIndexRouteImport } from './routes/api/dateien/index'
 import { Route as ApiDateienFileIdRouteImport } from './routes/api/dateien/$fileId'
+import { Route as ApiDesignKindRouteImport } from './routes/api/design/$kind'
 import { Route as ApiRechnungenLexwareRouteImport } from './routes/api/rechnungen/lexware'
 import { Route as AppAdminOrganisationenIndexRouteImport } from './routes/_app/admin/organisationen/index'
 import { Route as AppAdminOrganisationenOrganisationIdRouteImport } from './routes/_app/admin/organisationen/$organisationId'
@@ -60,6 +64,16 @@ const AppRoute = AppRouteImport.update({
 const AnmeldenRoute = AnmeldenRouteImport.update({
   id: '/anmelden',
   path: '/anmelden',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DatenschutzRoute = DatenschutzRouteImport.update({
+  id: '/datenschutz',
+  path: '/datenschutz',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImpressumRoute = ImpressumRouteImport.update({
+  id: '/impressum',
+  path: '/impressum',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -121,6 +135,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
 const AppAdminBenutzerRoute = AppAdminBenutzerRouteImport.update({
   id: '/benutzer',
   path: '/benutzer',
+  getParentRoute: () => AppAdminRouteRoute,
+} as any)
+const AppAdminDesignRoute = AppAdminDesignRouteImport.update({
+  id: '/design',
+  path: '/design',
   getParentRoute: () => AppAdminRouteRoute,
 } as any)
 const AppAdminEmailsRoute = AppAdminEmailsRouteImport.update({
@@ -194,6 +213,11 @@ const ApiDateienFileIdRoute = ApiDateienFileIdRouteImport.update({
   path: '/api/dateien/$fileId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDesignKindRoute = ApiDesignKindRouteImport.update({
+  id: '/api/design/$kind',
+  path: '/api/design/$kind',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiRechnungenLexwareRoute = ApiRechnungenLexwareRouteImport.update({
   id: '/api/rechnungen/lexware',
   path: '/api/rechnungen/lexware',
@@ -248,6 +272,8 @@ const ApiAuthOidcLoginRoute = ApiAuthOidcLoginRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/anmelden': typeof AnmeldenRoute
+  '/datenschutz': typeof DatenschutzRoute
+  '/impressum': typeof ImpressumRoute
   '/login': typeof LoginRoute
   '/registrieren': typeof RegistrierenRoute
   '/admin': typeof AppAdminRouteRouteWithChildren
@@ -260,6 +286,7 @@ export interface FileRoutesByFullPath {
   '/api/health': typeof ApiHealthRoute
   '/anfragen/': typeof AnfragenIndexRoute
   '/admin/benutzer': typeof AppAdminBenutzerRoute
+  '/admin/design': typeof AppAdminDesignRoute
   '/admin/emails': typeof AppAdminEmailsRoute
   '/admin/freigaben': typeof AppAdminFreigabenRoute
   '/admin/katalog': typeof AppAdminKatalogRoute
@@ -271,6 +298,7 @@ export interface FileRoutesByFullPath {
   '/organisationen/$organisationId': typeof AppOrganisationenOrganisationIdRoute
   '/api/auftraege/export': typeof ApiAuftraegeExportRoute
   '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
+  '/api/design/$kind': typeof ApiDesignKindRoute
   '/api/rechnungen/lexware': typeof ApiRechnungenLexwareRoute
   '/auftraege/': typeof AppAuftraegeIndexRoute
   '/organisationen/': typeof AppOrganisationenIndexRoute
@@ -287,6 +315,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/anmelden': typeof AnmeldenRoute
+  '/datenschutz': typeof DatenschutzRoute
+  '/impressum': typeof ImpressumRoute
   '/login': typeof LoginRoute
   '/registrieren': typeof RegistrierenRoute
   '/admin': typeof AppAdminRouteRouteWithChildren
@@ -299,6 +329,7 @@ export interface FileRoutesByTo {
   '/api/health': typeof ApiHealthRoute
   '/anfragen': typeof AnfragenIndexRoute
   '/admin/benutzer': typeof AppAdminBenutzerRoute
+  '/admin/design': typeof AppAdminDesignRoute
   '/admin/emails': typeof AppAdminEmailsRoute
   '/admin/freigaben': typeof AppAdminFreigabenRoute
   '/admin/katalog': typeof AppAdminKatalogRoute
@@ -310,6 +341,7 @@ export interface FileRoutesByTo {
   '/organisationen/$organisationId': typeof AppOrganisationenOrganisationIdRoute
   '/api/auftraege/export': typeof ApiAuftraegeExportRoute
   '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
+  '/api/design/$kind': typeof ApiDesignKindRoute
   '/api/rechnungen/lexware': typeof ApiRechnungenLexwareRoute
   '/auftraege': typeof AppAuftraegeIndexRoute
   '/organisationen': typeof AppOrganisationenIndexRoute
@@ -328,6 +360,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/anmelden': typeof AnmeldenRoute
+  '/datenschutz': typeof DatenschutzRoute
+  '/impressum': typeof ImpressumRoute
   '/login': typeof LoginRoute
   '/registrieren': typeof RegistrierenRoute
   '/_app/admin': typeof AppAdminRouteRouteWithChildren
@@ -340,6 +374,7 @@ export interface FileRoutesById {
   '/api/health': typeof ApiHealthRoute
   '/anfragen/': typeof AnfragenIndexRoute
   '/_app/admin/benutzer': typeof AppAdminBenutzerRoute
+  '/_app/admin/design': typeof AppAdminDesignRoute
   '/_app/admin/emails': typeof AppAdminEmailsRoute
   '/_app/admin/freigaben': typeof AppAdminFreigabenRoute
   '/_app/admin/katalog': typeof AppAdminKatalogRoute
@@ -351,6 +386,7 @@ export interface FileRoutesById {
   '/_app/organisationen/$organisationId': typeof AppOrganisationenOrganisationIdRoute
   '/api/auftraege/export': typeof ApiAuftraegeExportRoute
   '/api/dateien/$fileId': typeof ApiDateienFileIdRoute
+  '/api/design/$kind': typeof ApiDesignKindRoute
   '/api/rechnungen/lexware': typeof ApiRechnungenLexwareRoute
   '/_app/auftraege/': typeof AppAuftraegeIndexRoute
   '/_app/organisationen/': typeof AppOrganisationenIndexRoute
@@ -369,6 +405,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/anmelden'
+    | '/datenschutz'
+    | '/impressum'
     | '/login'
     | '/registrieren'
     | '/admin'
@@ -381,6 +419,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/anfragen/'
     | '/admin/benutzer'
+    | '/admin/design'
     | '/admin/emails'
     | '/admin/freigaben'
     | '/admin/katalog'
@@ -392,6 +431,7 @@ export interface FileRouteTypes {
     | '/organisationen/$organisationId'
     | '/api/auftraege/export'
     | '/api/dateien/$fileId'
+    | '/api/design/$kind'
     | '/api/rechnungen/lexware'
     | '/auftraege/'
     | '/organisationen/'
@@ -408,6 +448,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/anmelden'
+    | '/datenschutz'
+    | '/impressum'
     | '/login'
     | '/registrieren'
     | '/admin'
@@ -420,6 +462,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/anfragen'
     | '/admin/benutzer'
+    | '/admin/design'
     | '/admin/emails'
     | '/admin/freigaben'
     | '/admin/katalog'
@@ -431,6 +474,7 @@ export interface FileRouteTypes {
     | '/organisationen/$organisationId'
     | '/api/auftraege/export'
     | '/api/dateien/$fileId'
+    | '/api/design/$kind'
     | '/api/rechnungen/lexware'
     | '/auftraege'
     | '/organisationen'
@@ -448,6 +492,8 @@ export interface FileRouteTypes {
     | '/'
     | '/_app'
     | '/anmelden'
+    | '/datenschutz'
+    | '/impressum'
     | '/login'
     | '/registrieren'
     | '/_app/admin'
@@ -460,6 +506,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/anfragen/'
     | '/_app/admin/benutzer'
+    | '/_app/admin/design'
     | '/_app/admin/emails'
     | '/_app/admin/freigaben'
     | '/_app/admin/katalog'
@@ -471,6 +518,7 @@ export interface FileRouteTypes {
     | '/_app/organisationen/$organisationId'
     | '/api/auftraege/export'
     | '/api/dateien/$fileId'
+    | '/api/design/$kind'
     | '/api/rechnungen/lexware'
     | '/_app/auftraege/'
     | '/_app/organisationen/'
@@ -489,6 +537,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   AnmeldenRoute: typeof AnmeldenRoute
+  DatenschutzRoute: typeof DatenschutzRoute
+  ImpressumRoute: typeof ImpressumRoute
   LoginRoute: typeof LoginRoute
   RegistrierenRoute: typeof RegistrierenRoute
   AnfragenSplatRoute: typeof AnfragenSplatRoute
@@ -496,6 +546,7 @@ export interface RootRouteChildren {
   AnfragenIndexRoute: typeof AnfragenIndexRoute
   ApiAuftraegeExportRoute: typeof ApiAuftraegeExportRoute
   ApiDateienFileIdRoute: typeof ApiDateienFileIdRoute
+  ApiDesignKindRoute: typeof ApiDesignKindRoute
   ApiRechnungenLexwareRoute: typeof ApiRechnungenLexwareRoute
   ApiDateienIndexRoute: typeof ApiDateienIndexRoute
   ApiAdminDatenauskunftUserIdRoute: typeof ApiAdminDatenauskunftUserIdRoute
@@ -526,6 +577,20 @@ declare module '@tanstack/react-router' {
       path: '/anmelden'
       fullPath: '/anmelden'
       preLoaderRoute: typeof AnmeldenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/datenschutz': {
+      id: '/datenschutz'
+      path: '/datenschutz'
+      fullPath: '/datenschutz'
+      preLoaderRoute: typeof DatenschutzRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/impressum': {
+      id: '/impressum'
+      path: '/impressum'
+      fullPath: '/impressum'
+      preLoaderRoute: typeof ImpressumRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -610,6 +675,13 @@ declare module '@tanstack/react-router' {
       path: '/benutzer'
       fullPath: '/admin/benutzer'
       preLoaderRoute: typeof AppAdminBenutzerRouteImport
+      parentRoute: typeof AppAdminRouteRoute
+    }
+    '/_app/admin/design': {
+      id: '/_app/admin/design'
+      path: '/design'
+      fullPath: '/admin/design'
+      preLoaderRoute: typeof AppAdminDesignRouteImport
       parentRoute: typeof AppAdminRouteRoute
     }
     '/_app/admin/emails': {
@@ -710,6 +782,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDateienFileIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/design/$kind': {
+      id: '/api/design/$kind'
+      path: '/api/design/$kind'
+      fullPath: '/api/design/$kind'
+      preLoaderRoute: typeof ApiDesignKindRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/rechnungen/lexware': {
       id: '/api/rechnungen/lexware'
       path: '/api/rechnungen/lexware'
@@ -778,6 +857,7 @@ declare module '@tanstack/react-router' {
 
 interface AppAdminRouteRouteChildren {
   AppAdminBenutzerRoute: typeof AppAdminBenutzerRoute
+  AppAdminDesignRoute: typeof AppAdminDesignRoute
   AppAdminEmailsRoute: typeof AppAdminEmailsRoute
   AppAdminFreigabenRoute: typeof AppAdminFreigabenRoute
   AppAdminKatalogRoute: typeof AppAdminKatalogRoute
@@ -789,6 +869,7 @@ interface AppAdminRouteRouteChildren {
 
 const AppAdminRouteRouteChildren: AppAdminRouteRouteChildren = {
   AppAdminBenutzerRoute: AppAdminBenutzerRoute,
+  AppAdminDesignRoute: AppAdminDesignRoute,
   AppAdminEmailsRoute: AppAdminEmailsRoute,
   AppAdminFreigabenRoute: AppAdminFreigabenRoute,
   AppAdminKatalogRoute: AppAdminKatalogRoute,
@@ -841,6 +922,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   AnmeldenRoute: AnmeldenRoute,
+  DatenschutzRoute: DatenschutzRoute,
+  ImpressumRoute: ImpressumRoute,
   LoginRoute: LoginRoute,
   RegistrierenRoute: RegistrierenRoute,
   AnfragenSplatRoute: AnfragenSplatRoute,
@@ -848,6 +931,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnfragenIndexRoute: AnfragenIndexRoute,
   ApiAuftraegeExportRoute: ApiAuftraegeExportRoute,
   ApiDateienFileIdRoute: ApiDateienFileIdRoute,
+  ApiDesignKindRoute: ApiDesignKindRoute,
   ApiRechnungenLexwareRoute: ApiRechnungenLexwareRoute,
   ApiDateienIndexRoute: ApiDateienIndexRoute,
   ApiAdminDatenauskunftUserIdRoute: ApiAdminDatenauskunftUserIdRoute,

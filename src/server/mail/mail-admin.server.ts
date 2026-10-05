@@ -15,7 +15,7 @@ import {
 } from '~/lib/mail-templates'
 import { writeAudit } from '../audit/audit.server'
 import { getDb, schema } from '../db/client.server'
-import { LAYOUT_KEY, getMailLayout, storedTemplate } from './mail-templates.server'
+import { LAYOUT_KEY, getMailBrand, getMailLayout, storedTemplate } from './mail-templates.server'
 
 const { mailTemplates, settings } = schema
 type Actor = { id: string; role: 'superadmin' | 'admin' | 'staff' | 'customer' }
@@ -29,9 +29,10 @@ export async function listMailTemplates(actor: Actor) {
   requireAdminActor(actor)
   const db = getDb()
   const rows = await db.select().from(mailTemplates)
-  const layout = await getMailLayout(db)
+  const [layout, brand] = await Promise.all([getMailLayout(db), getMailBrand(db)])
   return {
     layout,
+    brand,
     templates: MAIL_TEMPLATE_KEYS.map((key) => {
       const def = MAIL_TEMPLATES[key]
       const row = rows.find((r) => r.key === key)
@@ -122,7 +123,8 @@ export const testMailSchema = saveMailTemplateSchema
 export async function sendTestMail(actor: Actor & { email: string }, input: z.infer<typeof testMailSchema>) {
   requireAdminActor(actor)
   const db = getDb()
-  const mail = renderMail(input.template, MAIL_TEMPLATES[input.key].sample, await getMailLayout(db))
+  const [layout, brand] = await Promise.all([getMailLayout(db), getMailBrand(db)])
+  const mail = renderMail(input.template, MAIL_TEMPLATES[input.key].sample, layout, brand)
   await db
     .insert(schema.emailOutbox)
     .values({ to: actor.email, subject: `[Test] ${mail.subject}`, text: mail.text, html: mail.html })

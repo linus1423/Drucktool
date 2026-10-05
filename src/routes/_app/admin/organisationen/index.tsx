@@ -5,10 +5,11 @@ import { Badge, PageHeader } from '~/components/ui'
 import { formatDate } from '~/lib/format'
 import { organisationsQuery } from '~/lib/queries'
 import { ORG_STATUS } from '~/lib/roles'
+import { pageTitle } from '~/lib/design'
 
 export const Route = createFileRoute('/_app/admin/organisationen/')({
   loader: ({ context }) => context.queryClient.ensureQueryData(organisationsQuery),
-  head: () => ({ meta: [{ title: 'Organisationen · Drucktool' }] }),
+  head: ({ match }) => ({ meta: [{ title: pageTitle('Organisationen', match.context.design) }] }),
   component: OrganisationsPage,
 })
 
@@ -39,7 +40,7 @@ function OrganisationsPage() {
         actions={
           <Link
             to="/admin/organisationen/neu"
-            className="inline-flex items-center rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
+            className="inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-fg hover:bg-primary-hover"
           >
             Neue Organisation
           </Link>

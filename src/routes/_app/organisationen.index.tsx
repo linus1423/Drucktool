@@ -1,5 +1,6 @@
 import { createFileRoute, Link, redirect } from '@tanstack/react-router'
 import { Card, PageHeader } from '~/components/ui'
+import { pageTitle } from '~/lib/design'
 
 // Einstieg „Organisation“ in der Kopfzeile (Issue #162): Wer genau eine Organisation verwaltet, landet direkt
 // in deren Verwaltung, wer mehrere verwaltet, wählt hier aus.
@@ -12,7 +13,7 @@ export const Route = createFileRoute('/_app/organisationen/')({
     }
     return { managed }
   },
-  head: () => ({ meta: [{ title: 'Organisationen · Drucktool' }] }),
+  head: ({ match }) => ({ meta: [{ title: pageTitle('Organisationen', match.context.design) }] }),
   component: ChooseOrganisationPage,
 })
 
@@ -29,7 +30,7 @@ function ChooseOrganisationPage() {
               <Link
                 to="/organisationen/$organisationId"
                 params={{ organisationId: o.id }}
-                className="font-medium text-sky-700 hover:underline"
+                className="font-medium text-accent-strong hover:underline"
               >
                 Verwalten
               </Link>

@@ -44,7 +44,7 @@ export function HelpTip({ label, children }: { label: string; children: ReactNod
           setPinned(!pinned)
           setOpen(!pinned)
         }}
-        className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-600 hover:bg-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none"
+        className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-600 hover:bg-slate-300 focus:ring-2 focus:ring-primary focus:outline-none"
       >
         ?
       </button>

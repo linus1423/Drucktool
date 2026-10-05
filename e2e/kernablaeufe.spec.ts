@@ -128,6 +128,7 @@ test('Verwaltungsseiten sind barrierefrei', async ({ page }) => {
     '/admin/organisationen',
     '/admin/katalog',
     '/admin/emails',
+    '/admin/design',
     '/admin/protokoll',
   ]) {
     await page.goto(path)

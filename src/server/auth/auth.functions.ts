@@ -23,12 +23,6 @@ export const getAuthOptions = createServerFn({ method: 'GET' }).handler(() => {
   }
 })
 
-/** Links auf Datenschutzerklärung und Impressum (PRIVACY_URL, IMPRINT_URL), für die Fußzeile. */
-export const getSiteLinksFn = createServerFn({ method: 'GET' }).handler(() => ({
-  privacyUrl: process.env.PRIVACY_URL || null,
-  imprintUrl: process.env.IMPRINT_URL || null,
-}))
-
 export const login = createServerFn({ method: 'POST' })
   .validator(loginSchema)
   .handler(async ({ data }) => {

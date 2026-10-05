@@ -1,1 +1,17 @@
 @import 'tailwindcss';
+
+/*
+ * Farben der Design-Seite (Issue #189). Das sind die Standardwerte; eingestellte Farben setzt der Server als
+ * CSS-Variablen am html-Element (colorVariables in src/lib/design.ts), dort stehen auch die Ableitungen.
+ */
+@theme {
+  --color-primary: #0f172a;
+  --color-primary-fg: #ffffff;
+  --color-primary-hover: #3a4150;
+  --color-accent: #0ea5e9;
+  --color-accent-soft: #e2f4fc;
+  --color-accent-ring: #9fdbf6;
+  --color-accent-strong: #0a74a3;
+  --color-header: #ffffff;
+  --color-header-fg: #0f172a;
+}
