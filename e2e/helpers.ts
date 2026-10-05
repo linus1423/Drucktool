@@ -20,7 +20,12 @@ export async function expectAccessible(page: Page, name: string) {
   await page.waitForLoadState('networkidle')
   // Laufende Übergänge abwarten, sonst misst axe mitten in transition-colors (z. B. „Zurück“ wird gerade aktiv).
   await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined))))
-  const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()
+  // Sandbox-iframes (E-Mail-Vorschau) auslassen: Mit Playwright ab 1.63 bleibt axe dort sonst hängen, und ihr Inhalt ist
+  // die E-Mail, nicht die Oberfläche.
+  const result = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .exclude('iframe[sandbox]')
+    .analyze()
   const serious = result.violations
     .filter((v) => v.impact === 'serious' || v.impact === 'critical')
     .map((v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)
