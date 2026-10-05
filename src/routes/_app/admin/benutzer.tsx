@@ -9,10 +9,11 @@ import { formatDateTime } from '~/lib/format'
 import { activeOrganisationsQuery, usersQuery } from '~/lib/queries'
 import { ROLE_LABELS, USER_ROLES, USER_STATUSES, USER_STATUS_LABELS, type UserRole, type UserStatus } from '~/lib/roles'
 import { anonymizeUserFn, createUserFn, updateUserFn } from '~/server/admin/admin.functions'
+import { pageTitle } from '~/lib/design'
 
 export const Route = createFileRoute('/_app/admin/benutzer')({
   loader: ({ context }) => context.queryClient.ensureQueryData(usersQuery),
-  head: () => ({ meta: [{ title: 'Benutzer · Drucktool' }] }),
+  head: ({ match }) => ({ meta: [{ title: pageTitle('Benutzer', match.context.design) }] }),
   component: UsersPage,
 })
 

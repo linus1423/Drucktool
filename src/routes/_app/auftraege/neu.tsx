@@ -38,6 +38,7 @@ import { createOfferFn, createRequestFn, prepareReorderFn } from '~/server/reque
 import { describeScriptFn } from '~/server/scripts/scripts.functions'
 import { draftFilesFn } from '~/server/files/files.functions'
 import { DRAFT_VERSION, clearDraft, draftStorageKey, loadDraft, saveDraft } from '~/lib/order-draft'
+import { pageTitle } from '~/lib/design'
 
 export const Route = createFileRoute('/_app/auftraege/neu')({
   // ?vorlage=<id>: Nachbestellung eines früheren Auftrags (Issue #10); ?skript=<id>: Bestellung für ein Skript der SVK
@@ -50,7 +51,7 @@ export const Route = createFileRoute('/_app/auftraege/neu')({
   }),
   loader: ({ context }) =>
     Promise.all([context.queryClient.ensureQueryData(orderCatalogQuery), context.queryClient.ensureQueryData(accountQuery)]),
-  head: () => ({ meta: [{ title: 'Neuer Auftrag · Drucktool' }] }),
+  head: ({ match }) => ({ meta: [{ title: pageTitle('Neuer Auftrag', match.context.design) }] }),
   component: NewOrderPage,
 })
 
@@ -559,7 +560,7 @@ function NewOrderPage() {
                 className={cx(
                   'rounded-full px-3 py-1',
                   i === step
-                    ? 'bg-slate-900 text-white'
+                    ? 'bg-primary text-primary-fg'
                     : canOpen(i)
                       ? 'bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100'
                       : 'text-slate-400',
@@ -735,7 +736,7 @@ function ChoiceCard({
       className={cx(
         'rounded-lg p-3 text-left text-sm ring-1 transition-shadow',
         selected
-          ? 'bg-slate-900 text-white ring-slate-900'
+          ? 'bg-primary text-primary-fg ring-primary'
           : disabled
             ? 'bg-slate-50 text-slate-400 ring-slate-200'
             : 'bg-white ring-slate-300 hover:ring-slate-500',
@@ -754,7 +755,7 @@ function ChoiceCard({
         </button>
         {help ? <HelpTip label={typeof title === 'string' ? title : 'Option'}>{help}</HelpTip> : null}
       </div>
-      {children ? <div className={cx('mt-1 text-xs', selected ? 'text-slate-200' : 'text-slate-500')}>{children}</div> : null}
+      {children ? <div className={cx('mt-1 text-xs', selected ? 'text-primary-fg/85' : 'text-slate-500')}>{children}</div> : null}
       {disabled && reason ? <div className="mt-1 text-xs">{reason}</div> : null}
     </div>
   )

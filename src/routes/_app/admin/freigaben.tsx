@@ -6,13 +6,14 @@ import { errorMessage } from '~/lib/errors'
 import { formatDateTime } from '~/lib/format'
 import { activeOrganisationsQuery, pendingRegistrationsQuery } from '~/lib/queries'
 import { approveRegistrationFn, rejectRegistrationFn } from '~/server/admin/admin.functions'
+import { pageTitle } from '~/lib/design'
 
 export const Route = createFileRoute('/_app/admin/freigaben')({
   beforeLoad: ({ context }) => {
     if (context.user.role !== 'superadmin') throw redirect({ to: '/auftraege' })
   },
   loader: ({ context }) => context.queryClient.ensureQueryData(pendingRegistrationsQuery),
-  head: () => ({ meta: [{ title: 'Freigaben · Drucktool' }] }),
+  head: ({ match }) => ({ meta: [{ title: pageTitle('Freigaben', match.context.design) }] }),
   component: ApprovalsPage,
 })
 

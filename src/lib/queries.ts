@@ -1,6 +1,7 @@
 import { queryOptions } from '@tanstack/react-query'
 import { getAdminCatalogFn, getOrderCatalogFn, listCatalogChangesFn } from '~/server/catalog/catalog.functions'
-import { getCurrentUser, getSiteLinksFn } from '~/server/auth/auth.functions'
+import { getCurrentUser } from '~/server/auth/auth.functions'
+import { getDesignSettingsFn, getLegalTextFn, getPublicDesignFn } from '~/server/design/design.functions'
 import { getMyAccountFn } from '~/server/account/account.functions'
 import { getRequestFn, listAssignableStaffFn, listBoardFn, listRequestsFn } from '~/server/requests/requests.functions'
 import {
@@ -38,11 +39,20 @@ export const currentUserQuery = queryOptions({
   staleTime: 60_000,
 })
 
-export const siteLinksQuery = queryOptions({
-  queryKey: ['site-links'],
-  queryFn: () => getSiteLinksFn(),
-  staleTime: Infinity,
+/** Name, Logo, Farben und Fußzeile (Issue #186); nach dem Speichern auf der Design-Seite neu geladen. */
+export const designQuery = queryOptions({
+  queryKey: ['design'],
+  queryFn: () => getPublicDesignFn(),
+  staleTime: 5 * 60_000,
 })
+
+export const designSettingsQuery = queryOptions({
+  queryKey: ['admin', 'design'],
+  queryFn: () => getDesignSettingsFn(),
+})
+
+export const legalTextQuery = (page: 'imprint' | 'privacy') =>
+  queryOptions({ queryKey: ['legal-text', page], queryFn: () => getLegalTextFn({ data: { page } }) })
 
 export const appInfoQuery = queryOptions({
   queryKey: ['app-info'],

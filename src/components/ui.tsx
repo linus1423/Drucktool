@@ -8,7 +8,7 @@ export function cx(...classes: (string | false | null | undefined)[]) {
 type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost'
 
 const buttonVariants: Record<ButtonVariant, string> = {
-  primary: 'bg-slate-900 text-white hover:bg-slate-700 disabled:bg-slate-400',
+  primary: 'bg-primary text-primary-fg hover:bg-primary-hover disabled:bg-slate-400 disabled:text-white',
   secondary: 'bg-white text-slate-900 ring-1 ring-slate-300 hover:bg-slate-100 disabled:text-slate-400',
   danger: 'bg-rose-600 text-white hover:bg-rose-500 disabled:bg-rose-300',
   ghost: 'text-slate-700 hover:bg-slate-100',
@@ -33,7 +33,7 @@ export function Button({
 }
 
 const inputBase =
-  'block rounded-md border-0 bg-white px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 ring-inset placeholder:text-slate-500 focus:ring-2 focus:ring-slate-900 focus:outline-none disabled:bg-slate-100'
+  'block rounded-md border-0 bg-white px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 ring-inset placeholder:text-slate-500 focus:ring-2 focus:ring-primary focus:outline-none disabled:bg-slate-100'
 
 // Volle Breite, außer der Aufrufer gibt selbst eine Breite vor.
 function inputClass(className?: string) {
@@ -121,7 +121,7 @@ export function Alert({ tone = 'error', children }: { tone?: 'error' | 'success'
   const tones = {
     error: 'bg-rose-50 text-rose-800 ring-rose-200',
     success: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
-    info: 'bg-sky-50 text-sky-800 ring-sky-200',
+    info: 'bg-accent-soft text-accent-strong ring-accent-ring',
   }
   return (
     <div role={tone === 'error' ? 'alert' : 'status'} className={cx('rounded-md px-3 py-2 text-sm ring-1', tones[tone])}>

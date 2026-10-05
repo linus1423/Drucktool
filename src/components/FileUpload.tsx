@@ -97,7 +97,7 @@ export function FileUpload({
             role="progressbar"
             aria-valuenow={Math.round(progress * 100)}
           >
-            <div className="h-full bg-slate-900 transition-all" style={{ width: `${Math.round(progress * 100)}%` }} />
+            <div className="h-full bg-primary transition-all" style={{ width: `${Math.round(progress * 100)}%` }} />
           </div>
         ) : (
           <div className="flex gap-2">

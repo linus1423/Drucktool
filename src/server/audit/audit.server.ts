@@ -16,7 +16,7 @@ const SECRET_FIELDS = new Set(['passwordHash', 'password'])
 export type AuditEntry = {
   actorId: string | null
   action: AuditAction
-  targetType: 'user' | 'organisation' | 'mail_template'
+  targetType: 'user' | 'organisation' | 'mail_template' | 'design'
   targetId: string | null
   organisationId?: string | null
   before?: object | null

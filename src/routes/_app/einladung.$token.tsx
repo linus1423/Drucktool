@@ -4,11 +4,14 @@ import { Alert, Button, Card, PageHeader } from '~/components/ui'
 import { errorMessage } from '~/lib/errors'
 import { inviteQuery } from '~/lib/queries'
 import { acceptInviteFn } from '~/server/organisations/org-admin.functions'
+import { pageTitle } from '~/lib/design'
 
 // Einladung in eine Organisation (Issue #12). Wer nicht angemeldet ist, landet über _app beim Login und danach hier.
 export const Route = createFileRoute('/_app/einladung/$token')({
   loader: ({ context, params }) => context.queryClient.ensureQueryData(inviteQuery(params.token)),
-  head: () => ({ meta: [{ title: 'Einladung · Drucktool' }, { name: 'referrer', content: 'no-referrer' }] }),
+  head: ({ match }) => ({
+    meta: [{ title: pageTitle('Einladung', match.context.design) }, { name: 'referrer', content: 'no-referrer' }],
+  }),
   component: InvitePage,
 })
 

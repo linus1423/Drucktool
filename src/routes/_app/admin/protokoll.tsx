@@ -14,6 +14,7 @@ import { formatDateTime } from '~/lib/format'
 import { MAIL_TEMPLATES, type MailTemplateKey } from '~/lib/mail-templates'
 import { auditLogQuery, organisationsQuery, usersQuery } from '~/lib/queries'
 import { ROLE_LABELS, USER_STATUS_LABELS, ORG_STATUS, type UserRole, type UserStatus } from '~/lib/roles'
+import { pageTitle } from '~/lib/design'
 
 const searchSchema = z.object({
   benutzer: z.uuid().optional().catch(undefined),
@@ -43,7 +44,7 @@ export const Route = createFileRoute('/_app/admin/protokoll')({
   validateSearch: searchSchema,
   loaderDeps: ({ search }) => search,
   loader: ({ context, deps }) => context.queryClient.ensureQueryData(auditLogQuery(toFilter(deps))),
-  head: () => ({ meta: [{ title: 'Protokoll · Drucktool' }] }),
+  head: ({ match }) => ({ meta: [{ title: pageTitle('Protokoll', match.context.design) }] }),
   component: AuditLogPage,
 })
 
@@ -198,6 +199,7 @@ function describeDetails(e: Entry) {
   if (data.existingOrganisation === true) parts.push('bestehender Organisation zugeordnet')
   if (typeof data.requested === 'string') parts.push(`angefragt: „${data.requested}“`)
   if (data.created === true || data.fromRequest === true) parts.push('neu angelegt aus Anfrage')
+  if (Array.isArray(data.changed) && data.changed.length) parts.push(`geändert: ${data.changed.join(', ')}`)
   return parts.join(' · ')
 }
 
@@ -212,9 +214,14 @@ function AuditRow({ entry: e, orgName }: { entry: Entry; orgName: OrgName }) {
           ? e.targetId
             ? (MAIL_TEMPLATES[e.targetId as MailTemplateKey]?.label ?? e.targetId)
             : 'Absender, Signatur und Fußzeile'
-          : null
+          : e.targetType === 'design'
+            ? e.targetId === 'favicon'
+              ? 'Favicon'
+              : 'Design'
+            : null
   // Vorlagen bestehen aus Bausteinen; den Inhalt zeigt die Seite „E-Mails“, hier nur, dass sich etwas geändert hat.
-  const changes = e.targetType === 'mail_template' ? null : describeChanges(e.before, e.after, orgName)
+  const changes =
+    e.targetType === 'mail_template' || e.targetType === 'design' ? null : describeChanges(e.before, e.after, orgName)
   const details = describeDetails(e)
   const failed = e.action === 'login.failed'
   return (

@@ -20,6 +20,7 @@ import {
   updateBindingFn,
   updateFormatFn,
 } from '~/server/catalog/catalog.functions'
+import { pageTitle } from '~/lib/design'
 
 const TABS = [
   { id: 'formate', label: 'Formate und Bindungen' },
@@ -39,7 +40,7 @@ export const Route = createFileRoute('/_app/admin/katalog')({
       .catch(undefined),
   }),
   loader: ({ context }) => context.queryClient.ensureQueryData(adminCatalogQuery),
-  head: () => ({ meta: [{ title: 'Katalog und Preise · Drucktool' }] }),
+  head: ({ match }) => ({ meta: [{ title: pageTitle('Katalog und Preise', match.context.design) }] }),
   component: CatalogPage,
 })
 

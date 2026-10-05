@@ -109,11 +109,11 @@ export function OrganisationsCard({ account }: { account: Pick<Account, 'members
                     <Badge className={ORG_STATUS[m.status].className}>{ORG_STATUS[m.status].label}</Badge>
                   ) : m.isAdmin ? (
                     <>
-                      <Badge className="bg-sky-100 text-sky-800">Verwalter</Badge>
+                      <Badge className="bg-accent-soft text-accent-strong">Verwalter</Badge>
                       <Link
                         to="/organisationen/$organisationId"
                         params={{ organisationId: m.id }}
-                        className="font-medium text-sky-700 hover:underline"
+                        className="font-medium text-accent-strong hover:underline"
                       >
                         Verwalten
                       </Link>

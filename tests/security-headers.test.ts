@@ -53,4 +53,16 @@ describe('Security-Header', () => {
     expect(result.headers.get('location')).toBe('http://localhost/ziel')
     expect(result.headers.get('x-content-type-options')).toBe('nosniff')
   })
+
+  it('lässt eine Route CSP und CORP selbst setzen, etwa für das Logo in E-Mails (Issue #188)', () => {
+    const logo = new Response('x', {
+      headers: { 'Content-Security-Policy': "default-src 'none'; sandbox", 'Cross-Origin-Resource-Policy': 'cross-origin' },
+    })
+    const result = withSecurityHeaders(logo, securityHeaders({ nonce: 'n', https: false, csp: true }))
+    expect(result.headers.get('content-security-policy')).toBe("default-src 'none'; sandbox")
+    expect(result.headers.get('cross-origin-resource-policy')).toBe('cross-origin')
+    expect(result.headers.get('x-frame-options')).toBe('DENY')
+    const page = withSecurityHeaders(new Response('x'), securityHeaders({ nonce: 'n', https: false, csp: true }))
+    expect(page.headers.get('cross-origin-resource-policy')).toBe('same-origin')
+  })
 })

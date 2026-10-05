@@ -3,7 +3,7 @@ import { createFileRoute, Link, Outlet, redirect, useRouter, useRouterState } fr
 import { useQueryClient } from '@tanstack/react-query'
 import { ROLE_LABELS, isAdminRole, isStaffRole } from '~/lib/roles'
 import { logout } from '~/server/auth/auth.functions'
-import { LegalLinks } from '~/components/LegalLinks'
+import { SiteBrand, SiteFooter } from '~/components/Branding'
 
 export const Route = createFileRoute('/_app')({
   beforeLoad: ({ context, location }) => {
@@ -15,8 +15,12 @@ export const Route = createFileRoute('/_app')({
   component: AppLayout,
 })
 
-const navLink = 'rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-const navActive = { className: 'bg-slate-100 text-slate-900' }
+// Kopfzeile in der Farbe der Design-Seite (Issue #189); Text und Hover leiten sich aus deren Textfarbe ab.
+const navLink = 'rounded-md px-3 py-2 text-sm font-medium text-header-fg/80 hover:bg-header-fg/10 hover:text-header-fg'
+const navActive = { className: 'bg-header-fg/10 text-header-fg' }
+// Einträge im aufgeklappten Verwaltungsmenü liegen auf Weiß.
+const menuLink = 'rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+const menuActive = { className: 'bg-slate-100 text-slate-900' }
 
 function AppLayout() {
   const { user } = Route.useRouteContext()
@@ -42,6 +46,7 @@ function AppLayout() {
           { to: '/admin/benutzer', label: 'Benutzer' },
           { to: '/admin/katalog', label: 'Katalog und Preise' },
           { to: '/admin/emails', label: 'E-Mails' },
+          { to: '/admin/design', label: 'Design' },
         ] as const)
       : []),
     ...(user.role === 'superadmin' ? [{ to: '/admin/protokoll', label: 'Protokoll' } as const] : []),
@@ -81,7 +86,7 @@ function AppLayout() {
     <>
       <Link to="/profil" className="leading-tight hover:underline md:text-right">
         <div className="font-medium">{user.name}</div>
-        <div className="text-xs text-slate-600">
+        <div className="text-xs text-header-fg/80">
           {isStaffRole(user.role) ? ROLE_LABELS[user.role] : user.organisations.map((o) => o.name).join(', ') || user.email}
         </div>
       </Link>
@@ -95,19 +100,19 @@ function AppLayout() {
     <div className="min-h-screen">
       <a
         href="#inhalt"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:ring-2 focus:ring-sky-500"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:ring-2 focus:ring-accent"
       >
         Zum Inhalt springen
       </a>
-      <header className="border-b border-slate-200 bg-white">
+      <header className="border-b border-slate-200 bg-header text-header-fg">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-4 py-3">
           <Link to="/uebersicht" className="mr-auto text-lg font-semibold tracking-tight lg:mr-4">
-            Drucktool
+            <SiteBrand />
           </Link>
           {/* Unter 1024 px klappt die Navigation hinter einem Menüknopf zusammen (Issue #20, #152). */}
           <button
             type="button"
-            className="rounded-md px-3 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 lg:hidden"
+            className="rounded-md px-3 py-2 text-sm font-medium text-header-fg ring-1 ring-header-fg/30 lg:hidden"
             aria-expanded={menuOpen}
             aria-controls="hauptmenue"
             onClick={() => setMenuOpen((o) => !o)}
@@ -125,12 +130,14 @@ function AppLayout() {
                 {links}
                 {adminLinks.length > 0 ? (
                   <>
-                    <p className="mt-2 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Verwaltung</p>
+                    <p className="mt-2 px-3 text-xs font-semibold uppercase tracking-wide text-header-fg/70">Verwaltung</p>
                     {adminLinkList}
                   </>
                 ) : null}
               </nav>
-              <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-200 pt-3 text-sm">{account}</div>
+              <div className="mt-3 flex items-center justify-between gap-3 border-t border-header-fg/15 pt-3 text-sm">
+                {account}
+              </div>
             </div>
           ) : null}
         </div>
@@ -139,7 +146,7 @@ function AppLayout() {
         <Outlet />
       </main>
       <footer>
-        <LegalLinks className="pb-8" />
+        <SiteFooter className="pb-8" />
         {isAdminRole(user.role) ? <VersionInfo /> : null}
       </footer>
     </div>
@@ -147,7 +154,13 @@ function AppLayout() {
 }
 
 type AdminPath =
-  '/admin/freigaben' | '/admin/organisationen' | '/admin/benutzer' | '/admin/katalog' | '/admin/emails' | '/admin/protokoll'
+  | '/admin/freigaben'
+  | '/admin/organisationen'
+  | '/admin/benutzer'
+  | '/admin/katalog'
+  | '/admin/emails'
+  | '/admin/design'
+  | '/admin/protokoll'
 
 /**
  * Verwaltungsseiten als Aufklappmenü, damit die Navigation auch für Superadmins in eine Zeile passt (Issue #152).
@@ -192,7 +205,7 @@ function AdminMenu({ pathname, links }: { pathname: string; links: readonly { to
           className="absolute left-0 z-20 mt-1 flex min-w-48 flex-col gap-1 rounded-md bg-white p-1 shadow-lg ring-1 ring-slate-200"
         >
           {links.map((link) => (
-            <Link key={link.to} to={link.to} className={navLink} activeProps={navActive} onClick={() => setOpen(false)}>
+            <Link key={link.to} to={link.to} className={menuLink} activeProps={menuActive} onClick={() => setOpen(false)}>
               {link.label}
             </Link>
           ))}

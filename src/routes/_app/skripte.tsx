@@ -9,6 +9,7 @@ import { scriptsQuery } from '~/lib/queries'
 import { isStaffRole } from '~/lib/roles'
 import type { RequestStatus } from '~/lib/status'
 import { copyScriptFn, createScriptFn, updateScriptFn } from '~/server/scripts/scripts.functions'
+import { pageTitle } from '~/lib/design'
 
 // Skriptenverwaltung der SVK (Issue #59). Mitarbeiter sehen alle Skripte, die SVK nur ihre. Verwalten dürfen
 // SVK-Mitglieder, Admins und dafür freigegebene Mitarbeiter (Issue #158); nachbestellen nur SVK-Mitglieder.
@@ -24,7 +25,7 @@ export const Route = createFileRoute('/_app/skripte')({
   loaderDeps: ({ search }) => search,
   loader: ({ context, deps }) =>
     context.queryClient.ensureQueryData(scriptsQuery({ semester: deps.semester, archived: deps.archiv })),
-  head: () => ({ meta: [{ title: 'Skripte · Drucktool' }] }),
+  head: ({ match }) => ({ meta: [{ title: pageTitle('Skripte', match.context.design) }] }),
   component: ScriptsPage,
 })
 
@@ -158,7 +159,7 @@ function ScriptRow({
                   search={{ vorlage: s.templateRequestId ?? undefined, skript: s.id }}
                   className={
                     s.templateRequestId
-                      ? 'inline-flex items-center rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700'
+                      ? 'inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-fg hover:bg-primary-hover'
                       : linkButton
                   }
                 >
