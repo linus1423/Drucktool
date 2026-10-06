@@ -21,8 +21,29 @@ export const mailLayoutSchema = z.object({
   header: z.string().trim().max(100),
   signature: z.string().trim().max(1000),
   footer: z.string().trim().max(1000),
+  /** Logo aus der Design-Seite oben in der Mail (Issue #191). */
+  showLogo: z.boolean(),
+  /** Impressum, Datenschutz und weitere Links der Fußzeile unter der Mail. */
+  showLegalLinks: z.boolean(),
 })
 export type MailLayout = z.infer<typeof mailLayoutSchema>
+
+/** Was die Design-Seite zur Mail beiträgt: Logo (absolute URL), Primärfarbe und Links der Fußzeile. */
+export type MailBrand = {
+  siteName: string
+  logoUrl: string | null
+  primary: string
+  primaryFg: string
+  links: { label: string; href: string }[]
+}
+
+export const DEFAULT_MAIL_BRAND: MailBrand = {
+  siteName: 'Drucktool',
+  logoUrl: null,
+  primary: '#0f172a',
+  primaryFg: '#ffffff',
+  links: [],
+}
 
 export const DEFAULT_MAIL_LAYOUT: MailLayout = {
   senderName: '',
@@ -30,6 +51,8 @@ export const DEFAULT_MAIL_LAYOUT: MailLayout = {
   header: 'Drucktool',
   signature: '',
   footer: 'Diese Nachricht wurde automatisch verschickt. Benachrichtigungen können Sie im Profil abschalten.',
+  showLogo: true,
+  showLegalLinks: false,
 }
 
 export const storedTemplateSchema = z.object({
@@ -589,10 +612,20 @@ export function htmlToText(html: string) {
     .trim()
 }
 
-function wrapHtml(body: string, layout: MailLayout) {
+function wrapHtml(body: string, layout: MailLayout, brand: MailBrand) {
+  const logo =
+    layout.showLogo && brand.logoUrl
+      ? `<p style="margin:0 0 16px"><img src="${escapeHtml(brand.logoUrl)}" alt="${escapeHtml(brand.siteName)}" style="display:block;max-height:48px;max-width:240px;height:auto;border:0"></p>\n`
+      : ''
   const header = layout.header
     ? `<p style="margin:0 0 16px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#64748b">${escapeHtml(layout.header)}</p>\n`
     : ''
+  const links =
+    layout.showLegalLinks && brand.links.length
+      ? `\n<p style="max-width:560px;margin:8px auto 0;font-size:12px;color:#64748b">${brand.links
+          .map((l) => `<a href="${escapeHtml(safeHref(l.href))}" style="color:#475569">${escapeHtml(l.label)}</a>`)
+          .join(' &middot; ')}</p>`
+      : ''
   const signature = layout.signature
     ? `\n<p style="margin:24px 0 0;font-size:13px;color:#475569">${escapeHtml(layout.signature).replace(/\n/g, '<br>')}</p>`
     : ''
@@ -602,13 +635,16 @@ function wrapHtml(body: string, layout: MailLayout) {
   return `<!doctype html>
 <html lang="de"><body style="margin:0;padding:24px;background:#f8fafc;font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:15px;line-height:1.5;color:#0f172a">
 <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:24px">
-${header}${body}${signature}
-</div>${footer}
+${logo}${header}${body}${signature}
+</div>${footer}${links}
 </body></html>`
 }
 
-function textWithSignature(parts: string[], layout: MailLayout) {
-  return [...parts, ...(layout.signature ? ['', '-- ', layout.signature] : [])].join('\n\n')
+function textWithSignature(parts: string[], layout: MailLayout, brand: MailBrand) {
+  const links = layout.showLegalLinks ? brand.links.map((l) => `${l.label}: ${l.href}`) : []
+  return [...parts, ...(layout.signature ? ['', '-- ', layout.signature] : []), ...(links.length ? [links.join('\n')] : [])].join(
+    '\n\n',
+  )
 }
 
 /** Baut Betreff, Text- und HTML-Fassung aus einer Vorlage und den Werten der Platzhalter. */
@@ -616,6 +652,7 @@ export function renderMail(
   t: StoredTemplate,
   vars: Record<string, string>,
   layout: MailLayout = DEFAULT_MAIL_LAYOUT,
+  brand: MailBrand = DEFAULT_MAIL_BRAND,
 ): MailContent {
   // Zeilenumbrüche im Betreff würden den Mail-Header brechen.
   const subject = fill(t.subject, vars)
@@ -623,7 +660,7 @@ export function renderMail(
     .trim()
   if (t.mode === 'html') {
     const body = fill(t.html, vars, escapeHtml)
-    return { subject, text: textWithSignature([htmlToText(body)], layout), html: wrapHtml(body, layout) }
+    return { subject, text: textWithSignature([htmlToText(body)], layout, brand), html: wrapHtml(body, layout, brand) }
   }
   const blocks = t.blocks.filter((b) => !isEmpty(b, vars))
   const text = blocks.map((b) => {
@@ -636,16 +673,16 @@ export function renderMail(
     }
     return `${fill(b.label, vars)}: ${fill(b.href, vars)}`
   })
-  const body = blocks.map((b) => blockHtml(b, vars, safeHref(fill(b.kind === 'button' ? b.href : '', vars)))).join('\n')
-  return { subject, text: textWithSignature(text, layout), html: wrapHtml(body, layout) }
+  const body = blocks.map((b) => blockHtml(b, vars, safeHref(fill(b.kind === 'button' ? b.href : '', vars)), brand)).join('\n')
+  return { subject, text: textWithSignature(text, layout, brand), html: wrapHtml(body, layout, brand) }
 }
 
-function blockHtml(b: MailBlock, vars: Record<string, string>, href: string) {
+function blockHtml(b: MailBlock, vars: Record<string, string>, href: string, brand: MailBrand = DEFAULT_MAIL_BRAND) {
   if (b.kind === 'p') return `<p style="margin:0 0 16px">${fill(escapeHtml(b.text), vars, escapeHtml).replace(/\n/g, '<br>')}</p>`
   if (b.kind === 'quote') {
     return `<blockquote style="margin:0 0 16px;padding:8px 12px;border-left:3px solid #cbd5e1;color:#334155;white-space:pre-wrap">${fill(escapeHtml(b.text), vars, escapeHtml)}</blockquote>`
   }
-  return `<p style="margin:24px 0"><a href="${escapeHtml(href)}" style="background:#0f172a;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;display:inline-block">${fill(escapeHtml(b.label), vars, escapeHtml)}</a></p>`
+  return `<p style="margin:24px 0"><a href="${escapeHtml(href)}" style="background:${brand.primary};color:${brand.primaryFg};padding:10px 16px;border-radius:6px;text-decoration:none;display:inline-block">${fill(escapeHtml(b.label), vars, escapeHtml)}</a></p>`
 }
 
 /** Bausteine als HTML mit unveränderten Platzhaltern, als Startpunkt beim Umschalten auf den HTML-Modus. */

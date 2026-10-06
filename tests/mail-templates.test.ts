@@ -69,6 +69,8 @@ describe('E-Mail-Vorlagen rendern', () => {
         header: 'Fachschaftsdruckerei',
         signature: 'Viele Grüße\nEure Druckerei',
         footer: 'Impressum',
+        showLogo: true,
+        showLegalLinks: false,
       },
     )
     expect(mail.html).toContain('Fachschaftsdruckerei')
@@ -131,7 +133,15 @@ describe.skipIf(!url)('E-Mail-Vorlagen anpassen (Integration)', async () => {
         html: '',
       },
     })
-    await admin.saveMailLayout(adminUser, { senderName: 'Druckerei', replyTo: '', header: 'Kopf', signature: 'Gruß', footer: '' })
+    await admin.saveMailLayout(adminUser, {
+      senderName: 'Druckerei',
+      replyTo: '',
+      header: 'Kopf',
+      signature: 'Gruß',
+      footer: '',
+      showLogo: true,
+      showLegalLinks: false,
+    })
     const to = `empfaenger-${Date.now()}@test`
     await getDb().transaction((tx) =>
       enqueueMail(

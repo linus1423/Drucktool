@@ -11,6 +11,7 @@ import { DELIVERY_LABELS, HANDOVER_LABELS } from '~/lib/order'
 import { activeOrganisationsQuery, assignableStaffQuery, readableOrganisationsQuery, requestListQuery } from '~/lib/queries'
 import { isStaffRole } from '~/lib/roles'
 import { INTERNAL_STATUS_LABELS, INTERNAL_STATUS_TONES, REQUEST_STATUSES, STATUS_LABELS } from '~/lib/status'
+import { pageTitle } from '~/lib/design'
 
 const SORTS = ['number', 'title', 'customer', 'status', 'total', 'created', 'updated'] as const
 type Sort = (typeof SORTS)[number]
@@ -58,7 +59,7 @@ export const Route = createFileRoute('/_app/auftraege/')({
   validateSearch: searchSchema,
   loaderDeps: ({ search }) => search,
   loader: ({ context, deps }) => context.queryClient.ensureQueryData(requestListQuery(toFilter(deps))),
-  head: () => ({ meta: [{ title: 'Aufträge · Drucktool' }] }),
+  head: ({ match }) => ({ meta: [{ title: pageTitle('Aufträge', match.context.design) }] }),
   component: RequestListPage,
 })
 
@@ -125,7 +126,7 @@ function RequestListPage() {
             className={cx('hover:underline', info.row.original.unread ? 'font-bold' : 'font-medium')}
           >
             {info.row.original.unread ? (
-              <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-sky-500 align-middle" aria-label="Ungelesen" />
+              <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-accent align-middle" aria-label="Ungelesen" />
             ) : null}
             {info.getValue()}
           </Link>
@@ -240,7 +241,7 @@ function RequestListPage() {
             ) : null}
             <Link
               to="/auftraege/neu"
-              className="inline-flex items-center rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
+              className="inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-fg hover:bg-primary-hover"
             >
               Neuer Auftrag
             </Link>

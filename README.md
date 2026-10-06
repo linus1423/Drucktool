@@ -367,8 +367,14 @@ darunter weiter die Anmeldung per E-Mail-Link für Externe.
   die Vorlage eines nicht archivierten Skripts sind. Hochgeladene, nie abgeschickte Dateien werden nach
   `UNSUBMITTED_UPLOAD_RETENTION_DAYS` Tagen (Standard 1) gelöscht. In Backups bleiben gelöschte Dateien bis zu deren
   Ablauf enthalten. Diese Fristen gehören auch in die Datenschutzerklärung (`PRIVACY_URL`).
-- **Datenschutzerklärung und Impressum:** `PRIVACY_URL` und `IMPRINT_URL` erscheinen als Links in der Fußzeile und
-  auf der Anmeldeseite.
+- **Datenschutzerklärung und Impressum:** Admins pflegen beide unter **Verwaltung → Design**, entweder als Link oder als
+  eigenen Text unter `/impressum` bzw. `/datenschutz`. Solange dort nichts eingestellt ist, erscheinen `PRIVACY_URL`
+  und `IMPRINT_URL` als Links in der Fußzeile und auf der Anmeldeseite.
+- **Design:** Unter **Verwaltung → Design** stellen Admins Name und Untertitel in der Kopfzeile, Logo, Favicon,
+  Primär-, Akzent- und Kopfzeilenfarbe sowie weitere Links und einen freien Text für die Fußzeile ein. Die Schriftfarbe
+  auf farbigen Flächen wählt das Drucktool selbst, damit der Kontrast reicht. Logo und Favicon liegen in der Datenbank
+  (Tabelle `settings`, höchstens 512 KB) und sind damit im Datenbank-Backup enthalten. E-Mails übernehmen Logo und
+  Primärfarbe; das lässt sich unter **E-Mails** abschalten.
 
 ## Lokale Entwicklung
 
@@ -734,7 +740,7 @@ holt einen älteren Stand.
 | `REJECTED_REGISTRATION_RETENTION_DAYS`                                              | Abgelehnte Registrierungen nach so vielen Tagen löschen, Standard 30                 |
 | `REQUEST_FILE_RETENTION_DAYS`                                                       | Dateien fertiger/abgelehnter/stornierter Aufträge löschen, Standard 90, `0` = nie    |
 | `UNSUBMITTED_UPLOAD_RETENTION_DAYS`                                                 | Nie abgeschickte Uploads löschen, Standard 1 (mindestens 1)                          |
-| `PRIVACY_URL`, `IMPRINT_URL`                                                        | Links auf Datenschutzerklärung und Impressum in der Fußzeile                         |
+| `PRIVACY_URL`, `IMPRINT_URL`                                                        | Datenschutz und Impressum in der Fußzeile, solange unter Design nichts gesetzt ist   |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`                               | OpenID Connect, siehe oben                                                           |
 | `OIDC_DISPLAY_NAME`, `OIDC_NEW_USERS`, `OIDC_TRUST_EMAIL`                           | Beschriftung und Verhalten der OIDC-Anmeldung                                        |
 | `CUSTOMER_OIDC_ISSUER`, `CUSTOMER_OIDC_CLIENT_ID`, `CUSTOMER_OIDC_CLIENT_SECRET`    | Kunden-Anmeldung über den TUM-Keycloak, siehe oben                                   |

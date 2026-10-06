@@ -9,6 +9,7 @@ import { errorMessage } from '~/lib/errors'
 import { safeRedirect } from '~/lib/redirect'
 import { emailSchema, loginSchema } from '~/lib/validation'
 import { getAuthOptions, login, requestLoginLinkFn } from '~/server/auth/auth.functions'
+import { pageTitle } from '~/lib/design'
 
 export const Route = createFileRoute('/login')({
   validateSearch: z.object({
@@ -20,7 +21,7 @@ export const Route = createFileRoute('/login')({
     if (context.user) throw redirect({ to: '/uebersicht' })
   },
   loader: () => getAuthOptions(),
-  head: () => ({ meta: [{ title: 'Anmelden · Drucktool' }] }),
+  head: ({ match }) => ({ meta: [{ title: pageTitle('Anmelden', match.context.design) }] }),
   component: LoginPage,
 })
 
@@ -42,7 +43,7 @@ function LoginPage() {
           <>
             <a
               href={`/api/auth/kunden-sso/login${redirectQuery}`}
-              className="flex w-full items-center justify-center rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
+              className="flex w-full items-center justify-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-fg hover:bg-primary-hover"
             >
               Anmelden mit {options.customerOidc.displayName}
             </a>

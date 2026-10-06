@@ -7,13 +7,14 @@ import { USER_STATUS_LABELS } from '~/lib/roles'
 import { organisationQuery } from '~/lib/queries'
 import { errorMessage } from '~/lib/errors'
 import { saveOrganisationFn, setOrganisationAdminFn } from '~/server/admin/admin.functions'
+import { pageTitle } from '~/lib/design'
 
 export const Route = createFileRoute('/_app/admin/organisationen/$organisationId')({
   loader: ({ context, params }) => {
     if (!UUID.test(params.organisationId)) throw notFound()
     return context.queryClient.ensureQueryData(organisationQuery(params.organisationId))
   },
-  head: ({ loaderData }) => ({ meta: [{ title: `${loaderData?.name ?? 'Organisation'} · Drucktool` }] }),
+  head: ({ loaderData, match }) => ({ meta: [{ title: pageTitle(loaderData?.name ?? 'Organisation', match.context.design) }] }),
   notFoundComponent: () => (
     <div className="space-y-4">
       <Alert>Organisation nicht gefunden</Alert>

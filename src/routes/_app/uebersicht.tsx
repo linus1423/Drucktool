@@ -6,10 +6,11 @@ import { Badge, Card, PageHeader } from '~/components/ui'
 import { formatMoney, formatRequestNumber } from '~/lib/format'
 import { dashboardQuery } from '~/lib/queries'
 import { INTERNAL_STATUS_LABELS, INTERNAL_STATUS_TONES, STATUS_LABELS } from '~/lib/status'
+import { pageTitle } from '~/lib/design'
 
 export const Route = createFileRoute('/_app/uebersicht')({
   loader: ({ context }) => context.queryClient.ensureQueryData(dashboardQuery),
-  head: () => ({ meta: [{ title: 'Übersicht · Drucktool' }] }),
+  head: ({ match }) => ({ meta: [{ title: pageTitle('Übersicht', match.context.design) }] }),
   component: DashboardPage,
 })
 
@@ -33,7 +34,7 @@ function Stat({ label, value, to, hint }: { label: string; value: ReactNode; to?
   )
 }
 
-const linkClass = 'font-medium text-sky-700 hover:underline'
+const linkClass = 'font-medium text-accent-strong hover:underline'
 const days = (n: number | null) => {
   if (n === null) return '–'
   if (n < 1) return 'unter einem Tag'
@@ -129,7 +130,7 @@ function StaffView({ data }: { data: StaffDashboard }) {
                   <td className="py-1 pr-4 tabular-nums">{m.completed}</td>
                   <td className="py-1 pr-4 text-right tabular-nums">{formatMoney(m.revenueCents)}</td>
                   <td className="hidden py-1 sm:table-cell" aria-hidden="true">
-                    <div className="h-2 rounded bg-sky-200" style={{ width: `${(m.created / maxCreated) * 100}%` }} />
+                    <div className="h-2 rounded bg-accent-ring" style={{ width: `${(m.created / maxCreated) * 100}%` }} />
                     <div
                       className="mt-0.5 h-2 rounded bg-emerald-300"
                       style={{ width: `${(m.completed / maxCreated) * 100}%` }}
@@ -205,7 +206,7 @@ function CustomerView({ data }: { data: CustomerDashboard }) {
         actions={
           <Link
             to="/auftraege/neu"
-            className="inline-flex items-center rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
+            className="inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-fg hover:bg-primary-hover"
           >
             Neuer Auftrag
           </Link>

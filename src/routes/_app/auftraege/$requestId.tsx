@@ -40,15 +40,21 @@ import {
   setWatchingFn,
   updateRequestFn,
 } from '~/server/requests/requests.functions'
+import { pageTitle } from '~/lib/design'
 
 export const Route = createFileRoute('/_app/auftraege/$requestId')({
   loader: ({ context, params }) => {
     if (!UUID.test(params.requestId)) throw notFound()
     return context.queryClient.ensureQueryData(requestDetailQuery(params.requestId))
   },
-  head: ({ loaderData }) => ({
+  head: ({ loaderData, match }) => ({
     meta: [
-      { title: loaderData ? `${formatRequestNumber(loaderData.number)} ${loaderData.title} · Drucktool` : 'Auftrag · Drucktool' },
+      {
+        title: pageTitle(
+          loaderData ? `${formatRequestNumber(loaderData.number)} ${loaderData.title}` : 'Auftrag',
+          match.context.design,
+        ),
+      },
     ],
   }),
   errorComponent: ({ error }) => (
@@ -785,7 +791,7 @@ function MentionText({ body, mentions }: { body: string; mentions: { id: string;
     <>
       {body.split(pattern).map((part, i) =>
         i % 2 === 1 ? (
-          <mark key={i} className="rounded bg-sky-100 px-0.5 font-medium text-sky-900">
+          <mark key={i} className="rounded bg-accent-soft px-0.5 font-medium text-accent-strong">
             {part}
           </mark>
         ) : (
@@ -860,7 +866,7 @@ function Comments({ request, staff, isNew }: { request: Detail; staff: boolean; 
                 key={c.id}
                 className={cx(
                   'rounded-md p-3 text-sm ring-1',
-                  isNew(c) && 'ring-2 ring-sky-400',
+                  isNew(c) && 'ring-2 ring-accent',
                   c.internal
                     ? 'bg-amber-50 ring-amber-200'
                     : c.authorIsStaff
@@ -873,7 +879,7 @@ function Comments({ request, staff, isNew }: { request: Detail; staff: boolean; 
                   {c.authorIsStaff ? <Badge>Druckerei</Badge> : null}
                   {c.internal ? <Badge className="bg-amber-200 text-amber-900">Intern</Badge> : null}
                   <span>{formatDateTime(c.createdAt)}</span>
-                  {isNew(c) ? <Badge className="bg-sky-100 text-sky-900">Neu</Badge> : null}
+                  {isNew(c) ? <Badge className="bg-accent-soft text-accent-strong">Neu</Badge> : null}
                 </div>
                 {c.body ? (
                   <p className="whitespace-pre-wrap">
@@ -1061,7 +1067,7 @@ function History({ request, isNew }: { request: Detail; isNew: (e: Entry) => boo
     <Card title="Verlauf">
       <ol className="space-y-3 text-sm">
         {request.events.map((e) => (
-          <li key={e.id} className={cx('border-l-2 pl-3', isNew(e) ? 'border-sky-500 bg-sky-50' : 'border-slate-200')}>
+          <li key={e.id} className={cx('border-l-2 pl-3', isNew(e) ? 'border-accent bg-accent-soft' : 'border-slate-200')}>
             <div>
               <span className="font-medium">{e.actorName ?? 'System'}</span> {describeEvent(e)}
             </div>

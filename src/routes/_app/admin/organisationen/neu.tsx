@@ -3,9 +3,10 @@ import { useQueryClient } from '@tanstack/react-query'
 import { OrganisationForm, emptyOrganisation } from '~/components/OrganisationForm'
 import { Card, PageHeader } from '~/components/ui'
 import { saveOrganisationFn } from '~/server/admin/admin.functions'
+import { pageTitle } from '~/lib/design'
 
 export const Route = createFileRoute('/_app/admin/organisationen/neu')({
-  head: () => ({ meta: [{ title: 'Neue Organisation · Drucktool' }] }),
+  head: ({ match }) => ({ meta: [{ title: pageTitle('Neue Organisation', match.context.design) }] }),
   component: NewOrganisationPage,
 })
 

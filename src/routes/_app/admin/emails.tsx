@@ -12,17 +12,19 @@ import {
   renderMail,
   unknownPlaceholders,
   type MailBlock,
+  type MailBrand,
   type MailLayout,
   type MailTemplateKey,
   type StoredTemplate,
 } from '~/lib/mail-templates'
 import { mailTemplatesQuery } from '~/lib/queries'
 import { resetMailTemplateFn, saveMailLayoutFn, saveMailTemplateFn, sendTestMailFn } from '~/server/mail/mail-templates.functions'
+import { pageTitle } from '~/lib/design'
 
 export const Route = createFileRoute('/_app/admin/emails')({
   validateSearch: z.object({ vorlage: mailTemplateKeySchema.optional().catch(undefined) }),
   loader: ({ context }) => context.queryClient.ensureQueryData(mailTemplatesQuery),
-  head: () => ({ meta: [{ title: 'E-Mails · Drucktool' }] }),
+  head: ({ match }) => ({ meta: [{ title: pageTitle('E-Mails', match.context.design) }] }),
   component: MailTemplatesPage,
 })
 
@@ -58,24 +60,24 @@ function MailTemplatesPage() {
               aria-current={t.key === selected.key ? 'page' : undefined}
               className={cx(
                 'block rounded-md px-3 py-2 text-sm',
-                t.key === selected.key ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100',
+                t.key === selected.key ? 'bg-primary text-primary-fg' : 'text-slate-700 hover:bg-slate-100',
               )}
             >
               <span className="flex items-center justify-between gap-2">
                 <span>{t.label}</span>
                 {t.customized ? (
-                  <Badge className={t.key === selected.key ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'}>
+                  <Badge className={t.key === selected.key ? 'bg-primary-fg/20 text-primary-fg' : 'bg-amber-100 text-amber-800'}>
                     angepasst
                   </Badge>
                 ) : null}
               </span>
-              <span className={cx('block text-xs', t.key === selected.key ? 'text-slate-300' : 'text-slate-500')}>
+              <span className={cx('block text-xs', t.key === selected.key ? 'text-primary-fg/80' : 'text-slate-500')}>
                 {t.audience}
               </span>
             </Link>
           ))}
         </nav>
-        <TemplateEditor key={selected.key} info={selected} layout={data.layout} />
+        <TemplateEditor key={selected.key} info={selected} layout={data.layout} brand={data.brand} />
       </div>
     </div>
   )
@@ -89,6 +91,8 @@ function LayoutCard({ layout }: { layout: MailLayout }) {
   const issue = (field: keyof MailLayout) =>
     parsed.success ? undefined : parsed.error.issues.find((i) => i.path[0] === field)?.message
   const set = (field: keyof MailLayout) => (e: { target: { value: string } }) => setDraft({ ...draft, [field]: e.target.value })
+  const toggle = (field: 'showLogo' | 'showLegalLinks') => (e: { target: { checked: boolean } }) =>
+    setDraft({ ...draft, [field]: e.target.checked })
 
   return (
     <Card title="Absender, Signatur und Fußzeile">
@@ -132,6 +136,24 @@ function LayoutCard({ layout }: { layout: MailLayout }) {
             <Textarea id="layout-footer" rows={2} value={draft.footer} onChange={set('footer')} />
           </Field>
         </div>
+        <fieldset className="space-y-1 text-sm md:col-span-2">
+          <legend className="mb-1 block font-medium text-slate-700">Aus der Design-Seite</legend>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={draft.showLogo} onChange={toggle('showLogo')} />
+            Logo oben in der Mail zeigen (sofern eines hochgeladen ist)
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={draft.showLegalLinks} onChange={toggle('showLegalLinks')} />
+            Impressum, Datenschutz und weitere Links unter der Mail zeigen
+          </label>
+          <p className="text-slate-600">
+            Knöpfe in Mails haben die Primärfarbe aus der{' '}
+            <Link to="/admin/design" className="font-medium text-accent-strong underline">
+              Design-Seite
+            </Link>
+            .
+          </p>
+        </fieldset>
         <div className="flex items-center gap-3 md:col-span-2">
           <Button type="submit" disabled={!parsed.success || save.isPending}>
             Speichern
@@ -144,7 +166,7 @@ function LayoutCard({ layout }: { layout: MailLayout }) {
   )
 }
 
-function TemplateEditor({ info, layout }: { info: TemplateInfo; layout: MailLayout }) {
+function TemplateEditor({ info, layout, brand }: { info: TemplateInfo; layout: MailLayout; brand: MailBrand }) {
   const [draft, setDraft] = useState<StoredTemplate>(info.current)
   const [view, setView] = useState<'html' | 'text'>('html')
   const invalidate = useInvalidate()
@@ -161,7 +183,7 @@ function TemplateEditor({ info, layout }: { info: TemplateInfo; layout: MailLayo
   const test = useMutation({ mutationFn: () => sendTestMailFn({ data: { key, template: draft } }) })
 
   const unknown = unknownPlaceholders(key, draft)
-  const preview = useMemo(() => renderMail(draft, info.sample, layout), [draft, info.sample, layout])
+  const preview = useMemo(() => renderMail(draft, info.sample, layout, brand), [draft, info.sample, layout, brand])
   const dirty = JSON.stringify(draft) !== JSON.stringify(info.current)
   const differsFromStandard = JSON.stringify(draft) !== JSON.stringify(info.standard)
   const invalid =
@@ -210,7 +232,7 @@ function TemplateEditor({ info, layout }: { info: TemplateInfo; layout: MailLayo
                   }
                   className={cx(
                     'px-3 py-1.5 text-sm first:rounded-l-md last:rounded-r-md',
-                    draft.mode === mode ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100',
+                    draft.mode === mode ? 'bg-primary text-primary-fg' : 'text-slate-700 hover:bg-slate-100',
                   )}
                 >
                   {mode === 'blocks' ? 'Bausteine' : 'HTML'}
@@ -338,7 +360,7 @@ function TemplateEditor({ info, layout }: { info: TemplateInfo; layout: MailLayo
                 onClick={() => setView(v)}
                 className={cx(
                   'px-2 py-1 text-xs first:rounded-l-md last:rounded-r-md',
-                  view === v ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100',
+                  view === v ? 'bg-primary text-primary-fg' : 'text-slate-700 hover:bg-slate-100',
                 )}
               >
                 {v === 'html' ? 'HTML' : 'Text'}

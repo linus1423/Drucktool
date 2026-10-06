@@ -21,6 +21,9 @@ export const AUDIT_ACTIONS = [
   'mail_template.updated',
   'mail_template.reset',
   'mail_layout.updated',
+  'design.updated',
+  'design.logo_updated',
+  'design.logo_removed',
   'file.virus_found',
 ] as const
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
@@ -46,6 +49,9 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   'mail_template.updated': 'E-Mail-Vorlage geändert',
   'mail_template.reset': 'E-Mail-Vorlage zurückgesetzt',
   'mail_layout.updated': 'E-Mail-Layout geändert',
+  'design.updated': 'Design geändert',
+  'design.logo_updated': 'Logo hochgeladen',
+  'design.logo_removed': 'Logo entfernt',
   'file.virus_found': 'Schadsoftware in Upload gefunden',
 }
 
