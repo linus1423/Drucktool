@@ -26,7 +26,7 @@
     "@tanstack/react-router-ssr-query": "^1.167.3",
     "@tanstack/react-start": "^1.168.60",
     "@tanstack/react-table": "^9.2.4",
-    "drizzle-orm": "^0.45.3",
+    "drizzle-orm": "^0.45.4",
     "nodemailer": "^10.0.13",
     "openid-client": "^6.8.8",
     "pdf-lib": "^1.17.1",
